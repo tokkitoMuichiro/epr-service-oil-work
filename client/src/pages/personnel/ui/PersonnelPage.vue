@@ -59,21 +59,23 @@ const workers = [
 
 header h1 {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: 2rem;
-  color: var(--color-navy);
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--midnight);
 }
 
 header p {
   margin: 0.35rem 0 0;
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 .table-wrap {
   overflow: auto;
-  background: var(--color-surface-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
 }
 
 table {

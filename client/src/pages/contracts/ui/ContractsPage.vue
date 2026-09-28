@@ -211,15 +211,17 @@ async function removeObject(objectId: string) {
 
 .page__header h1 {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(1.8rem, 2.4vw, 2.3rem);
-  font-weight: 700;
-  color: var(--color-navy);
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--midnight);
 }
 
 .page__header p {
   margin: 0.25rem 0 0;
-  color: var(--color-text-muted);
+  color: var(--muted);
+  font-size: var(--font-size-base);
 }
 
 .page__actions {
@@ -246,14 +248,14 @@ async function removeObject(objectId: string) {
 
 .list__item {
   text-align: left;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-elevated);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: var(--radius);
   padding: 0.85rem 0.95rem;
   cursor: pointer;
   display: grid;
   gap: 0.25rem;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-card);
 }
 
 .list__item strong {
@@ -270,8 +272,9 @@ async function removeObject(objectId: string) {
 }
 
 .list__item--active {
-  border-color: var(--color-teal);
-  box-shadow: 0 0 0 2px rgb(0 201 157 / 22%);
+  border-color: var(--dodger);
+  background: var(--row-selected);
+  box-shadow: 0 0 0 2px rgb(0 136 255 / 18%);
 }
 
 .detail {

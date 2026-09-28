@@ -1,30 +1,72 @@
 :root {
-  --color-navy: #171044;
-  --color-navy-deep: #0f0a2e;
-  --color-slate: #242d3d;
-  --color-slate-soft: #3a465c;
-  --color-teal: #00c99d;
-  --color-teal-bright: #00ecb9;
-  --color-blue: #0082f3;
-  --color-surface: #f4f6f8;
-  --color-surface-elevated: #ffffff;
-  --color-border: #d8dee8;
-  --color-text: #1a2230;
-  --color-text-muted: #5c6b7f;
-  --color-danger: #c62828;
-  --color-warning: #c77700;
-  --color-success: #1b7f5a;
-  --color-early: #1b7f5a;
-  --color-delay: #c62828;
+  /* Tokens from equipment accounting module (-quipment-accounting) */
+  --midnight: #242d3d;
+  --midnight-soft: #2e3a4f;
+  --lavender: #ced9eb;
+  --white-smoke: #eef0f3;
+  --paper: #ffffff;
+  --dodger: #0088ff;
+  --dodger-deep: #00adee;
+  --sky: #00b2ff;
+  --steel: #0088cf;
+  --steel-muted: #a1adc3;
+  --ok: #2f6f4e;
+  --ok-bg: #e4f3ea;
+  --warn: #c4921a;
+  --warn-bg: #f8efd2;
+  --warn-text: #8a6510;
+  --bad: #9b2f2f;
+  --bad-bg: #f8e4e4;
+  --ink: #242d3d;
+  --muted: #5d6b80;
+  --line: #d5deea;
+  --table-head: #f6f8fb;
+  --row-hover: #f8fbff;
+  --row-selected: #eef6ff;
 
-  --font-sans: 'Montserrat', system-ui, sans-serif;
-  --font-display: 'Cormorant Infant', Georgia, serif;
+  /* Aliases used by existing ERP components */
+  --color-navy: var(--midnight);
+  --color-navy-deep: var(--midnight);
+  --color-slate: var(--midnight-soft);
+  --color-slate-soft: var(--steel-muted);
+  --color-teal: var(--dodger);
+  --color-teal-bright: var(--dodger-deep);
+  --color-blue: var(--dodger);
+  --color-surface: var(--white-smoke);
+  --color-surface-elevated: var(--paper);
+  --color-border: var(--line);
+  --color-text: var(--ink);
+  --color-text-muted: var(--muted);
+  --color-danger: var(--bad);
+  --color-warning: var(--warn);
+  --color-success: var(--ok);
+  --color-early: var(--ok);
+  --color-delay: var(--bad);
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --shadow-sm: 0 1px 2px rgb(23 16 68 / 6%);
-  --shell-sidebar: 248px;
+  --font-sans: Montserrat, sans-serif;
+  --font-display: Montserrat, sans-serif;
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-md: 13px;
+  --font-size-base: 14px;
+  --font-size-lg: 22px;
+  --font-size-xl: 28px;
+
+  --radius: 2px;
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --header-height: 64px;
+  --shell-sidebar: 280px;
+  --control-height: 44px;
+  --control-height-sm: 40px;
   --timeline-row: 44px;
+  --bp-mobile: 860px;
+
+  --shadow-card: 0 8px 24px rgb(36 45 61 / 5%);
+  --shadow-accent: 0 6px 14px rgb(0 136 255 / 35%);
+  --shadow-modal: 0 9px 18px rgb(0 136 255 / 12%);
+  --shadow-sm: var(--shadow-card);
+  --shadow: var(--shadow-modal);
 }
 
 *,
@@ -43,12 +85,11 @@ body,
 
 body {
   font-family: var(--font-sans);
-  color: var(--color-text);
-  background:
-    radial-gradient(1200px 600px at 0% 0%, rgb(0 201 157 / 8%), transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, rgb(23 16 68 / 10%), transparent 50%),
-    var(--color-surface);
+  font-size: var(--font-size-base);
+  color: var(--ink);
+  background: var(--white-smoke);
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button,
@@ -56,6 +97,7 @@ input,
 select,
 textarea {
   font: inherit;
+  font-family: inherit;
 }
 
 a {
@@ -64,6 +106,6 @@ a {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-teal);
+  outline: 2px solid var(--dodger);
   outline-offset: 2px;
 }

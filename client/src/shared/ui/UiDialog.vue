@@ -31,32 +31,33 @@ defineEmits<{
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 60;
   display: grid;
   place-items: center;
   padding: 1rem;
-  background: rgb(15 10 46 / 45%);
-  backdrop-filter: blur(2px);
+  background: rgb(36 45 61 / 45%);
 }
 
 .dialog {
   width: min(480px, 100%);
-  background: var(--color-surface-elevated);
-  border-radius: var(--radius-md);
-  box-shadow: 0 18px 48px rgb(23 16 68 / 25%);
+  background: var(--paper);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-modal);
 }
 
 .dialog__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.15rem;
-  border-bottom: 1px solid var(--color-border);
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
 }
 
 .dialog__head h2 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .dialog__close {
@@ -65,10 +66,10 @@ defineEmits<{
   font-size: 1.4rem;
   line-height: 1;
   cursor: pointer;
-  color: var(--color-text-muted);
+  color: var(--muted);
 }
 
 .dialog__body {
-  padding: 1.15rem;
+  padding: 18px;
 }
 </style>

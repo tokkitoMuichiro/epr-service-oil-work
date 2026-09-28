@@ -2,9 +2,9 @@
 defineProps<{
   modelValue: string
   label: string
-  type?: string
   required?: boolean
   placeholder?: string
+  rows?: number
 }>()
 
 defineEmits<{
@@ -15,13 +15,13 @@ defineEmits<{
 <template>
   <label class="field">
     <span class="field__label">{{ label }}{{ required ? ' *' : '' }}</span>
-    <input
+    <textarea
       class="field__input"
-      :type="type ?? 'text'"
       :value="modelValue"
       :required="required"
       :placeholder="placeholder"
-      @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
+      :rows="rows ?? 3"
+      @input="$emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
     />
   </label>
 </template>
@@ -46,6 +46,7 @@ defineEmits<{
   color: var(--ink);
   min-height: var(--control-height);
   width: 100%;
+  resize: vertical;
 }
 
 .field__input:focus {

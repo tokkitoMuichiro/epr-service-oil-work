@@ -26,39 +26,38 @@ function onChange(event: Event) {
 
 <style scoped>
 .role {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  display: grid;
+  gap: 8px;
 }
 
 .role__label {
-  font-size: 0.7rem;
+  font-size: var(--font-size-xs);
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgb(255 255 255 / 55%);
+  color: var(--steel-muted);
 }
 
 .role__select {
-  border: 1px solid rgb(255 255 255 / 18%);
-  background: rgb(255 255 255 / 8%);
-  color: #fff;
-  border-radius: var(--radius-sm);
-  padding: 0.4rem 0.55rem;
-  min-width: 8rem;
+  border: 1px solid var(--muted);
+  background: rgb(255 255 255 / 6%);
+  color: var(--paper);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  min-height: var(--control-height-sm);
+  width: 100%;
 }
 
 .role__select option {
-  color: var(--color-text);
+  color: var(--ink);
 }
 
 .role__hint {
-  font-size: 0.7rem;
-  color: rgb(255 255 255 / 45%);
+  font-size: var(--font-size-sm);
+  color: var(--lavender);
 }
 
 .role__hint[data-on='true'] {
-  color: var(--color-teal-bright);
+  color: var(--dodger-deep);
 }
 </style>

@@ -22,8 +22,8 @@ const demoSnils = '123-456-789 00'
         <RouterLink to="/contracts">
           <UiButton variant="primary">Открыть контракты</UiButton>
         </RouterLink>
-        <RouterLink to="/personnel">
-          <UiButton variant="secondary">Персонал (заглушка)</UiButton>
+        <RouterLink to="/reports">
+          <UiButton variant="ghost">Ежедневные отчёты</UiButton>
         </RouterLink>
       </div>
     </header>
@@ -34,7 +34,7 @@ const demoSnils = '123-456-789 00'
         <p>{{ currentRoleLabel }}</p>
         <p class="muted">
           Переключатель роли — в боковой панели. «Бригадир» — назначение в бригаде, не отдельная
-          роль входа. Реальная авторизация появится позже.
+          роль входа.
         </p>
       </article>
       <article>
@@ -45,8 +45,9 @@ const demoSnils = '123-456-789 00'
       <article>
         <h2>Модули</h2>
         <ul>
-          <li>Контракты — линейный график (MVP)</li>
-          <li>Персонал / отчёты / оборудование — следующие итерации</li>
+          <li>Контракты — линейный график</li>
+          <li>Ежедневные отчёты — миграция MVP</li>
+          <li>Персонал / оборудование — следующие итерации</li>
         </ul>
       </article>
     </div>
@@ -55,74 +56,82 @@ const demoSnils = '123-456-789 00'
 
 <style scoped>
 .page {
-  padding: 1.5rem;
   display: grid;
-  gap: 1.25rem;
+  gap: 18px;
 }
 
 .hero {
-  padding: 1.75rem 1.5rem;
-  border-radius: var(--radius-md);
-  background:
-    linear-gradient(135deg, rgb(23 16 68 / 92%), rgb(36 45 61 / 88%)),
-    radial-gradient(circle at 90% 20%, rgb(0 201 157 / 35%), transparent 40%);
-  color: #fff;
+  padding: 28px 24px;
+  background: var(--midnight);
+  color: var(--paper);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
 }
 
 .eyebrow {
   margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgb(255 255 255 / 65%);
-  font-weight: 600;
-}
-
-.hero h1 {
-  margin: 0.45rem 0 0;
-  font-family: var(--font-display);
-  font-size: clamp(2.2rem, 4vw, 3rem);
+  color: var(--steel-muted);
   font-weight: 700;
 }
 
+.hero h1 {
+  margin: 10px 0 0;
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .lead {
-  margin: 0.75rem 0 0;
-  max-width: 48ch;
-  color: rgb(255 255 255 / 78%);
+  margin: 12px 0 0;
+  max-width: 52ch;
+  color: var(--lavender);
   line-height: 1.5;
+  font-size: var(--font-size-base);
 }
 
 .cta {
-  margin-top: 1.25rem;
+  margin-top: 20px;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.55rem;
+  gap: 8px;
+}
+
+.cta :deep(.btn--ghost) {
+  color: var(--paper);
+  border-color: var(--muted);
 }
 
 .panels {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.85rem;
+  gap: 12px;
 }
 
 .panels article {
-  background: var(--color-surface-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 1rem 1.1rem;
-  box-shadow: var(--shadow-sm);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-card);
 }
 
 .panels h2 {
-  margin: 0 0 0.45rem;
-  font-size: 0.95rem;
+  margin: 0 0 8px;
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .panels p,
 .panels li {
   margin: 0;
-  color: var(--color-text-muted);
-  font-size: 0.88rem;
+  color: var(--muted);
+  font-size: var(--font-size-base);
   line-height: 1.45;
 }
 
@@ -130,14 +139,14 @@ const demoSnils = '123-456-789 00'
   margin: 0;
   padding-left: 1.1rem;
   display: grid;
-  gap: 0.3rem;
+  gap: 4px;
 }
 
 .muted {
-  margin-top: 0.45rem !important;
+  margin-top: 8px !important;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 860px) {
   .panels {
     grid-template-columns: 1fr;
   }

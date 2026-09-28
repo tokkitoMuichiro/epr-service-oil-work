@@ -10,8 +10,8 @@ import { RoleSwitcher } from '@/widgets/role-switcher'
       <div class="brand">
         <div class="brand__mark" aria-hidden="true">А</div>
         <div>
-          <div class="brand__name">{{ APP_NAME }}</div>
-          <div class="brand__tag">{{ APP_TAGLINE }}</div>
+          <div class="brand__title">{{ APP_NAME }}</div>
+          <p class="brand__tag">{{ APP_TAGLINE }}</p>
         </div>
       </div>
 
@@ -19,7 +19,7 @@ import { RoleSwitcher } from '@/widgets/role-switcher'
         <RouterLink class="nav__link" to="/">Обзор</RouterLink>
         <RouterLink class="nav__link" to="/contracts">Контракты</RouterLink>
         <RouterLink class="nav__link" to="/personnel">Персонал</RouterLink>
-        <span class="nav__link nav__link--disabled" title="Скоро">Отчёты</span>
+        <RouterLink class="nav__link" to="/reports">Отчёты</RouterLink>
         <span class="nav__link nav__link--disabled" title="Скоро">Оборудование</span>
       </nav>
 
@@ -45,70 +45,75 @@ import { RoleSwitcher } from '@/widgets/role-switcher'
 .shell__sidebar {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.25rem 1rem;
-  background:
-    linear-gradient(180deg, var(--color-navy) 0%, var(--color-navy-deep) 100%);
-  color: #fff;
+  gap: 22px;
+  padding: 22px 16px 20px;
+  background: var(--midnight);
+  color: var(--lavender);
 }
 
 .brand {
   display: flex;
-  gap: 0.75rem;
+  gap: 12px;
   align-items: center;
-  padding: 0.25rem 0.35rem;
+  padding: 4px 8px 8px;
 }
 
 .brand__mark {
-  width: 2.4rem;
-  height: 2.4rem;
-  border-radius: 0.65rem;
+  width: 36px;
+  height: 28px;
   display: grid;
   place-items: center;
-  font-family: var(--font-display);
-  font-size: 1.45rem;
-  font-weight: 700;
-  background: var(--color-teal);
-  color: var(--color-navy-deep);
+  font-size: var(--font-size-md);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: var(--dodger);
+  color: var(--paper);
+  border-radius: var(--radius);
 }
 
-.brand__name {
-  font-weight: 700;
-  font-size: 0.95rem;
-  letter-spacing: 0.02em;
+.brand__title {
+  margin: 0;
+  color: var(--paper);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .brand__tag {
-  margin-top: 0.15rem;
-  font-size: 0.65rem;
-  line-height: 1.3;
-  color: rgb(255 255 255 / 55%);
-  max-width: 14ch;
+  margin: 6px 0 0;
+  color: var(--steel-muted);
+  font-size: var(--font-size-sm);
+  max-width: 18ch;
+  line-height: 1.35;
 }
 
 .nav {
-  display: grid;
-  gap: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   flex: 1;
 }
 
 .nav__link {
-  padding: 0.7rem 0.85rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: rgb(255 255 255 / 78%);
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lavender);
   transition: background 0.15s ease, color 0.15s ease;
 }
 
 .nav__link:hover {
-  background: rgb(255 255 255 / 8%);
-  color: #fff;
+  background: var(--midnight-soft);
+  color: var(--paper);
 }
 
 .nav__link.router-link-active {
-  background: rgb(0 201 157 / 18%);
-  color: var(--color-teal-bright);
+  background: var(--midnight-soft);
+  color: var(--paper);
 }
 
 .nav__link--disabled {
@@ -117,34 +122,46 @@ import { RoleSwitcher } from '@/widgets/role-switcher'
 }
 
 .shell__footer {
-  padding-top: 0.75rem;
-  border-top: 1px solid rgb(255 255 255 / 12%);
+  margin-top: auto;
+  padding: 14px;
+  background: rgb(255 255 255 / 4%);
 }
 
 .shell__main {
   min-width: 0;
   min-height: 0;
   overflow: auto;
+  padding: 28px 32px 96px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 860px) {
   .shell {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
   }
 
   .shell__sidebar {
-    gap: 1rem;
+    gap: 14px;
+    padding: 16px 14px;
   }
 
   .nav {
-    display: flex;
+    flex-direction: row;
     flex-wrap: wrap;
-    gap: 0.25rem;
+  }
+
+  .nav__link {
+    font-size: var(--font-size-sm);
+    letter-spacing: 0.04em;
+    padding: 10px 12px;
   }
 
   .brand__tag {
     max-width: none;
+  }
+
+  .shell__main {
+    padding: 16px 14px 120px;
   }
 }
 </style>
