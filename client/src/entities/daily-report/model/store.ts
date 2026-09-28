@@ -70,6 +70,9 @@ export const useDailyReportsStore = defineStore('daily-reports', () => {
     saveError.value = ''
     viewingReport.value = null
     selectedDate.value = null
+    if (next === 'archive' && selectedObjectId.value) {
+      void loadArchiveDates(selectedObjectId.value)
+    }
   }
 
   function selectObject(id: string) {
