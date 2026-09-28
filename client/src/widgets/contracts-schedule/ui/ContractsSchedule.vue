@@ -481,7 +481,7 @@ function workTone(work: WorkItem) {
 }
 
 .track--object {
-  background: rgb(23 16 68 / 2%);
+  background: rgb(36 45 61 / 3%);
 }
 
 .track--notes {
@@ -494,7 +494,7 @@ function workTone(work: WorkItem) {
   top: 50%;
   transform: translateY(-50%);
   height: 14px;
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 
 .bar--plan {
