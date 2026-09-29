@@ -44,6 +44,58 @@ type ReportRecord = {
 
 const reports: ReportRecord[] = []
 
+const equipmentCatalog = {
+  warehouses: [
+    { id: 'wh-repair', name: 'Ремонт', slug: 'repair', isSystem: true },
+    { id: 'wh-north', name: 'База Север', slug: 'demo-north', isSystem: false },
+    { id: 'wh-south', name: 'База Юг', slug: 'demo-south', isSystem: false },
+  ],
+  people: [
+    { id: 'u-admin', fullName: 'Админ Тестов', roleSlug: 'admin' },
+    { id: 'u-master-ivanov', fullName: 'Мастер Иванов', roleSlug: 'master' },
+    { id: 'u-master-sidorov', fullName: 'Мастер Сидоров', roleSlug: 'master' },
+    { id: 'u-keeper', fullName: 'Кладовщик Складской', roleSlug: 'keeper' },
+  ],
+  items: [
+    {
+      id: 'eq-1',
+      name: 'Насос центробежный НЦ-80',
+      factoryNumber: 'NC-80-4412',
+      type: 'SERIAL',
+      condition: 'OK',
+      ownerType: 'USER',
+      ownerUserId: 'u-master-ivanov',
+    },
+    {
+      id: 'eq-3',
+      name: 'Рукав напорный',
+      quantity: 24,
+      type: 'CONSUMABLE',
+      condition: 'OK',
+      ownerType: 'WAREHOUSE',
+      ownerWarehouseId: 'wh-north',
+    },
+    {
+      id: 'eq-4',
+      name: 'Шлифмашина угловая',
+      factoryNumber: 'AG-125-77',
+      type: 'SERIAL',
+      condition: 'IN_REPAIR',
+      ownerType: 'WAREHOUSE',
+      ownerWarehouseId: 'wh-repair',
+    },
+  ],
+  transfers: [
+    {
+      id: 'tr-pending-1',
+      equipmentName: 'Генератор 5 кВт',
+      status: 'PENDING',
+      fromLabel: 'Мастер Сидоров',
+      toLabel: 'Мастер Иванов',
+    },
+  ],
+}
+
 app.get('/health', (_req, res) => {
   res.json({
     ok: true,
@@ -55,13 +107,16 @@ app.get('/health', (_req, res) => {
 app.get('/api', (_req, res) => {
   res.json({
     name: 'ERP АММИР API',
-    version: '0.2.0',
+    version: '0.3.0',
     endpoints: [
       '/health',
       '/api/reports/objects',
       '/api/reports',
       '/api/reports/:objectId/dates',
       '/api/reports/:objectId/:date',
+      '/api/equipment',
+      '/api/equipment/warehouses',
+      '/api/equipment/transfers',
     ],
     bitrix: 'mock',
   })
@@ -139,6 +194,23 @@ app.post('/api/reports', (req, res) => {
     object,
     mockMode: true,
   })
+})
+
+app.get('/api/equipment', (_req, res) => {
+  res.json({
+    items: equipmentCatalog.items,
+    people: equipmentCatalog.people,
+    mockMode: true,
+    note: 'Клиент ведёт полный demo-store в Pinia; этот stub — контракт API.',
+  })
+})
+
+app.get('/api/equipment/warehouses', (_req, res) => {
+  res.json({ items: equipmentCatalog.warehouses, mockMode: true })
+})
+
+app.get('/api/equipment/transfers', (_req, res) => {
+  res.json({ items: equipmentCatalog.transfers, mockMode: true })
 })
 
 app.listen(port, '0.0.0.0', () => {

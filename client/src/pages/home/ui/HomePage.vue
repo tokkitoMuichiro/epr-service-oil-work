@@ -22,6 +22,9 @@ const demoSnils = '123-456-789 00'
         <RouterLink to="/contracts">
           <UiButton variant="primary">Открыть контракты</UiButton>
         </RouterLink>
+        <RouterLink to="/equipment">
+          <UiButton variant="ghost">Оборудование</UiButton>
+        </RouterLink>
         <RouterLink to="/reports">
           <UiButton variant="ghost">Ежедневные отчёты</UiButton>
         </RouterLink>
@@ -33,8 +36,8 @@ const demoSnils = '123-456-789 00'
         <h2>Текущая роль</h2>
         <p>{{ currentRoleLabel }}</p>
         <p class="muted">
-          Переключатель роли — в боковой панели. «Бригадир» — назначение в бригаде, не отдельная
-          роль входа.
+          Переключатель роли — в боковой панели (на мобильном — в шапке). «Бригадир» — назначение в
+          бригаде, не отдельная роль входа.
         </p>
       </article>
       <article>
@@ -47,7 +50,8 @@ const demoSnils = '123-456-789 00'
         <ul>
           <li>Контракты — линейный график</li>
           <li>Ежедневные отчёты — миграция MVP</li>
-          <li>Персонал / оборудование — следующие итерации</li>
+          <li>Оборудование — список, базы, передачи</li>
+          <li>Персонал — заглушка</li>
         </ul>
       </article>
     </div>

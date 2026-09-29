@@ -197,7 +197,6 @@ async function removeObject(objectId: string) {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  padding: 1.25rem;
   min-height: 100%;
 }
 
@@ -282,7 +281,7 @@ async function removeObject(objectId: string) {
   min-height: 420px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 860px) {
   .layout {
     grid-template-columns: 1fr;
   }

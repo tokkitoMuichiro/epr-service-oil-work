@@ -52,7 +52,6 @@ const workers = [
 
 <style scoped>
 .page {
-  padding: 1.25rem;
   display: grid;
   gap: 1rem;
 }

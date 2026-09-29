@@ -319,14 +319,19 @@ function workTone(work: WorkItem) {
 
 .label-row {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 0.35rem;
   align-items: center;
-  padding: 0.35rem 0.5rem 0.35rem 0.35rem;
+  height: var(--timeline-row);
+  min-height: var(--timeline-row);
+  max-height: var(--timeline-row);
+  padding: 0 0.5rem 0 0.35rem;
+  overflow: hidden;
 }
 
 .label-row--object {
-  background: rgb(23 16 68 / 3%);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  background: rgb(36 45 61 / 3%);
 }
 
 .label-row--work {
@@ -336,8 +341,10 @@ function workTone(work: WorkItem) {
 }
 
 .label-row--notes {
-  min-height: auto;
-  padding: 0.45rem 0.75rem 0.55rem 1.75rem;
+  height: 3.2rem;
+  min-height: 3.2rem;
+  max-height: 3.2rem;
+  padding: 0.35rem 0.75rem 0.35rem 1.75rem;
   background: rgb(199 119 0 / 6%);
 }
 
@@ -394,11 +401,11 @@ function workTone(work: WorkItem) {
 }
 
 .label-row__actions {
-  grid-column: 1 / -1;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  padding-left: 1.75rem;
+  flex-wrap: nowrap;
+  gap: 0.45rem;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .label-row__actions button {
@@ -504,7 +511,8 @@ function workTone(work: WorkItem) {
 
 .bar--fact {
   height: 10px;
-  top: calc(50% + 8px);
+  top: calc(50% + 6px);
+  transform: translateY(-50%);
 }
 
 .bar--fact.var--delayed {
