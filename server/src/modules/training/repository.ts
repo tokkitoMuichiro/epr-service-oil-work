@@ -62,11 +62,9 @@ import {
   type PublicMaterial,
   type PublicResult,
   type PublicTestView,
-  type ReviewItem,
   type SkipReason,
   type SkippedWorker,
   type StorageCheck,
-  type SummaryRow,
   type TestAssignmentDraft,
   type TestAttempt,
   type TestContent,
@@ -79,7 +77,7 @@ import {
   type TrainingTest,
 } from '../../shared.js'
 import { isFileUnavailable, type StorageFolder, type TrainingStorage } from './bitrix.js'
-import { emptyTraining, trainingSeed, type AssignmentRecord, type TrainingState } from './seed.js'
+import { emptyTraining, type AssignmentRecord, type TrainingState } from './model.js'
 
 export interface TrainingWorker {
   id: string
@@ -231,10 +229,9 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
   const today = deps.today ?? (() => todayIso())
   const now = deps.now ?? Date.now
   const random = deps.random ?? Math.random
-  const snapshot = storage.snapshot<TrainingState>('training', { seed: trainingSeed, empty: emptyTraining })
+  const snapshot = storage.snapshot<TrainingState>('training', { empty: emptyTraining })
   const state = snapshot.state
   const secret = storage.snapshot<{ key: string }>('training-secret', {
-    seed: () => ({ key: randomBytes(32).toString('base64') }),
     empty: () => ({ key: randomBytes(32).toString('base64') }),
   })
   const key = Buffer.from(secret.state.key, 'base64')

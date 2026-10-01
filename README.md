@@ -1,69 +1,55 @@
 # ERP АММИР
 
-Внутренняя ERP-система компании **АММИР**: контракты и графики объектов, персонал и бригады, полевые отчёты, оборудование.
+Внутренняя ERP-система компании **АММИР**: контракты и графики объектов, персонал и бригады, обучение и проверки знаний, полевые отчёты, оборудование.
 
-Стек: **Vite + Vue 3 + TypeScript + Pinia + Vue Router** (клиент, Feature-Sliced Design) + **Express 5 + TypeScript** (API). UI на русском. Хостинг — VDS.
-
-Визуальный стиль — из модуля учёта оборудования ([`-quipment-accounting`](https://github.com/tokkitoMuichiro/-quipment-accounting)): Montserrat, midnight `#242d3d` / dodger `#0088ff`, radius 2px.
+Стек: **Vite + Vue 3 + TypeScript + Pinia** (клиент, Feature-Sliced Design) и **Express 5 + TypeScript** (API), хранилище — SQLite (`node:sqlite`, Node.js 22.13+).
 
 ## Структура
 
 ```
-client/   # Vite Vue SPA (FSD: app, pages, widgets, features, entities, shared)
-server/   # Express API: модули contracts, reports, equipment, personnel (+ brigades, assignments)
-shared/   # Общие типы и чистая доменная логика (права, валидация, даты); @shared/* в клиенте
-scripts/  # dev-all.mjs — запуск API и клиента одной командой
-deploy/   # systemd unit и пример nginx
-docs/     # контекст проекта, передача агенту, деплой
+client/   # SPA (FSD: app, pages, widgets, features, entities, shared)
+server/   # Express API, модули в server/src/modules/<module>
+shared/   # общие типы и доменная логика (права, валидация, статусы)
+scripts/  # dev-all.mjs — API и клиент одной командой
+deploy/   # systemd unit и пример конфигурации nginx
 ```
 
-## Запуск локально
+## Разработка
 
 ```bash
 npm install
 npm run dev:all      # API http://127.0.0.1:4568 + клиент http://127.0.0.1:4567
+npm run check        # проверка типов + тесты
+npm run build        # client/dist + server/dist
 ```
 
-По отдельности: `npm run dev:server`, `npm run dev:client`. Клиент проксирует `/api` и `/health` на `127.0.0.1:4568` (переопределяется `API_PROXY_TARGET`).
+## Запуск в продакшене
 
 ```bash
-npm run check        # vue-tsc + tsc + тесты (node:test через tsx)
-npm run build        # client/dist + server/dist
-CLIENT_DIST=client/dist npm start   # один процесс: API + SPA
+npm ci && npm run build
+NODE_ENV=production CLIENT_DIST=client/dist npm start
 ```
 
-Деплой на VDS — [docs/deploy.md](docs/deploy.md).
+| Переменная | Назначение |
+|------------|------------|
+| `PORT`, `HOST` | Адрес API (по умолчанию `0.0.0.0:4568`) |
+| `DB_PATH` | Файл базы (по умолчанию `data/erp.sqlite`) |
+| `ADMIN_LOGIN`, `ADMIN_PASSWORD` | Первый администратор, создаётся при старте, если логина ещё нет |
+| `PUBLIC_URL` | Внешний адрес для ссылок на проверку знаний |
+| `COOKIE_SECURE=1`, `TRUST_PROXY=1` | Работа за HTTPS-прокси (nginx) |
+| `CORS_ORIGIN` | Только если клиент раздаётся с другого домена |
+| `BITRIX_MODE`, `BITRIX_WEBHOOK_URL`, `BITRIX_TRAINING_FOLDER_ID` | Интеграция с Диском Битрикс24 (`mock` по умолчанию) |
 
 ## Роли
 
-Демо-переключатель в оболочке (сохраняется в `localStorage`), роль передаётся заголовком `x-erp-role`, права проверяются на сервере.
+Права проверяются на сервере по сессии пользователя; матрицу доступа настраивает администратор.
 
 | Роль | Доступ |
 |------|--------|
-| Админ | Всё; **ПДн (СНИЛС, паспорт, дата рождения) — только эта роль** |
-| Мастер | Свои позиции оборудования, планирование бригад, отчёты |
-| Кладовщик | Оборудование своих баз по матрице прав модуля учёта |
+| Администратор | Всё; персональные данные (СНИЛС, паспорт, дата рождения) — только эта роль |
 | Офис | Просмотр, персонал, планирование бригад |
+| Мастер | Свои позиции оборудования, бригады, отчёты |
+| Кладовщик | Оборудование своих баз |
+| Инженер ОТ | Обучение и проверки знаний |
 
 «Бригадир» — назначение внутри бригады, не системная роль.
-
-## Модули
-
-- **Контракты** — CRUD договоров и объектов, линейный график план/факт, журнал правки сроков, полосы назначений бригад и кнопка «Бригада».
-- **Персонал** — сотрудники, документы об обучении со сроками (истекает / просрочен), статусы работает / запланирован / свободен, бригады (один человек — одна бригада), мок-папка Bitrix Disk «учет персонала».
-- **Ежедневные отчёты** — объекты из контрактов, мастер отчёта, архив, путь на мок-диске, подстановка состава бригад на дату.
-- **Оборудование** — список, базы (включая «Ремонт»), передачи с подтверждением, история операций, документы, экспорт в Excel и мок-выгрузка в Битрикс, матрица прав.
-
-Данные хранятся в памяти сервера (демо-сиды, сброс при перезапуске). Интеграция с Битрикс — мок.
-
-## API (кратко)
-
-| Путь | Назначение |
-|------|------------|
-| `GET /health` | Проверка живости |
-| `/api/contracts` | Договоры, `/:id/objects` — объекты |
-| `/api/reports` | `/objects?q`, `/:objectId/dates`, `/:objectId/:date`, `POST /` |
-| `/api/equipment` | `/state`, `/transfers`, `/:id/condition|accept|cancel|history|documents`, `/export.xls`, `/export/bitrix` |
-| `/api/personnel` | Сотрудники, `/:id/documents` |
-| `/api/brigades` | Бригады |
-| `/api/assignments` | Назначения бригад на объекты, `/crew?objectId&date` |

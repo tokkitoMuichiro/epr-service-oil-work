@@ -17,7 +17,7 @@ onMounted(() => {
 })
 
 watch(
-  () => roleStore.currentRole,
+  () => roleStore.user?.id,
   () => {
     store.lastBitrixExport = null
     void store.load()
@@ -32,9 +32,6 @@ watch(
         <p class="ui-overline shell__eyebrow">Учёт оборудования</p>
         <h1>{{ title }}</h1>
         <p v-if="route.meta.description" class="shell__text">{{ route.meta.description }}</p>
-        <p v-if="store.isReady" class="shell__persona">
-          Вы работаете как <strong>{{ store.persona.fullName }}</strong>
-        </p>
       </div>
       <div v-if="store.isReady && canExport(store.auth)" class="shell__actions">
         <UiButton variant="ghost" size="sm" :disabled="store.busy" @click="store.exportExcel()">Excel</UiButton>
@@ -44,7 +41,7 @@ watch(
 
     <p v-if="store.lastBitrixExport" class="notice" role="status">
       <span>
-        Выгружено в Битрикс (мок): {{ store.lastBitrixExport.rows }} поз. →
+        Выгрузка подготовлена ({{ store.lastBitrixExport.rows }} поз.), интеграция с Битрикс пока не подключена →
         <code>{{ store.lastBitrixExport.storagePath }}</code>
       </span>
       <button type="button" class="ui-icon-button" aria-label="Скрыть" @click="store.lastBitrixExport = null"><IconClose :size="18" /></button>
@@ -90,16 +87,11 @@ watch(
   color: var(--text-primary);
 }
 
-.shell__text,
-.shell__persona {
+.shell__text {
   margin: var(--space-2) 0 0;
   max-width: 70ch;
   color: var(--text-secondary);
   line-height: var(--line-height-base);
-}
-
-.shell__persona {
-  font-size: var(--font-size-sm);
 }
 
 .shell__actions {

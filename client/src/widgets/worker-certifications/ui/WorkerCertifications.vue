@@ -14,6 +14,7 @@ import {
   type AssignmentKind,
   type AssignmentView,
   type CertificationRecord,
+  type ProgramStatus,
   type TestAttempt,
   type WorkerCertifications,
 } from '@/entities/training'
@@ -23,7 +24,7 @@ import { copyText } from '@/shared/lib/clipboard'
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/date'
 import { UiButton, UiDialog } from '@/shared/ui'
 
-const props = defineProps<{ workerId: string; view: 'training' | 'testing'; isFired?: boolean }>()
+const props = defineProps<{ workerId: string; isFired?: boolean }>()
 
 const access = useAccessStore()
 const store = useTrainingStore()
@@ -76,6 +77,17 @@ const activeAssignments = computed(() =>
 )
 
 const history = computed(() => [...(data.value?.records ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
+
+function lastResultText(status: ProgramStatus) {
+  const record = status.lastRecord
+  if (!record) return 'Тест ещё не проходил'
+  return `Тест ${formatDateRu(record.passedAt)}: ${record.isPassed ? 'сдан' : 'не сдан'}, ${record.percent} %`
+}
+
+function validityText(status: ProgramStatus) {
+  if (status.result === 'expired' && status.validRecord?.nextDueAt) return `истёк ${formatDateRu(status.validRecord.nextDueAt)}`
+  return status.nextDueAt ? `действует до ${formatDateRu(status.nextDueAt)}` : ''
+}
 
 function flash(text: string) {
   notice.value = text
@@ -151,10 +163,10 @@ function onAssigned() {
 <template>
   <section v-if="isVisible" class="certs">
     <h3 class="certs__title">
-      {{ view === 'training' ? 'Обучение' : 'Тестирование' }}
+      Допуски по результатам тестирования
       <span class="certs__actions">
-        <UiButton v-if="canAssign" variant="ghost" size="sm" @click="assign = { kind: 'regular' }">Назначить проверку</UiButton>
-        <UiButton v-if="canAssign" variant="ghost" size="sm" @click="assign = { kind: 'extraordinary' }">Назначить внеочередную</UiButton>
+        <UiButton v-if="canAssign" variant="secondary" size="sm" @click="assign = { kind: 'regular' }">Назначить тестирование</UiButton>
+        <UiButton v-if="canAssign" variant="ghost" size="sm" @click="assign = { kind: 'extraordinary' }">Внеочередное</UiButton>
       </span>
     </h3>
 
@@ -167,18 +179,21 @@ function onAssigned() {
       <p v-if="notice" class="certs__notice" role="status">{{ notice }}</p>
       <p v-if="actionError" class="ui-form__hint" role="alert">{{ actionError }}</p>
 
-      <template v-if="view === 'training'">
-      <p v-if="!groups.length" class="certs__muted">Обучения сотруднику ещё не назначались.</p>
+      <p v-if="!groups.length" class="certs__muted">
+        Тестирование сотруднику ещё не назначалось.<template v-if="canAssign"> Назначьте его кнопкой выше.</template>
+      </p>
       <div v-for="g in groups" :key="g.direction.id" class="certs__group">
         <p class="certs__direction">{{ g.direction.name }}</p>
         <ul class="certs__list">
-          <li v-for="s in g.items" :key="s.programId" class="cert" :data-state="s.state">
+          <li v-for="s in g.items" :key="s.programId" class="cert" :data-state="s.result ?? s.state">
             <span class="cert__name">
               <strong>{{ store.labelOf(s.programId) }}</strong>
+              <small>
+                {{ lastResultText(s) }}<template v-if="validityText(s)"> · {{ validityText(s) }}</template>
+              </small>
               <small v-if="s.validRecord?.electrical">{{ describeElectricalScope(s.validRecord.electrical) }}</small>
             </span>
-            <span class="cert__date">{{ s.nextDueAt ? `до ${formatDateRu(s.nextDueAt)}` : '—' }}</span>
-            <ProgramStateBadge :state="s.state" />
+            <ProgramStateBadge :state="s.result ?? s.state" />
             <UiButton
               v-if="canAssign && !s.activeAssignment"
               variant="ghost"
@@ -190,12 +205,7 @@ function onAssigned() {
           </li>
         </ul>
       </div>
-      </template>
 
-      <template v-else>
-      <p v-if="!activeAssignments.length && !history.length" class="certs__muted">
-        Тестирования сотруднику ещё не назначались.
-      </p>
       <template v-if="activeAssignments.length">
         <p class="certs__direction">Активные назначения</p>
         <ul class="certs__list">
@@ -218,7 +228,7 @@ function onAssigned() {
       </template>
 
       <template v-if="history.length">
-        <p class="certs__direction">Результаты</p>
+        <p class="certs__direction">История тестов</p>
         <ul class="certs__list">
           <li v-for="r in history" :key="r.id" class="cert cert--history" :class="{ 'is-annulled': r.isAnnulled }">
             <span class="cert__name">
@@ -235,7 +245,6 @@ function onAssigned() {
             </span>
           </li>
         </ul>
-      </template>
       </template>
     </template>
 
@@ -398,11 +407,6 @@ function onAssigned() {
 .cert__name small {
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
-}
-
-.cert__date {
-  color: var(--text-secondary);
-  white-space: nowrap;
 }
 
 .cert__buttons {

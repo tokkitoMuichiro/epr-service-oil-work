@@ -51,7 +51,7 @@ export interface ContractObject {
   actualEnd?: string
   works: WorkItem[]
   deadlineEdits: DeadlineEdit[]
-  /** Qualifications every brigade member needs on this object (on top of position requirements). */
+  /** Qualifications every brigade member needs on this object. */
   requiredQualificationIds?: string[]
   archived?: boolean
 }

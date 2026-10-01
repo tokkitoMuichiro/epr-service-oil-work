@@ -22,6 +22,7 @@ import {
   validateProgramDraft,
   validateTestAssignmentDraft,
   validateTestDraft,
+  testingMark,
   worstProgramState,
   type CertificationRecord,
   type TestAssignment,
@@ -309,6 +310,18 @@ describe('programState', () => {
     assert.equal(worstProgramState([null, 'valid', 'assigned', 'expiring']), 'expiring')
     assert.equal(worstProgramState(['failed', 'expired']), 'failed')
     assert.equal(worstProgramState([]), null)
+  })
+
+  it('marks the worker as tested only when every assigned programme has a valid result', () => {
+    assert.equal(testingMark([]), 'none')
+    assert.equal(testingMark([{ result: 'valid' }, { result: 'valid' }]), 'passed')
+    assert.equal(testingMark([{ result: 'valid' }, { result: 'expiring' }]), 'expiring')
+    assert.equal(testingMark([{ result: 'valid' }, { result: null }]), 'none')
+    assert.equal(testingMark([{ result: 'expired' }]), 'none')
+    assert.equal(testingMark([{ result: 'failed' }, { result: 'expiring' }]), 'none')
+    const recheck = programState(fire, [record({ passedAt: '2026-04-15', nextDueAt: '2027-04-15' })], [assignment()], TODAY)
+    assert.equal(recheck?.state, 'assigned')
+    assert.equal(testingMark([recheck!]), 'passed')
   })
 
   it('counts states and workers without trainings', () => {

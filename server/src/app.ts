@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import cors from 'cors'
 import express from 'express'
-import { createAuditLog, createStorage, openDatabase, type Database } from './db.js'
+import { createAuditLog, createStorage, openDatabase, type Database, type DatabaseSeed } from './db.js'
 import { errorHandler, notFound } from './http.js'
 import { accessRouter } from './modules/access/router.js'
 import { createAccessStore } from './modules/access/store.js'
@@ -31,8 +31,8 @@ export interface AppOptions {
   today?: () => string
   /** Defaults to an in-memory database (tests). */
   db?: Database
-  /** Fill a brand-new database with demo data. */
-  seedDemo?: boolean
+  /** Initial content for a brand-new database (local demo dataset). */
+  seed?: DatabaseSeed
   /** Dev only: demo users per role and password-less switching between them. */
   devLogin?: boolean
   /** Bootstrap administrator; created once if the login does not exist yet. */
@@ -48,17 +48,20 @@ export interface AppOptions {
 
 export function createApp(options: AppOptions = {}) {
   const db = options.db ?? openDatabase()
-  const storage = createStorage(db, { seedDemo: options.seedDemo })
+  const storage = createStorage(db, { seed: options.seed })
   const audit = createAuditLog(db)
   const users = createUserRepository(db)
   const access = createAccessStore(storage)
   const contracts = createContractsRepository(storage)
   const reports = createReportsRepository(contracts, storage)
-  const equipment = createEquipmentService(storage, (role) => access.equipmentPermissionsOf(role))
+  const equipment = createEquipmentService(storage, {
+    users: () => users.list(),
+    permissionsOf: (role) => access.equipmentPermissionsOf(role),
+  })
   let training: TrainingRepository | null = null
   const personnel = createPersonnelRepository(contracts, storage, {
     today: options.today,
-    equipmentOf: (fullName) => equipment.itemsOwnedBy(fullName),
+    equipmentOf: (worker) => equipment.itemsOwnedBy(worker),
     audit,
     onFired: (workerId) => training?.cancelForWorker(workerId, 'Сотрудник уволен') ?? 0,
   })
@@ -74,7 +77,14 @@ export function createApp(options: AppOptions = {}) {
   if (options.devLogin) users.ensureDemoUsers()
 
   const app = express()
+  app.disable('x-powered-by')
   if (options.trustProxy) app.set('trust proxy', 1)
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN')
+    res.setHeader('Referrer-Policy', 'same-origin')
+    next()
+  })
   if (options.corsOrigins?.length) app.use(cors({ origin: options.corsOrigins, credentials: true }))
   app.use(express.json({ limit: '1mb' }))
 
@@ -132,7 +142,16 @@ export function createApp(options: AppOptions = {}) {
 
   const clientDist = options.clientDist ? path.resolve(options.clientDist) : null
   if (clientDist && existsSync(clientDist)) {
-    app.use(express.static(clientDist, { index: false, maxAge: '1h' }))
+    app.use(
+      express.static(clientDist, {
+        index: false,
+        maxAge: '1h',
+        setHeaders: (res, file) => {
+          if (/(?:^|[\\/])assets[\\/]/.test(file)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+          else if (/(?:sw\.js|registerSW\.js|manifest\.webmanifest)$/.test(file)) res.setHeader('Cache-Control', 'no-cache')
+        },
+      }),
+    )
     app.get(/^(?!\/api\/|\/health$).*/, (_req, res) => {
       res.setHeader('Cache-Control', 'no-cache')
       res.sendFile(path.join(clientDist, 'index.html'))

@@ -12,24 +12,24 @@ import {
   type BitrixExportResult,
   type BulkTransferDraft,
   type BulkTransferResult,
-  type DemoPerson,
   type EquipmentCondition,
   type EquipmentDraft,
   type EquipmentItem,
   type EquipmentPatch,
   type EquipmentPermission,
+  type EquipmentPerson,
   type Transfer,
   type TransferDraft,
   type Warehouse,
   type WarehouseDraft,
 } from './types'
 
-const NOBODY: DemoPerson = { id: '', fullName: '—', roleSlug: 'office', warehouseIds: [] }
+const NOBODY: EquipmentPerson = { id: '', fullName: '—', role: 'office', warehouseIds: [] }
 
 export const useEquipmentStore = defineStore('equipment', () => {
-  const persona = ref<DemoPerson>(NOBODY)
+  const persona = ref<EquipmentPerson>(NOBODY)
   const permissions = ref<EquipmentPermission[]>([])
-  const people = ref<DemoPerson[]>([])
+  const people = ref<EquipmentPerson[]>([])
   const warehouses = ref<Warehouse[]>([])
   const items = ref<EquipmentItem[]>([])
   const transfers = ref<Transfer[]>([])

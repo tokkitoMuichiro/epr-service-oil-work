@@ -6,7 +6,6 @@ import { ROLE_SUMMARY } from '../model/roles'
 import AccessMatrix from './AccessMatrix.vue'
 import BitrixCheck from './BitrixCheck.vue'
 import EquipmentPeople from './EquipmentPeople.vue'
-import RequirementsMatrix from './RequirementsMatrix.vue'
 import UsersPanel from './UsersPanel.vue'
 
 const access = useAccessStore()
@@ -20,7 +19,7 @@ const isEditable = computed(() => access.can('settings_manage'))
     <header class="page__header">
       <div>
         <h1>Настройки</h1>
-        <p>Пользователи, роли и права по всей системе, требования к допускам по должностям.</p>
+        <p>Пользователи, роли и права по всей системе.</p>
       </div>
     </header>
 
@@ -70,15 +69,6 @@ const isEditable = computed(() => access.can('settings_manage'))
       </section>
 
       <section v-if="isEditable" class="panel">
-        <h2 class="panel__title">Допуски по должностям</h2>
-        <p class="panel__text">
-          Какие допуски обязательны для каждой должности. По матрице считается статус допусков сотрудника; при
-          назначении бригады к ним добавляются требования объекта.
-        </p>
-        <RequirementsMatrix />
-      </section>
-
-      <section v-if="isEditable" class="panel">
         <h2 class="panel__title">Хранилище материалов обучения</h2>
         <p class="panel__text">
           Материалы и картинки тестов хранятся на Диске Битрикс24. Режим и папка задаются переменными окружения
@@ -89,7 +79,7 @@ const isEditable = computed(() => access.can('settings_manage'))
 
       <section v-if="access.canView('equipment')" class="panel">
         <h2 class="panel__title">Сотрудники модуля оборудования</h2>
-        <p class="panel__text">Демо-персоны: роль, закреплённые базы и число позиций за каждым.</p>
+        <p class="panel__text">Активные пользователи: роль, закреплённые базы и число позиций за каждым.</p>
         <EquipmentPeople />
       </section>
     </template>

@@ -53,6 +53,12 @@ export function verifyPassword(password: string, stored: string): boolean {
   return timingSafeEqual(actual, expected)
 }
 
+/** Dev-only user of a role; the id is stable so local demo data can reference it. */
+export function demoUserOf(role: RoleId): { id: string; login: string; fullName: string } {
+  const label = ROLES.find((r) => r.id === role)?.label ?? role
+  return { id: `u-demo-${role}`, login: `demo.${role}`, fullName: `Демо: ${label}` }
+}
+
 function tokenId(token: string): string {
   return createHash('sha256').update(token).digest('base64url')
 }
@@ -103,9 +109,8 @@ export function createUserRepository(db: Database, now: () => number = Date.now)
     if (taken && taken.id !== exceptId) conflict('Пользователь с таким логином уже есть')
   }
 
-  function insert(draft: UserDraft & { password: string }): User {
+  function insert(draft: UserDraft & { password: string }, id = uid('u')): User {
     assertLoginFree(draft.login, null)
-    const id = uid('u')
     statements.insert.run(
       id,
       draft.login,
@@ -120,12 +125,12 @@ export function createUserRepository(db: Database, now: () => number = Date.now)
   }
 
   /** Creates the user unless the login already exists; the password of an existing user is never reset. */
-  function ensure(draft: UserDraft & { password: string }): User {
+  function ensure(draft: UserDraft & { password: string }, id?: string): User {
     const existing = statements.byLogin.get(normalizeLogin(draft.login)) as UserRow | undefined
     if (existing) return toUser(existing)
     const error = validateUserDraft(draft, true)
     if (error) throw new Error(`${draft.login}: ${error}`)
-    return insert({ ...draft, login: normalizeLogin(draft.login) })
+    return insert({ ...draft, login: normalizeLogin(draft.login) }, id)
   }
 
   return {
@@ -173,23 +178,22 @@ export function createUserRepository(db: Database, now: () => number = Date.now)
       return toUser(found)
     },
 
-    ensure,
+    ensure(draft: UserDraft & { password: string }): User {
+      return ensure(draft)
+    },
 
     ensureDemoUsers(): User[] {
-      return ROLES.map((role) =>
-        ensure({
-          login: `demo.${role.id}`,
-          fullName: `Демо: ${role.label}`,
-          role: role.id,
-          workerId: null,
-          active: true,
-          password: randomBytes(24).toString('base64url'),
-        }),
-      )
+      return ROLES.map((role) => {
+        const { id, login, fullName } = demoUserOf(role.id)
+        return ensure(
+          { login, fullName, role: role.id, workerId: null, active: true, password: randomBytes(24).toString('base64url') },
+          id,
+        )
+      })
     },
 
     demoUser(role: RoleId): User | null {
-      const found = statements.byLogin.get(`demo.${role}`) as UserRow | undefined
+      const found = statements.byLogin.get(demoUserOf(role).login) as UserRow | undefined
       return found && found.active === 1 ? toUser(found) : null
     },
 

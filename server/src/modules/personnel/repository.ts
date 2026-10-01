@@ -14,7 +14,6 @@ import {
   isOutsidePlan,
   isQualificationTypeId,
   membershipConflicts,
-  normalizeRequirements,
   objectConflict,
   permissionLabel,
   rangeContains,
@@ -23,7 +22,6 @@ import {
   validateBrigadeDraft,
   validateDocumentMeta,
   validateQualificationFields,
-  validateRequirements,
   validateWorkerDraft,
   withoutWorker,
   workerHasHistory,
@@ -36,7 +34,6 @@ import {
   type CrewMember,
   type DocumentMeta,
   type ObjectCrew,
-  type PositionRequirement,
   type RoleId,
   type User,
   type Worker,
@@ -45,7 +42,7 @@ import {
   type WorkerPii,
 } from '../../shared.js'
 import type { ContractsRepository } from '../contracts/repository.js'
-import { DEFAULT_REQUIREMENTS, personnelSeed, type PersonnelSeed, type WorkerRecord } from './seed.js'
+import { PERSONNEL_KEY, WORKER_DOCUMENTS_BUCKET, emptyPersonnel, type PersonnelState, type WorkerRecord } from './model.js'
 
 const EMPTY_PII: WorkerPii = { snils: '', birthDate: '', passport: '' }
 
@@ -55,8 +52,8 @@ const OVERRIDE_COMMENT_MIN = 10
 
 export interface PersonnelDeps {
   today?: () => string
-  /** Equipment registered to a person with this full name, for the dismissal warning. */
-  equipmentOf?: (fullName: string) => string[]
+  /** Equipment registered to the worker's user account, for the dismissal warning. */
+  equipmentOf?: (worker: Pick<WorkerRecord, 'id' | 'fullName'>) => string[]
   audit?: AuditLog
   /** Cancels active knowledge checks of a dismissed worker; returns how many were cancelled. */
   onFired?: (workerId: string) => number
@@ -70,16 +67,6 @@ export interface AssignmentActor {
 export interface WithWarnings<T> {
   item: T
   warnings: string[]
-}
-
-function placeholderFile(worker: WorkerRecord, doc: WorkerDocument): StoredFile {
-  const lines = [
-    `Демо-документ ERP АММИР`,
-    `Сотрудник: ${worker.fullName}`,
-    `Документ: ${doc.title}`,
-    ...(doc.expiresAt ? [`Действует до: ${formatIsoDate(doc.expiresAt)}`] : []),
-  ]
-  return { data: Buffer.from(`\uFEFF${lines.join('\r\n')}\r\n`, 'utf8'), mimeType: doc.mimeType }
 }
 
 function parsePii(value: unknown): WorkerPii | undefined {
@@ -122,15 +109,15 @@ function parseDocumentMeta(body: Partial<DocumentMeta>): DocumentMeta {
   return meta
 }
 
-function emptyPersonnel(): PersonnelSeed {
-  return { workers: [], brigades: [], assignments: [], requirements: structuredClone(DEFAULT_REQUIREMENTS) }
-}
-
 export function createPersonnelRepository(contracts: ContractsRepository, storage: Storage, deps: PersonnelDeps = {}) {
   const today = deps.today ?? (() => todayIso())
-  const snapshot = storage.snapshot<PersonnelSeed>('personnel', { seed: personnelSeed, empty: emptyPersonnel })
+  const snapshot = storage.snapshot<PersonnelState>(PERSONNEL_KEY, { empty: emptyPersonnel })
   const state = snapshot.state
-  const files = storage.files('worker-documents')
+  if ('requirements' in state) {
+    delete (state as { requirements?: unknown }).requirements
+    snapshot.save(state)
+  }
+  const files = storage.files(WORKER_DOCUMENTS_BUCKET)
   const photos = storage.files('worker-photos')
 
   function findWorker(id: string): WorkerRecord {
@@ -224,13 +211,7 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
           `Период назначения выходит за плановые сроки объекта (${formatIsoDate(object.plannedStart)} — ${formatIsoDate(object.plannedEnd)})`,
         ]
       : []
-    const issues = assignmentCompliance(
-      brigade,
-      state.workers,
-      state.requirements,
-      object.requiredQualificationIds ?? [],
-      draft,
-    )
+    const issues = assignmentCompliance(brigade, state.workers, object.requiredQualificationIds ?? [], draft)
     if (!issues.length) return { item: draft, warnings }
 
     const comment = trimmed(body.overrideComment)
@@ -333,7 +314,7 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
         const left = state.brigades.filter((b) => b.memberIds.includes(id))
         state.brigades = state.brigades.map((b) => withoutWorker(b, id))
         if (left.length) warnings.push(`Выведен из состава: ${left.map((b) => b.name).join(', ')}`)
-        const items = deps.equipmentOf?.(record.fullName) ?? []
+        const items = deps.equipmentOf?.(record) ?? []
         if (items.length) warnings.push(`За сотрудником числится оборудование: ${items.join('; ')}`)
         const cancelled = deps.onFired?.(id) ?? 0
         if (cancelled) warnings.push(`Отозваны назначенные проверки знаний: ${cancelled}`)
@@ -369,7 +350,7 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
     documentFile(workerId: string, docId: string): { doc: WorkerDocument; file: StoredFile } {
       const record = findWorker(workerId)
       const doc = record.documents.find((d) => d.id === docId) ?? notFound('Документ не найден')
-      return { doc: structuredClone(doc), file: files.get(docId) ?? placeholderFile(record, doc) }
+      return { doc: structuredClone(doc), file: files.get(docId) ?? notFound('Файл документа не найден') }
     },
 
     setPhoto(role: RoleId, id: string, file: StoredFile): Worker {
@@ -392,17 +373,6 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
     photo(id: string): StoredFile {
       findWorker(id)
       return photos.get(id) ?? notFound('Фото не загружено')
-    },
-
-    requirements(): PositionRequirement[] {
-      return structuredClone(state.requirements)
-    },
-
-    setRequirements(value: unknown): PositionRequirement[] {
-      const error = validateRequirements(value)
-      if (error) badRequest(error)
-      state.requirements = normalizeRequirements(value as PositionRequirement[])
-      return structuredClone(state.requirements)
     },
 
     listBrigades(): Brigade[] {
@@ -522,7 +492,6 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
       'removeDocument',
       'setPhoto',
       'removePhoto',
-      'setRequirements',
       'createBrigade',
       'updateBrigade',
       'removeBrigade',

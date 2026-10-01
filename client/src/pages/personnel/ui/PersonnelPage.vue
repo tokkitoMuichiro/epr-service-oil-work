@@ -4,7 +4,6 @@ import { storeToRefs } from 'pinia'
 import { BrigadeStatusBadge, useBrigadesStore } from '@/entities/brigade'
 import { useContractsStore } from '@/entities/contract'
 import {
-  ComplianceBadge,
   EMPLOYMENT_STATUS_LABEL,
   TRAINING_EXPIRING_DAYS,
   WorkerStatusBadge,
@@ -14,7 +13,7 @@ import {
   type WorkerSortKey,
 } from '@/entities/personnel'
 import { useAccessStore, useRoleStore } from '@/entities/role'
-import { ProgramStateBadge, useTrainingStore } from '@/entities/training'
+import { TestingMarkIcon, testingMark, useTrainingStore, type TestingMark } from '@/entities/training'
 import { WorkerFormDialog } from '@/features/worker-form'
 import { IconClose, IconSearch, UiButton, UiState } from '@/shared/ui'
 import { BrigadeProfileDialog, NEW_BRIGADE } from '@/widgets/brigade-profile'
@@ -39,27 +38,22 @@ const { currentRole, piiVisible } = storeToRefs(roleStore)
 const access = useAccessStore()
 const training = useTrainingStore()
 const showTraining = computed(() => access.canView('training'))
-const PROFILE_TRAINING_TABS = [
-  { id: 'training', label: 'Обучение' },
-  { id: 'testing', label: 'Тестирование' },
-] as const
-const profileTabs = computed(() => (showTraining.value ? [...PROFILE_TRAINING_TABS] : []))
-const trainingByWorker = computed(
-  () => new Map((training.summary?.rows ?? []).map((row) => [row.workerId, row.worst])),
+const profileTabs = computed(() => (showTraining.value ? [{ id: 'quals', label: 'Допуски' }] : []))
+const testingByWorker = computed(
+  () => new Map((training.summary?.rows ?? []).map((row) => [row.workerId, testingMark(row.statuses)])),
 )
 
-function trainingOf(workerId: string) {
-  return trainingByWorker.value.get(workerId) ?? null
+function testingOf(workerId: string): TestingMark {
+  return testingByWorker.value.get(workerId) ?? 'none'
 }
 
-const list = useWorkerList(workers, brigadeName, (id) => personnel.complianceOf(id).state, trainingOf)
+const list = useWorkerList(workers, brigadeName, testingOf)
 const {
   query,
   employmentFilter,
   statusFilter,
   brigadeFilter,
-  complianceFilter,
-  trainingFilter,
+  testingFilter,
   sortKey,
   sortDirection,
   rows,
@@ -236,9 +230,8 @@ function openCreateBrigade() {
             v-model:employment="employmentFilter"
             v-model:status="statusFilter"
             v-model:brigade="brigadeFilter"
-            v-model:compliance="complianceFilter"
-            v-model:training="trainingFilter"
-            :show-training="showTraining"
+            v-model:testing="testingFilter"
+            :show-testing="showTraining"
             :brigades="brigades"
             :active-count="activeFilterCount"
             @reset="list.resetFilters"
@@ -275,8 +268,7 @@ function openCreateBrigade() {
                     </span>
                   </button>
                 </th>
-                <th class="col--compliance"><span class="sort sort--static">Допуски</span></th>
-                <th v-if="showTraining" class="col--training"><span class="sort sort--static">Проверка знаний</span></th>
+                <th v-if="showTraining" class="col--testing"><span class="sort sort--static">Тестирование</span></th>
               </tr>
             </thead>
             <tbody>
@@ -294,12 +286,8 @@ function openCreateBrigade() {
                 <td class="nowrap col--phone" data-label="Телефон">{{ w.phone || '—' }}</td>
                 <td data-label="Занятость"><WorkerStatusBadge :status="w.status" /></td>
                 <td class="nowrap" data-label="В компании">{{ EMPLOYMENT_STATUS_LABEL[w.employment] }}</td>
-                <td class="nowrap" data-label="Допуски">
-                  <ComplianceBadge :state="personnel.complianceOf(w.id).state" />
-                </td>
-                <td v-if="showTraining" class="nowrap col--training" data-label="Проверка знаний">
-                  <ProgramStateBadge v-if="w.employment !== 'fired'" :state="trainingOf(w.id)" />
-                  <template v-else>—</template>
+                <td v-if="showTraining" class="col--testing" data-label="Тестирование">
+                  <TestingMarkIcon :mark="testingOf(w.id)" />
                 </td>
               </tr>
             </tbody>
@@ -375,12 +363,8 @@ function openCreateBrigade() {
       @save="saveWorker"
     />
     <WorkerProfileDialog :tabs="profileTabs">
-      <template #tab="{ tab, worker }">
-        <WorkerCertifications
-          :worker-id="worker.id"
-          :view="tab === 'testing' ? 'testing' : 'training'"
-          :is-fired="worker.employment === 'fired'"
-        />
+      <template #tab="{ worker }">
+        <WorkerCertifications :worker-id="worker.id" :is-fired="worker.employment === 'fired'" />
       </template>
     </WorkerProfileDialog>
     <BrigadeProfileDialog v-model:brigade-id="openBrigadeId" />
@@ -677,6 +661,12 @@ th {
   white-space: nowrap;
 }
 
+.col--testing,
+.col--testing .sort {
+  justify-content: center;
+  text-align: center;
+}
+
 tbody tr {
   cursor: pointer;
 }
@@ -763,9 +753,14 @@ tbody tr.row--expired td:first-child {
   }
 
   .table--workers .col--phone,
-  .table--workers .col--training,
-  .table--workers th.col--compliance {
+  .table--workers th.col--testing {
     display: none;
+  }
+
+  .table--workers td.col--testing {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
   }
 
   .legend__count {

@@ -38,8 +38,6 @@ watch(
   },
   { immediate: true },
 )
-
-const demoSnils = '123-456-789 00'
 </script>
 
 <template>
@@ -87,13 +85,12 @@ const demoSnils = '123-456-789 00'
         <span class="ui-overline">Текущая роль</span>
         <strong>{{ currentRoleLabel }}</strong>
         <p>
-          Переключатель роли — в боковой панели (на мобильном — в меню). «Бригадир» — назначение в бригаде, не
-          отдельная роль входа.
+          Роль назначает администратор в настройках. «Бригадир» — назначение в бригаде, не отдельная роль входа.
         </p>
       </div>
       <div class="strip__item">
         <span class="ui-overline">Персональные данные</span>
-        <p v-if="piiVisible">СНИЛС (демо): <strong class="num">{{ demoSnils }}</strong></p>
+        <p v-if="piiVisible">Вам доступны персональные данные сотрудников, включая СНИЛС.</p>
         <p v-else>СНИЛС скрыт — доступен только роли «Администратор».</p>
       </div>
     </section>
@@ -248,10 +245,6 @@ const demoSnils = '123-456-789 00'
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
   line-height: var(--line-height-base);
-}
-
-.strip__item p strong {
-  color: var(--text-primary);
 }
 
 @media (max-width: 860px) {

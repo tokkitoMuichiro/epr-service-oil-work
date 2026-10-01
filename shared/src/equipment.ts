@@ -8,8 +8,6 @@ export type FillStatus = 'OK' | 'NEEDS_FIX' | 'PENDING_REVIEW'
 export type AssetCategory = 'EQUIPMENT' | 'VEHICLE' | 'CARD'
 export type VehicleKind = 'PASSENGER' | 'TRUCK' | 'SPECIAL' | 'MOTORCYCLE' | 'TRAILER'
 export type CardKind = 'TRANSPONDER' | 'FUEL' | 'BUSINESS'
-export type PersonaSlug = 'admin' | 'master' | 'keeper' | 'office'
-
 export type EquipmentPermission =
   | 'view_own'
   | 'view_all'
@@ -39,10 +37,11 @@ export type EquipmentHistoryAction =
 
 export type RolePermissions = Record<RoleId, EquipmentPermission[]>
 
-export interface DemoPerson {
+/** A system user as seen by the equipment module. */
+export interface EquipmentPerson {
   id: string
   fullName: string
-  roleSlug: PersonaSlug
+  role: RoleId
   /** Derived from `Warehouse.keeperIds`; never stored separately. */
   warehouseIds: string[]
 }
@@ -172,9 +171,9 @@ export interface BulkTransferResult {
 }
 
 export interface EquipmentState {
-  persona: DemoPerson
+  persona: EquipmentPerson
   permissions: EquipmentPermission[]
-  people: DemoPerson[]
+  people: EquipmentPerson[]
   warehouses: Warehouse[]
   items: EquipmentItem[]
   transfers: Transfer[]
@@ -297,18 +296,10 @@ export const ROLE_PERMISSIONS: RolePermissions = {
   safety_engineer: ['view_own'],
 }
 
-const PERSONA_BY_ROLE: Record<RoleId, PersonaSlug> = {
-  admin: 'admin',
-  master: 'master',
-  storekeeper: 'keeper',
-  office: 'office',
-  safety_engineer: 'office',
-}
-
 export const CONDITIONS_NEEDING_NOTE: EquipmentCondition[] = ['NEEDS_REPAIR', 'IN_REPAIR', 'IRREPARABLE']
 
 export interface EquipmentAuth {
-  user: DemoPerson
+  user: EquipmentPerson
   permissions: EquipmentPermission[]
   can: (permission: EquipmentPermission) => boolean
 }
@@ -322,28 +313,16 @@ export function isAssetCategory(value: unknown): value is AssetCategory {
 }
 
 export function withKeeperWarehouses(
-  people: Omit<DemoPerson, 'warehouseIds'>[],
+  people: Omit<EquipmentPerson, 'warehouseIds'>[],
   warehouses: Warehouse[],
-): DemoPerson[] {
+): EquipmentPerson[] {
   return people.map((p) => ({
     ...p,
     warehouseIds: warehouses.filter((w) => w.keeperIds.includes(p.id)).map((w) => w.id),
   }))
 }
 
-/** Maps ERP role switcher → demo persona from equipment module. */
-export function personaForRole(role: RoleId, people: DemoPerson[]): DemoPerson {
-  const slug = PERSONA_BY_ROLE[role]
-  const persona = people.find((p) => p.roleSlug === slug) ?? people.find((p) => p.roleSlug === 'admin')
-  if (!persona) throw new Error('В справочнике нет демо-персоны для роли')
-  return persona
-}
-
-export function buildAuth(role: RoleId, people: DemoPerson[], matrix: RolePermissions = ROLE_PERMISSIONS): EquipmentAuth {
-  return authFor(personaForRole(role, people), matrix[role])
-}
-
-export function authFor(user: DemoPerson, permissions: EquipmentPermission[]): EquipmentAuth {
+export function authFor(user: EquipmentPerson, permissions: EquipmentPermission[]): EquipmentAuth {
   return {
     user,
     permissions,
@@ -513,7 +492,7 @@ export function normalizeConditionNote(condition: EquipmentCondition, note: unkn
   return { note: text || null }
 }
 
-export function ownerLabel(item: EquipmentItem, people: DemoPerson[], warehouses: Warehouse[]) {
+export function ownerLabel(item: EquipmentItem, people: Pick<EquipmentPerson, 'id' | 'fullName'>[], warehouses: Warehouse[]) {
   if (item.ownerType === 'USER') {
     return people.find((p) => p.id === item.ownerUserId)?.fullName ?? 'Сотрудник'
   }

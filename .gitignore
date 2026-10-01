@@ -9,16 +9,37 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-ssr
+coverage
+*.local
+*.tsbuildinfo
+
+# Runtime data
 data/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
-dist-ssr
-*.local
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Internal documentation and agent context: local only
+docs/
+.cursorrules
+.cursor/
+AGENTS.md
+CLAUDE.md
+
+# Demo dataset: local development only, never deployed
+server/src/demo/
+
+# Editors and OS
 .DS_Store
+Thumbs.db
 .idea
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 *.suo
 *.ntvs*
 *.njsproj

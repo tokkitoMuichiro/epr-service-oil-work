@@ -3,17 +3,7 @@ import { computed, ref } from 'vue'
 import { todayIso } from '@shared/dates'
 import { errorMessage } from '@/shared/api'
 import { personnelApi, type DocumentUpload } from '../api/personnel'
-import {
-  complianceSummary,
-  workerAttention,
-  workerCompliance,
-  type ComplianceState,
-  type EmploymentStatus,
-  type PositionRequirement,
-  type QualificationCheck,
-  type Worker,
-  type WorkerDraft,
-} from './types'
+import { workerAttention, type EmploymentStatus, type Worker, type WorkerDraft } from './types'
 
 export type WorkerSortKey = 'fullName' | 'position' | 'brigade' | 'phone' | 'status' | 'employment'
 
@@ -24,24 +14,10 @@ export const usePersonnelStore = defineStore('personnel', () => {
   const actionError = ref('')
   const busy = ref(false)
   const profileId = ref<string | null>(null)
-  const requirements = ref<PositionRequirement[]>([])
   /** Non-blocking server warnings of the last action (e.g. equipment still registered to a fired worker). */
   const notices = ref<string[]>([])
 
   const today = computed(() => todayIso())
-
-  const complianceById = computed(() => {
-    const map = new Map<string, { checks: QualificationCheck[]; state: ComplianceState | null }>()
-    for (const w of workers.value) {
-      const checks = workerCompliance(w, requirements.value, today.value)
-      map.set(w.id, { checks, state: complianceSummary(checks) })
-    }
-    return map
-  })
-
-  function complianceOf(id: string) {
-    return complianceById.value.get(id) ?? { checks: [], state: null }
-  }
 
   const profileWorker = computed(() => workers.value.find((w) => w.id === profileId.value) ?? null)
 
@@ -55,9 +31,7 @@ export const usePersonnelStore = defineStore('personnel', () => {
     status.value = 'loading'
     errorText.value = ''
     try {
-      const [list, catalog] = await Promise.all([personnelApi.list(), personnelApi.qualifications()])
-      workers.value = list
-      requirements.value = catalog.requirements
+      workers.value = await personnelApi.list()
       status.value = 'ready'
       if (!workers.value.some((w) => w.id === profileId.value)) profileId.value = null
     } catch (e) {
@@ -128,14 +102,6 @@ export const usePersonnelStore = defineStore('personnel', () => {
     })
   }
 
-  async function loadRequirements() {
-    requirements.value = (await personnelApi.qualifications()).requirements
-  }
-
-  async function saveRequirements(next: PositionRequirement[]) {
-    requirements.value = await personnelApi.setRequirements(next)
-  }
-
   function uploadDocuments(id: string, uploads: DocumentUpload[]) {
     return mutate(async () => {
       for (const upload of uploads) replace(await personnelApi.uploadDocument(id, upload))
@@ -166,11 +132,7 @@ export const usePersonnelStore = defineStore('personnel', () => {
     busy,
     profileId,
     profileWorker,
-    requirements,
     notices,
-    complianceOf,
-    loadRequirements,
-    saveRequirements,
     today,
     isEmpty,
     attentionCount,

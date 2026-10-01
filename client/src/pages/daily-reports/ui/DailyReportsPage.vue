@@ -121,7 +121,7 @@ function changeObject() {
       <div>
         <h1>Ежедневные отчёты</h1>
         <p>
-          Объекты из контрактов ERP. Отчёты хранятся на сервере, путь на Диске — мок Битрикс.
+          Объекты из контрактов ERP. Отчёты хранятся на сервере.
         </p>
       </div>
       <div v-if="canEdit" class="mode-tabs ui-segmented" role="tablist">
@@ -215,7 +215,7 @@ function changeObject() {
         <template v-else-if="mode === 'create'">
           <div v-if="lastSaved" class="success">
             <p class="ui-badge ui-badge--ok success__badge">Сохранено</p>
-            <h2>Отчёт записан (демо)</h2>
+            <h2>Отчёт записан</h2>
             <p>
               {{ lastSaved.date }} · {{ objectTitle }} ·
               <code>{{ lastSaved.storagePath }}</code>

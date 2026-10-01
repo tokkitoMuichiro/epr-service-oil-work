@@ -4,9 +4,10 @@ import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { authFor, canViewAllList, useEquipmentStore } from '@/entities/equipment'
 import { equipmentPermissionsOf, useAccessStore, useRoleStore, type AccessBlock } from '@/entities/role'
 import { ThemeSwitch } from '@/features/theme-switch'
-import { APP_NAME, APP_TAGLINE } from '@/shared/config'
+import { APP_NAME } from '@/shared/config'
 import { useEscape, useScrollLock } from '@/shared/lib/scroll-lock'
 import {
+  AppLogo,
   IconChevron,
   IconClose,
   IconContracts,
@@ -308,10 +309,9 @@ onUnmounted(() => {
       @touchend.passive="onDrawerTouchEnd"
     >
       <div class="brand">
-        <div class="brand__mark" aria-hidden="true">А</div>
+        <AppLogo />
         <div class="brand__text">
           <div class="brand__title">{{ APP_NAME }}</div>
-          <p class="brand__tag">{{ APP_TAGLINE }}</p>
         </div>
         <button
           ref="drawerClose"
@@ -516,32 +516,12 @@ onUnmounted(() => {
   flex: 1;
 }
 
-.brand__mark {
-  flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  font-size: var(--font-size-base);
-  font-weight: 800;
-  background: var(--brand-mark-bg);
-  color: var(--text-on-accent);
-  border-radius: var(--radius);
-}
-
 .brand__title {
   margin: 0;
   color: var(--text-on-inverse);
   font-size: var(--font-size-base);
   font-weight: 700;
   letter-spacing: 0.02em;
-}
-
-.brand__tag {
-  margin: 2px 0 0;
-  color: var(--text-on-inverse-subtle);
-  font-size: var(--font-size-xs);
-  line-height: 1.35;
 }
 
 .nav {

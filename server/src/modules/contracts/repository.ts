@@ -19,8 +19,6 @@ import {
   type WorkDraft,
   type WorkItem,
 } from '../../shared.js'
-import { contractsSeed } from './seed.js'
-
 function optionalDate(value: unknown, label: string): string | undefined {
   if (value === undefined || value === null || value === '') return undefined
   if (!isIsoDate(value)) badRequest(`${label}: некорректная дата`)
@@ -33,7 +31,7 @@ function qualificationIds(value: unknown): string[] {
 }
 
 export function createContractsRepository(storage: Storage) {
-  const snapshot = storage.snapshot<Contract[]>('contracts', { seed: contractsSeed, empty: () => [] })
+  const snapshot = storage.snapshot<Contract[]>('contracts', { empty: () => [] })
   let contracts = snapshot.state
 
   function get(id: string): Contract {

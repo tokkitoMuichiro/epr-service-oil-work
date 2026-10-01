@@ -1,12 +1,5 @@
 import { apiUrl, http } from '@/shared/api'
-import type {
-  EmploymentStatus,
-  PositionRequirement,
-  QualificationType,
-  QualificationTypeId,
-  Worker,
-  WorkerDraft,
-} from '../model/types'
+import type { EmploymentStatus, QualificationTypeId, Worker, WorkerDraft } from '../model/types'
 
 type One = { item: Worker }
 
@@ -24,11 +17,6 @@ export interface DocumentUpload {
 export interface EmploymentResult {
   item: Worker
   warnings: string[]
-}
-
-export interface QualificationCatalog {
-  types: QualificationType[]
-  requirements: PositionRequirement[]
 }
 
 export const personnelApi = {
@@ -74,14 +62,6 @@ export const personnelApi = {
 
   async removePhoto(id: string): Promise<Worker> {
     return (await http.delete<One>(`/personnel/${id}/photo`)).item
-  },
-
-  async qualifications(): Promise<QualificationCatalog> {
-    return (await http.get<{ item: QualificationCatalog }>('/qualifications')).item
-  },
-
-  async setRequirements(requirements: PositionRequirement[]): Promise<PositionRequirement[]> {
-    return (await http.put<{ items: PositionRequirement[] }>('/qualifications/requirements', { requirements })).items
   },
 
   documentUrl(id: string, docId: string): string {

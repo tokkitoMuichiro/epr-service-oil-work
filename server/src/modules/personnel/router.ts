@@ -152,12 +152,7 @@ export function qualificationsRouter(repo: PersonnelRepository, access: AccessSt
     if (!canReadArea(permissions, 'personnel') && !canReadArea(permissions, 'brigades')) {
       forbidden(areaDeniedMessage('personnel', false))
     }
-    res.json({ item: { types: QUALIFICATION_TYPES, requirements: repo.requirements() } })
-  })
-
-  router.put('/requirements', (req, res) => {
-    access.requirePermission(requestRole(req), 'settings_manage')
-    res.json({ items: repo.setRequirements(req.body?.requirements) })
+    res.json({ item: { types: QUALIFICATION_TYPES } })
   })
 
   return router

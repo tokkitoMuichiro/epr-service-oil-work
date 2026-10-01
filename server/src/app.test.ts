@@ -7,6 +7,8 @@ import path from 'node:path'
 import { after, before, describe, it } from 'node:test'
 import { createApp, type AppOptions } from './app.js'
 import { openDatabase } from './db.js'
+import { loadDemoSeed } from './demo-seed.js'
+import { demoUserOf } from './modules/auth/repository.js'
 import {
   validateBrigadeDraft,
   type AssignmentIssue,
@@ -21,6 +23,11 @@ import {
 } from './shared.js'
 
 const TODAY = '2026-09-29'
+const demoSeed = await loadDemoSeed()
+const needsDemo = { skip: demoSeed ? false : 'нет демо-данных в server/src/demo' }
+const DEMO_ADMIN = demoUserOf('admin').id
+const DEMO_MASTER = demoUserOf('master').id
+const DEMO_KEEPER = demoUserOf('storekeeper').id
 
 interface CallResult {
   status: number
@@ -39,7 +46,7 @@ function sessionCookie(response: Response): string {
 }
 
 async function startApp(options: AppOptions = {}) {
-  const server: Server = createApp({ today: () => TODAY, devLogin: true, ...options }).listen(0, '127.0.0.1')
+  const server: Server = createApp({ today: () => TODAY, devLogin: true, seed: demoSeed ?? undefined, ...options }).listen(0, '127.0.0.1')
   await new Promise<void>((resolve) => server.once('listening', resolve))
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   const cookies = new Map<RoleId, string>()
@@ -106,7 +113,7 @@ after(async () => {
   await api.close()
 })
 
-describe('api', () => {
+describe('api', needsDemo, () => {
   it('reports health and unknown API routes', async () => {
     assert.equal((await call('GET', '/health')).json.ok, true)
     const missing = await call('GET', '/api/nope')
@@ -207,19 +214,11 @@ describe('api', () => {
     assert.equal(doc.expiresAt, '2027-09-01')
   })
 
-  it('edits the position requirement matrix with settings_manage only', async () => {
+  it('serves the qualification catalogue without position requirements', async () => {
     const view = (await call('GET', '/api/qualifications', 'master')).json.item
     assert.ok(view.types.length >= 10)
-    assert.ok(view.requirements.some((r: { position: string }) => r.position === 'Мастер'))
-    const next = [...view.requirements, { position: 'Водитель', qualificationTypeIds: ['first_aid'] }]
-    assert.equal((await call('PUT', '/api/qualifications/requirements', 'office', { requirements: next })).status, 403)
-    assert.equal(
-      (await call('PUT', '/api/qualifications/requirements', 'admin', { requirements: [{ position: 'X', qualificationTypeIds: ['fly'] }] })).status,
-      400,
-    )
-    const saved = await call('PUT', '/api/qualifications/requirements', 'admin', { requirements: next })
-    assert.equal(saved.status, 200)
-    assert.ok(saved.json.items.some((r: { position: string }) => r.position === 'Водитель'))
+    assert.equal(view.requirements, undefined)
+    assert.equal((await call('PUT', '/api/qualifications/requirements', 'admin', { requirements: [] })).status, 404)
   })
 
   it('rejects a second brigade on an occupied object', async () => {
@@ -422,7 +421,7 @@ describe('api', () => {
       plateNumber: 'о 555 ор 116',
       condition: 'OK',
       ownerType: 'USER',
-      ownerUserId: 'u-admin',
+      ownerUserId: DEMO_ADMIN,
     }
     const created = await call('POST', '/api/equipment', 'admin', draft)
     assert.equal(created.status, 201)
@@ -436,7 +435,7 @@ describe('api', () => {
     const blocked = await call('POST', '/api/equipment/transfers', 'admin', {
       equipmentId: vehicle.id,
       toOwnerType: 'USER',
-      toUserId: 'u-master-ivanov',
+      toUserId: DEMO_MASTER,
     })
     assert.equal(blocked.status, 403)
 
@@ -450,7 +449,7 @@ describe('api', () => {
 
   it('transfers in bulk and reports failures per item', async () => {
     const state = (await call('GET', '/api/equipment/state', 'admin')).json as EquipmentState
-    const free = state.items.filter((i) => i.ownerUserId === 'u-master-ivanov' && !i.pendingTransferId && i.fillStatus === 'OK')
+    const free = state.items.filter((i) => i.ownerUserId === DEMO_MASTER && !i.pendingTransferId && i.fillStatus === 'OK')
     const pending = state.items.find((i) => i.pendingTransferId)
     assert.ok(free.length > 0 && pending)
     const result = await call('POST', '/api/equipment/transfers/bulk', 'admin', {
@@ -476,7 +475,7 @@ describe('api', () => {
     assert.equal((await call('DELETE', `/api/equipment/${item.id}/documents/${doc.id}`)).status, 200)
 
     assert.equal((await call('POST', '/api/equipment/warehouses', 'master', { name: 'База Восток' })).status, 403)
-    const wh = await call('POST', '/api/equipment/warehouses', 'storekeeper', { name: 'База Восток', keeperIds: ['u-keeper'] })
+    const wh = await call('POST', '/api/equipment/warehouses', 'storekeeper', { name: 'База Восток', keeperIds: [DEMO_KEEPER] })
     assert.equal(wh.status, 201)
     assert.equal((await call('DELETE', '/api/equipment/warehouses/wh-repair')).status, 400)
     assert.equal((await call('DELETE', '/api/equipment/warehouses/wh-north')).status, 409)
@@ -561,6 +560,13 @@ describe('api', () => {
 })
 
 describe('authentication', () => {
+  it('sends security headers and hides the framework', async () => {
+    const response = await call('GET', '/health', null)
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff')
+    assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN')
+    assert.equal(response.headers.get('x-powered-by'), null)
+  })
+
   it('ignores the role header: no session means 401, the header never grants PII', async () => {
     const anonymous = await call('GET', '/api/personnel', null, undefined, { 'x-erp-role': 'admin' })
     assert.equal(anonymous.status, 401)
@@ -631,7 +637,7 @@ describe('authentication', () => {
   })
 })
 
-describe('training', () => {
+describe('training', needsDemo, () => {
   let training: Api
 
   before(async () => {
@@ -775,7 +781,7 @@ describe('training', () => {
 })
 
 describe('storage', () => {
-  it('keeps data across a restart and seeds only an empty database', async () => {
+  it('keeps data across a restart and seeds only an empty database', needsDemo, async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'erp-db-'))
     const file = path.join(dir, 'erp.sqlite')
     try {
@@ -805,10 +811,37 @@ describe('storage', () => {
   })
 
   it('starts empty without demo data when seeding is off', async () => {
-    const empty = await startApp({ seedDemo: false })
+    const empty = await startApp({ seed: undefined })
     try {
       assert.deepEqual((await empty.call('GET', '/api/personnel')).json.items, [])
       assert.deepEqual((await empty.call('GET', '/api/contracts')).json.items, [])
+      const training = (await empty.call('GET', '/api/training/directions')).json.items as unknown[]
+      assert.ok(training.length > 0, 'the training catalogue is reference data')
+    } finally {
+      await empty.close()
+    }
+  })
+
+  it('registers equipment to the signed-in user in an empty database', async () => {
+    const empty = await startApp({ seed: undefined, devLogin: false, admin: { login: 'root', password: 'корневой-пароль' } })
+    try {
+      const response = await fetch(`${empty.base}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login: 'root', password: 'корневой-пароль' }),
+      })
+      const root = { cookie: sessionCookie(response) }
+      const state = (await empty.call('GET', '/api/equipment/state', root)).json as EquipmentState
+      assert.equal(state.persona.fullName, 'Администратор')
+      assert.deepEqual(state.people.map((p) => p.id), [state.persona.id])
+      assert.deepEqual(state.warehouses.map((w) => w.slug), ['repair'])
+      assert.deepEqual(state.items, [])
+
+      const draft = { name: 'Насос', type: 'CONSUMABLE', quantity: 2, condition: 'OK', ownerType: 'USER', ownerUserId: state.persona.id }
+      const created = await empty.call('POST', '/api/equipment', root, draft)
+      assert.equal(created.status, 201, created.text)
+      const stranger = await empty.call('POST', '/api/equipment', root, { ...draft, ownerUserId: 'u-unknown' })
+      assert.equal(stranger.status, 404)
     } finally {
       await empty.close()
     }

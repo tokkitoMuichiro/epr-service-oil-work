@@ -20,23 +20,15 @@ export {
   type WorkerStatus,
 } from '@shared/personnel'
 export {
-  COMPLIANCE_STATE_LABEL,
   OTHER_QUALIFICATION_LABEL,
   QUALIFICATION_TYPES,
   TANK_CLEANING_QUALIFICATIONS,
-  complianceSummary,
   defaultExpiry,
   describeAssignmentIssue,
-  normalizeRequirements,
   qualificationLabel,
   qualificationType,
   validateQualificationFields,
-  validateRequirements,
-  workerCompliance,
   type AssignmentIssue,
-  type ComplianceState,
-  type PositionRequirement,
-  type QualificationCheck,
   type QualificationType,
   type QualificationTypeId,
 } from '@shared/qualifications'

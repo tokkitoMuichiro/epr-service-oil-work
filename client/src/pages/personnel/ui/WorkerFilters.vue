@@ -9,23 +9,16 @@ import {
 } from '@/entities/personnel'
 import { useScrollLock } from '@/shared/lib/scroll-lock'
 import { IconClose, IconFilter } from '@/shared/ui'
-import {
-  COMPLIANCE_FILTER_OPTIONS,
-  NO_BRIGADE,
-  TRAINING_FILTER_OPTIONS,
-  type ComplianceFilter,
-  type TrainingFilter,
-} from '../model/use-worker-list'
+import { NO_BRIGADE, TESTING_FILTER_OPTIONS, type TestingFilter } from '../model/use-worker-list'
 
-defineProps<{ brigades: Brigade[]; activeCount: number; showTraining?: boolean }>()
+defineProps<{ brigades: Brigade[]; activeCount: number; showTesting?: boolean }>()
 
 const emit = defineEmits<{ reset: [] }>()
 
 const employment = defineModel<'' | EmploymentStatus>('employment', { required: true })
 const status = defineModel<'' | WorkerStatus>('status', { required: true })
 const brigade = defineModel<string>('brigade', { required: true })
-const compliance = defineModel<ComplianceFilter>('compliance', { required: true })
-const training = defineModel<TrainingFilter>('training', { default: '' })
+const testing = defineModel<TestingFilter>('testing', { default: '' })
 
 const isOpen = ref(false)
 const isSheet = ref(false)
@@ -108,18 +101,11 @@ onBeforeUnmount(() => {
           <option v-for="b in brigades" :key="b.id" :value="b.id">{{ b.name }}</option>
         </select>
       </label>
-      <label class="field">
-        <span>Допуски по должности</span>
-        <select v-model="compliance">
+      <label v-if="showTesting" class="field">
+        <span>Тестирование</span>
+        <select v-model="testing">
           <option value="">Все</option>
-          <option v-for="o in COMPLIANCE_FILTER_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
-        </select>
-      </label>
-      <label v-if="showTraining" class="field">
-        <span>Проверка знаний</span>
-        <select v-model="training">
-          <option value="">Все</option>
-          <option v-for="o in TRAINING_FILTER_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
+          <option v-for="o in TESTING_FILTER_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
         </select>
       </label>
       <button type="button" class="reset" :disabled="!activeCount" @click="emit('reset')">Сбросить фильтры</button>

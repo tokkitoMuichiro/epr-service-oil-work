@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   ROLE_PERMISSIONS,
-  buildAuth,
+  authFor,
   canAcceptTransfer,
   canBrowse,
   canCancelPendingTransfer,
@@ -32,17 +32,19 @@ import {
   validateEquipmentDraft,
   validateEquipmentPatch,
   withKeeperWarehouses,
-  type DemoPerson,
   type EquipmentItem,
+  type EquipmentPerson,
+  type RolePermissions,
   type Transfer,
   type Warehouse,
 } from './equipment.js'
+import type { RoleId } from './roles.js'
 
-const people: DemoPerson[] = [
-  { id: 'u-admin', fullName: 'Админ', roleSlug: 'admin', warehouseIds: [] },
-  { id: 'u-master', fullName: 'Мастер', roleSlug: 'master', warehouseIds: [] },
-  { id: 'u-keeper', fullName: 'Кладовщик', roleSlug: 'keeper', warehouseIds: ['wh-north'] },
-  { id: 'u-office', fullName: 'Офис', roleSlug: 'office', warehouseIds: [] },
+const people: EquipmentPerson[] = [
+  { id: 'u-admin', fullName: 'Админ', role: 'admin', warehouseIds: [] },
+  { id: 'u-master', fullName: 'Мастер', role: 'master', warehouseIds: [] },
+  { id: 'u-keeper', fullName: 'Кладовщик', role: 'storekeeper', warehouseIds: ['wh-north'] },
+  { id: 'u-office', fullName: 'Офис', role: 'office', warehouseIds: [] },
 ]
 
 function item(patch: Partial<EquipmentItem> = {}): EquipmentItem {
@@ -83,23 +85,31 @@ const pending: Transfer = {
   createdAt: '2026-01-02T00:00:00.000Z',
 }
 
-const admin = buildAuth('admin', people)
-const master = buildAuth('master', people)
-const keeper = buildAuth('storekeeper', people)
-const office = buildAuth('office', people)
+const PERSON_OF_ROLE: Partial<Record<RoleId, string>> = {
+  admin: 'u-admin',
+  master: 'u-master',
+  storekeeper: 'u-keeper',
+  office: 'u-office',
+}
+
+function authAs(role: RoleId, matrix: RolePermissions = ROLE_PERMISSIONS) {
+  const person = people.find((p) => p.id === PERSON_OF_ROLE[role])
+  assert.ok(person)
+  return authFor(person, matrix[role])
+}
+
+const admin = authAs('admin')
+const master = authAs('master')
+const keeper = authAs('storekeeper')
+const office = authAs('office')
 
 describe('equipment permissions', () => {
-  it('maps roles to demo personas', () => {
-    assert.equal(master.user.id, 'u-master')
-    assert.equal(keeper.user.id, 'u-keeper')
-  })
-
   it('derives keeper bases from warehouses', () => {
     const warehouses: Warehouse[] = [
       { id: 'wh-1', name: 'Север', slug: 'n', isSystem: false, keeperIds: ['u-1'] },
       { id: 'wh-2', name: 'Юг', slug: 's', isSystem: false, keeperIds: [] },
     ]
-    const [person] = withKeeperWarehouses([{ id: 'u-1', fullName: 'Кладовщик', roleSlug: 'keeper' }], warehouses)
+    const [person] = withKeeperWarehouses([{ id: 'u-1', fullName: 'Кладовщик', role: 'storekeeper' }], warehouses)
     assert.deepEqual(person.warehouseIds, ['wh-1'])
   })
 
@@ -138,7 +148,7 @@ describe('equipment permissions', () => {
     const flagged = item({ fillStatus: 'NEEDS_FIX' })
     assert.equal(canTransferItem(admin, flagged, []), false)
     assert.equal(canEditItem(master, flagged), true)
-    assert.equal(canEditItem(buildAuth('master', people, { ...ROLE_PERMISSIONS, master: [] }), item()), false)
+    assert.equal(canEditItem(authAs('master', { ...ROLE_PERMISSIONS, master: [] }), item()), false)
     assert.equal(canFlagFill(admin, item(), []), true)
     assert.equal(canFlagFill(keeper, item(), []), false)
     assert.equal(canConfirmFill(admin, flagged), true)
@@ -170,7 +180,7 @@ describe('equipment permissions', () => {
   })
 
   it('gives fill review to a role without making it privileged', () => {
-    const reviewer = buildAuth('storekeeper', people, {
+    const reviewer = authAs('storekeeper', {
       ...ROLE_PERMISSIONS,
       storekeeper: [...ROLE_PERMISSIONS.storekeeper, 'review_fill'],
     })

@@ -1,14 +1,10 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { CATEGORY_LABEL, useEquipmentStore, type AssetCategory, type PersonaSlug } from '@/entities/equipment'
+import { CATEGORY_LABEL, useEquipmentStore, type AssetCategory } from '@/entities/equipment'
+import { ROLES, type RoleId } from '@/entities/role'
 import { UiButton } from '@/shared/ui'
 
-const PERSONA_LABEL: Record<PersonaSlug, string> = {
-  admin: 'Администратор',
-  office: 'Офис',
-  master: 'Мастер',
-  keeper: 'Кладовщик',
-}
+const ROLE_LABEL = Object.fromEntries(ROLES.map((r) => [r.id, r.label])) as Record<RoleId, string>
 
 const CATEGORIES: AssetCategory[] = ['EQUIPMENT', 'VEHICLE', 'CARD']
 
@@ -46,7 +42,7 @@ function basesOf(ids: string[]) {
       <tbody>
         <tr v-for="p in store.people" :key="p.id" :class="{ 'is-current': p.id === store.persona.id }">
           <td><strong>{{ p.fullName }}</strong></td>
-          <td>{{ PERSONA_LABEL[p.roleSlug] }}</td>
+          <td>{{ ROLE_LABEL[p.role] }}</td>
           <td>{{ basesOf(p.warehouseIds) }}</td>
           <td v-for="c in CATEGORIES" :key="c" class="num">{{ countOf(p.id, c) }}</td>
         </tr>

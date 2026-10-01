@@ -55,9 +55,13 @@ export function requestAuth(req: Request): RequestAuth {
   return auths.get(req) ?? unauthorized()
 }
 
-/** The role always comes from the server-side session, never from client headers. */
+/** The user and role always come from the server-side session, never from client headers. */
+export function requestUser(req: Request): User {
+  return requestAuth(req).user
+}
+
 export function requestRole(req: Request): RoleId {
-  return requestAuth(req).user.role
+  return requestUser(req).role
 }
 
 export function param(req: Request, name: string): string {

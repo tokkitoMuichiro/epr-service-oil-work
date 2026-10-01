@@ -3,14 +3,12 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useBrigadesStore } from '@/entities/brigade'
 import {
-  ComplianceBadge,
   EMPLOYMENT_STATUS_LABEL,
   SNILS_MASK,
   TrainingStateBadge,
   WorkerStatusBadge,
   personnelApi,
   qualificationLabel,
-  qualificationType,
   trainingDocState,
   usePersonnelStore,
   validateWorkerDraft,
@@ -32,14 +30,11 @@ interface ProfileTab {
 }
 
 const MAIN_TAB = 'main'
-const QUALS_TAB = 'quals'
 const DOCS_TAB = 'docs'
-const OWN_TABS: ProfileTab[] = [
-  { id: MAIN_TAB, label: 'Данные' },
-  { id: QUALS_TAB, label: 'Допуски' },
-  { id: DOCS_TAB, label: 'Документы' },
-]
+const MAIN: ProfileTab = { id: MAIN_TAB, label: 'Данные' }
+const DOCS: ProfileTab = { id: DOCS_TAB, label: 'Документы' }
 
+/** Extra tabs are rendered through the `tab` slot between «Данные» and «Документы». */
 const props = withDefaults(defineProps<{ tabs?: ProfileTab[] }>(), { tabs: () => [] })
 
 defineSlots<{ tab(props: { tab: string; worker: Worker }): unknown }>()
@@ -59,11 +54,11 @@ const dropzone = ref<InstanceType<typeof DocumentDropzone> | null>(null)
 const form = reactive({ fullName: '', position: '', phone: '', snils: '' })
 const activeTab = ref(MAIN_TAB)
 
-const allTabs = computed<ProfileTab[]>(() => [...OWN_TABS, ...props.tabs])
+const allTabs = computed<ProfileTab[]>(() => [MAIN, ...props.tabs, DOCS])
 
 const currentTab = computed(() => (allTabs.value.some((t) => t.id === activeTab.value) ? activeTab.value : MAIN_TAB))
 const isMainTab = computed(() => currentTab.value === MAIN_TAB)
-const isOwnTab = computed(() => OWN_TABS.some((t) => t.id === currentTab.value))
+const isOwnTab = computed(() => currentTab.value === MAIN_TAB || currentTab.value === DOCS_TAB)
 
 useScrollLock(() => Boolean(worker.value))
 
@@ -79,8 +74,6 @@ const brigadeRole = computed(() => {
 })
 
 const photoUrl = computed(() => (worker.value ? personnelApi.photoUrl(worker.value) : null))
-
-const compliance = computed(() => (worker.value ? personnel.complianceOf(worker.value.id) : null))
 
 function documentMeta(doc: { qualificationTypeId?: string; number?: string; group?: string; issuedAt?: string; issuer?: string }) {
   return [
@@ -375,29 +368,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 <li v-for="n in notices" :key="n">{{ n }}</li>
               </ul>
             </div>
-          </section>
-
-          <section v-else-if="currentTab === QUALS_TAB && compliance" class="quals">
-            <h3>
-              Допуски по должности
-              <ComplianceBadge :state="compliance.state" empty-label="Не заданы" />
-            </h3>
-            <p v-if="!compliance.checks.length" class="muted">
-              Для должности «{{ worker.position }}» обязательные допуски не заданы. Матрица настраивается в разделе
-              «Настройки».
-            </p>
-            <ul v-else class="quals__list">
-              <li v-for="check in compliance.checks" :key="check.typeId" class="qual" :data-state="check.state">
-                <span class="qual__name">
-                  <strong>{{ qualificationType(check.typeId)?.shortName }}</strong>
-                  {{ qualificationType(check.typeId)?.name }}
-                </span>
-                <span class="qual__date">
-                  {{ check.documentId ? (check.expiresAt ? `до ${formatDateRu(check.expiresAt)}` : 'бессрочно') : 'нет документа' }}
-                </span>
-                <ComplianceBadge :state="check.state" />
-              </li>
-            </ul>
           </section>
 
           <section v-else-if="currentTab === DOCS_TAB" class="docs">
@@ -725,68 +695,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   font-weight: 600;
 }
 
-.quals {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.quals h3 {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.quals__list {
-  display: grid;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.qual {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: var(--space-3);
-  align-items: center;
-  min-height: 44px;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
-  font-size: var(--font-size-sm);
-}
-
-.qual[data-state='expired'],
-.qual[data-state='missing'] {
-  box-shadow: inset 3px 0 0 var(--status-bad-solid);
-}
-
-.qual[data-state='expiring'] {
-  box-shadow: inset 3px 0 0 var(--status-warn-solid);
-}
-
-.qual__name {
-  min-width: 0;
-  color: var(--text-primary);
-}
-
-.qual__name strong {
-  margin-right: var(--space-1);
-  font-weight: 700;
-}
-
-.qual__date {
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
 .docs {
   display: grid;
   gap: var(--space-3);
@@ -946,15 +854,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   .facts div {
     grid-template-columns: 1fr;
     gap: var(--space-1);
-  }
-
-  .qual {
-    grid-template-columns: minmax(0, 1fr) auto;
-    padding: var(--space-2) var(--space-3);
-  }
-
-  .qual__date {
-    grid-row: 2;
   }
 
   .info__actions :deep(.btn) {

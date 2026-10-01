@@ -86,8 +86,7 @@ function onSubmit() {
         </label>
       </fieldset>
       <p class="ui-form__note">
-        Проверяются при назначении бригады вместе с допусками по должности. По умолчанию — набор для зачистки
-        резервуаров.
+        Проверяются по документам сотрудников при назначении бригады. По умолчанию — набор для зачистки резервуаров.
       </p>
       <div class="ui-form__actions">
         <UiButton variant="ghost" type="button" @click="emit('close')">Отмена</UiButton>

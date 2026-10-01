@@ -29,11 +29,8 @@ export interface AccessView {
 }
 
 export function createAccessStore(storage: Storage) {
-  const snapshot = storage.snapshot<AccessMatrix>('access', {
-    seed: () => structuredClone(DEFAULT_ACCESS),
-    empty: () => structuredClone(DEFAULT_ACCESS),
-  })
-  const migrations = storage.snapshot<string[]>('access-migrations', { seed: () => [], empty: () => [] })
+  const snapshot = storage.snapshot<AccessMatrix>('access', { empty: () => structuredClone(DEFAULT_ACCESS) })
+  const migrations = storage.snapshot<string[]>('access-migrations', { empty: () => [] })
   const migrated = migrateAccess(snapshot.state, migrations.state)
   const matrix = migrated.matrix
   snapshot.save(matrix)

@@ -40,7 +40,6 @@ import {
   ownerLabel,
   ownsItem,
   pendingTransfer,
-  personaForRole,
   sortEquipment,
   validateEquipmentDraft,
   validateEquipmentPatch,
@@ -58,15 +57,17 @@ import {
   type EquipmentItem,
   type EquipmentPatch,
   type EquipmentPermission,
+  type EquipmentPerson,
   type EquipmentState,
   type OwnerType,
   type RoleId,
   type Transfer,
   type TransferDraft,
+  type User,
   type Warehouse,
   type WarehouseDraft,
 } from '../../shared.js'
-import { equipmentSeed, type EquipmentSeed } from './seed.js'
+import { EQUIPMENT_FILES_BUCKET, EQUIPMENT_KEY, emptyEquipment, type EquipmentData } from './model.js'
 
 interface Target {
   ownerType: OwnerType
@@ -78,33 +79,39 @@ export interface DocumentUpload {
   fileName: string
 }
 
-function placeholderFile(item: EquipmentItem, doc: EquipmentDocument): StoredFile {
-  const lines = ['Демо-документ ERP АММИР', `Позиция: ${assetDisplayName(item)}`, `Файл: ${doc.fileName}`]
-  return { data: Buffer.from(`\uFEFF${lines.join('\r\n')}\r\n`, 'utf8'), mimeType: 'text/plain; charset=utf-8' }
-}
-
 function sameName(a: string, b: string) {
   return a.trim().toLocaleLowerCase('ru') === b.trim().toLocaleLowerCase('ru')
 }
 
-export type EquipmentPermissionsOf = (role: RoleId) => EquipmentPermission[]
+export type EquipmentActor = Pick<User, 'id' | 'fullName' | 'role'>
 
-function emptyEquipment(): EquipmentSeed {
-  const seed = equipmentSeed()
-  return { ...seed, warehouses: seed.warehouses.filter((w) => w.isSystem), items: [], transfers: [], history: [] }
+export interface EquipmentDeps {
+  /** All system users, including blocked ones (their names stay in labels). */
+  users: () => User[]
+  permissionsOf?: (role: RoleId) => EquipmentPermission[]
 }
 
-export function createEquipmentService(storage: Storage, permissionsOf: EquipmentPermissionsOf = (role) => [...ROLE_PERMISSIONS[role]]) {
-  const snapshot = storage.snapshot<EquipmentSeed>('equipment', { seed: equipmentSeed, empty: emptyEquipment })
-  const state = snapshot.state
-  const files = storage.files('equipment')
+function personOf(user: EquipmentActor): Omit<EquipmentPerson, 'warehouseIds'> {
+  return { id: user.id, fullName: user.fullName, role: user.role }
+}
 
-  function people() {
-    return withKeeperWarehouses(state.people, state.warehouses)
+export function createEquipmentService(storage: Storage, deps: EquipmentDeps) {
+  const permissionsOf = deps.permissionsOf ?? ((role: RoleId) => [...ROLE_PERMISSIONS[role]])
+  const snapshot = storage.snapshot<EquipmentData>(EQUIPMENT_KEY, { empty: emptyEquipment })
+  const state = snapshot.state
+  const files = storage.files(EQUIPMENT_FILES_BUCKET)
+
+  /** Active users: possible owners, recipients and keepers. */
+  function people(): EquipmentPerson[] {
+    return withKeeperWarehouses(
+      deps.users().filter((u) => u.active).map(personOf),
+      state.warehouses,
+    )
   }
 
-  function auth(role: RoleId): EquipmentAuth {
-    return authFor(personaForRole(role, people()), permissionsOf(role))
+  function auth(actor: EquipmentActor): EquipmentAuth {
+    const [user] = withKeeperWarehouses([personOf(actor)], state.warehouses)
+    return authFor(user, permissionsOf(actor.role))
   }
 
   function canSee(a: EquipmentAuth, item: EquipmentItem) {
@@ -140,12 +147,13 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
   }
 
   function labelOf(item: EquipmentItem) {
-    return ownerLabel(item, people(), state.warehouses)
+    return ownerLabel(item, deps.users(), state.warehouses)
   }
 
   function targetLabel(target: Target) {
     if (target.ownerType === 'USER') {
-      return state.people.find((p) => p.id === target.userId)?.fullName ?? notFound('Сотрудник не найден')
+      const user = deps.users().find((u) => u.id === target.userId && u.active)
+      return user?.fullName ?? notFound('Сотрудник не найден')
     }
     return state.warehouses.find((w) => w.id === target.warehouseId)?.name ?? notFound('База не найдена')
   }
@@ -323,16 +331,21 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
   }
 
   const service = {
-    /** Items registered to people with this full name (equipment people are not linked to personnel yet). */
-    itemsOwnedBy(fullName: string): string[] {
-      const ids = new Set(state.people.filter((p) => sameName(p.fullName, fullName)).map((p) => p.id))
+    /** Items registered to the worker's user accounts: linked by `workerId`, otherwise by full name. */
+    itemsOwnedBy(worker: { id: string; fullName: string }): string[] {
+      const ids = new Set(
+        deps
+          .users()
+          .filter((u) => (u.workerId ? u.workerId === worker.id : sameName(u.fullName, worker.fullName)))
+          .map((u) => u.id),
+      )
       return state.items
         .filter((i) => i.ownerType === 'USER' && i.ownerUserId && ids.has(i.ownerUserId))
         .map((i) => `${assetDisplayName(i)}${i.quantity > 1 ? `, ${i.quantity} шт.` : ''}`)
     },
 
-    state(role: RoleId): EquipmentState {
-      const a = auth(role)
+    state(actor: EquipmentActor): EquipmentState {
+      const a = auth(actor)
       const items = state.items.filter((i) => canSee(a, i))
       return {
         persona: structuredClone(a.user),
@@ -344,8 +357,8 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
       }
     },
 
-    create(role: RoleId, body: Partial<EquipmentDraft>): EquipmentItem {
-      const a = auth(role)
+    create(actor: EquipmentActor, body: Partial<EquipmentDraft>): EquipmentItem {
+      const a = auth(actor)
       if (!canCreate(a)) forbidden()
       const error = validateEquipmentDraft(body)
       if (error) badRequest(error)
@@ -402,8 +415,8 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
       return sanitized(a, toRepair ? moveToRepair(item, a) : item)
     },
 
-    update(role: RoleId, id: string, patch: EquipmentPatch): EquipmentItem {
-      const a = auth(role)
+    update(actor: EquipmentActor, id: string, patch: EquipmentPatch): EquipmentItem {
+      const a = auth(actor)
       const item = visibleItem(a, id)
       if (!canEditItem(a, item)) forbidden('Недостаточно прав для редактирования')
       if (isPendingAccept(item, state.transfers)) conflict('Позиция ожидает принятия — редактирование недоступно')
@@ -426,8 +439,8 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
       return sanitized(a, item)
     },
 
-    remove(role: RoleId, id: string) {
-      const a = auth(role)
+    remove(actor: EquipmentActor, id: string) {
+      const a = auth(actor)
       const item = visibleItem(a, id)
       if (!canDeleteItem(a, item, state.transfers)) {
         if (isPendingAccept(item, state.transfers)) conflict('Позиция ожидает принятия — удаление недоступно')
@@ -437,8 +450,8 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
       state.items = state.items.filter((i) => i.id !== item.id)
     },
 
-    updateCondition(role: RoleId, id: string, condition: EquipmentCondition, rawNote?: unknown): EquipmentItem {
-      const a = auth(role)
+    updateCondition(actor: EquipmentActor, id: string, condition: EquipmentCondition, rawNote?: unknown): EquipmentItem {
+      const a = auth(actor)
       const item = visibleItem(a, id)
       if (!(condition in CONDITION_LABEL)) badRequest('Неизвестное состояние')
       if (!canChangeCondition(a, item, state.transfers)) forbidden('Недостаточно прав для смены состояния')
@@ -454,15 +467,15 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
       return sanitized(a, result)
     },
 
-    createTransfer(role: RoleId, draft: Partial<TransferDraft>): Transfer {
-      const a = auth(role)
+    createTransfer(actor: EquipmentActor, draft: Partial<TransferDraft>): Transfer {
+      const a = auth(actor)
       const item = visibleItem(a, trimmed(draft.equipmentId))
       const target = parseTarget(draft)
       return structuredClone(transferOne(a, item, target, Math.floor(Number(draft.quantity) || 1)))
     },
 
-    bulkTransfer(role: RoleId, draft: Partial<BulkTransferDraft>): BulkTransferResult {
-      const a = auth(role)
+    bulkTransfer(actor: EquipmentActor, draft: Partial<BulkTransferDraft>): BulkTransferResult {
+      const a = auth(actor)
       const ids = Array.isArray(draft.ids) ? [...new Set(draft.ids.map((id) => trimmed(id)).filter(Boolean))] : []
       if (!ids.length) badRequest('Выберите позиции для передачи')
       const target = parseTarget(draft)
@@ -480,8 +493,8 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
       return result
     },
 
-    accept(role: RoleId, id: string): EquipmentItem {
-      const a = auth(role)
+    accept(actor: EquipmentActor, id: string): EquipmentItem {
+      const a = auth(actor)
       const item = visibleItem(a, id)
       if (!canAcceptTransfer(a, item, state.transfers)) forbidden('Принять может только получатель')
       const pending = pendingTransfer(item, state.transfers)
@@ -498,8 +511,8 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
       return sanitized(a, mergeIntoLot(moved))
     },
 
-    cancel(role: RoleId, id: string): EquipmentItem {
-      const a = auth(role)
+    cancel(actor: EquipmentActor, id: string): EquipmentItem {
+      const a = auth(actor)
       const item = visibleItem(a, id)
       if (!canCancelPendingTransfer(a, item, state.transfers)) forbidden('Отмена недоступна')
       const pending = pendingTransfer(item, state.transfers)
@@ -511,8 +524,8 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
       return sanitized(a, item)
     },
 
-    flagFill(role: RoleId, id: string, rawComment: unknown): EquipmentItem {
-      const a = auth(role)
+    flagFill(actor: EquipmentActor, id: string, rawComment: unknown): EquipmentItem {
+      const a = auth(actor)
       const item = visibleItem(a, id)
       if (!canFlagFill(a, item, state.transfers)) forbidden('Замечание может оставить только администратор')
       const comment = trimmed(rawComment)
@@ -524,8 +537,8 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
       return sanitized(a, item)
     },
 
-    confirmFill(role: RoleId, id: string): EquipmentItem {
-      const a = auth(role)
+    confirmFill(actor: EquipmentActor, id: string): EquipmentItem {
+      const a = auth(actor)
       const item = visibleItem(a, id)
       if (!canConfirmFill(a, item)) forbidden('Подтвердить заполнение может только администратор')
       item.fillStatus = 'OK'
@@ -535,13 +548,13 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
       return sanitized(a, item)
     },
 
-    history(role: RoleId, id: string): EquipmentHistoryEntry[] {
-      const item = visibleItem(auth(role), id)
+    history(actor: EquipmentActor, id: string): EquipmentHistoryEntry[] {
+      const item = visibleItem(auth(actor), id)
       return structuredClone(state.history.filter((h) => h.equipmentId === item.id))
     },
 
-    addDocument(role: RoleId, id: string, meta: DocumentUpload, file: StoredFile): EquipmentItem {
-      const a = auth(role)
+    addDocument(actor: EquipmentActor, id: string, meta: DocumentUpload, file: StoredFile): EquipmentItem {
+      const a = auth(actor)
       const item = visibleItem(a, id)
       if (!canEditDocuments(a, item)) forbidden('Недостаточно прав для документов')
       const fileName = trimmed(meta.fileName).replace(/[\\/:*?"<>|]+/g, '_')
@@ -564,14 +577,14 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
       return sanitized(a, item)
     },
 
-    documentFile(role: RoleId, id: string, docId: string): { doc: EquipmentDocument; file: StoredFile } {
-      const item = visibleItem(auth(role), id)
+    documentFile(actor: EquipmentActor, id: string, docId: string): { doc: EquipmentDocument; file: StoredFile } {
+      const item = visibleItem(auth(actor), id)
       const doc = item.documents.find((d) => d.id === docId) ?? notFound('Документ не найден')
-      return { doc: structuredClone(doc), file: files.get(doc.id) ?? placeholderFile(item, doc) }
+      return { doc: structuredClone(doc), file: files.get(doc.id) ?? notFound('Файл документа не найден') }
     },
 
-    removeDocument(role: RoleId, id: string, docId: string): EquipmentItem {
-      const a = auth(role)
+    removeDocument(actor: EquipmentActor, id: string, docId: string): EquipmentItem {
+      const a = auth(actor)
       const item = visibleItem(a, id)
       if (!canEditDocuments(a, item)) forbidden('Недостаточно прав для документов')
       const doc = item.documents.find((d) => d.id === docId) ?? notFound('Документ не найден')
@@ -583,8 +596,8 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
       return sanitized(a, item)
     },
 
-    createWarehouse(role: RoleId, body: Partial<WarehouseDraft>): Warehouse {
-      const a = auth(role)
+    createWarehouse(actor: EquipmentActor, body: Partial<WarehouseDraft>): Warehouse {
+      const a = auth(actor)
       if (!canManageWarehouses(a)) forbidden('Недостаточно прав для управления базами')
       const draft = parseWarehouse(body)
       const warehouse: Warehouse = {
@@ -597,8 +610,8 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
       return structuredClone(warehouse)
     },
 
-    updateWarehouse(role: RoleId, id: string, body: Partial<WarehouseDraft>): Warehouse {
-      const a = auth(role)
+    updateWarehouse(actor: EquipmentActor, id: string, body: Partial<WarehouseDraft>): Warehouse {
+      const a = auth(actor)
       if (!canManageWarehouses(a)) forbidden('Недостаточно прав для управления базами')
       const warehouse = findWarehouse(id)
       const draft = parseWarehouse(body, warehouse.id)
@@ -607,8 +620,8 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
       return structuredClone(warehouse)
     },
 
-    removeWarehouse(role: RoleId, id: string) {
-      const a = auth(role)
+    removeWarehouse(actor: EquipmentActor, id: string) {
+      const a = auth(actor)
       if (!canManageWarehouses(a)) forbidden('Недостаточно прав для управления базами')
       const warehouse = findWarehouse(id)
       if (warehouse.isSystem) badRequest('Системную базу нельзя удалить')
@@ -621,14 +634,15 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
       state.warehouses = state.warehouses.filter((w) => w.id !== id)
     },
 
-    exportRows(role: RoleId) {
-      const a = auth(role)
+    exportRows(actor: EquipmentActor) {
+      const a = auth(actor)
       if (!canExport(a)) forbidden('Экспорт доступен только роли с правом «Экспорт в Excel»')
-      return sortEquipment(state.items).map((item) => ({ item, owner: labelOf(item) }))
+      const directory = deps.users()
+      return sortEquipment(state.items).map((item) => ({ item, owner: ownerLabel(item, directory, state.warehouses) }))
     },
 
-    exportToBitrix(role: RoleId, date: string): BitrixExportResult {
-      const rows = service.exportRows(role)
+    exportToBitrix(actor: EquipmentActor, date: string): BitrixExportResult {
+      const rows = service.exportRows(actor)
       return {
         storagePath: `mock-disk/Оборудование/Учёт оборудования ${date}.xls`,
         rows: rows.length,
@@ -666,7 +680,7 @@ export function createEquipmentService(storage: Storage, permissionsOf: Equipmen
     if (state.warehouses.some((w) => w.id !== exceptId && sameName(w.name, name))) {
       conflict('База с таким названием уже есть')
     }
-    const known = new Set(state.people.map((p) => p.id))
+    const known = new Set(people().map((p) => p.id))
     const keeperIds = [...new Set((body.keeperIds ?? []).map((id) => trimmed(id)))].filter((id) => known.has(id))
     return { name, address: trimmed(body.address), keeperIds }
   }

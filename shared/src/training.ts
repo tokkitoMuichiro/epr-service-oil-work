@@ -761,6 +761,24 @@ export function worstProgramState(states: (ProgramState | null)[]): ProgramState
   }, null)
 }
 
+export type TestingMark = 'passed' | 'expiring' | 'none'
+
+export const TESTING_MARK_LABEL: Record<TestingMark, string> = {
+  passed: 'Тестирование пройдено',
+  expiring: 'Срок тестирования истекает',
+  none: 'Не пройдено или не назначено',
+}
+
+/**
+ * One mark for the worker's list row: every assigned programme must have a valid result.
+ * A re-check assigned before expiry keeps the mark, a programme assigned for the first time does not.
+ */
+export function testingMark(statuses: Pick<ProgramStatus, 'result'>[]): TestingMark {
+  if (!statuses.length) return 'none'
+  if (statuses.some((s) => s.result !== 'valid' && s.result !== 'expiring')) return 'none'
+  return statuses.some((s) => s.result === 'expiring') ? 'expiring' : 'passed'
+}
+
 /** Only programmes that were assigned to the worker: with results or an active assignment. */
 export function workerProgramStatuses(
   worker: { id: string },

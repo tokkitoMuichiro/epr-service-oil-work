@@ -3,8 +3,8 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ROLES, useRoleStore, type RoleId } from '@/entities/role'
 import { errorMessage } from '@/shared/api'
-import { APP_NAME, APP_TAGLINE } from '@/shared/config'
-import { UiButton, UiInput } from '@/shared/ui'
+import { APP_NAME } from '@/shared/config'
+import { AppLogo, UiButton, UiInput } from '@/shared/ui'
 
 const session = useRoleStore()
 const route = useRoute()
@@ -50,11 +50,8 @@ function enterAs(role: RoleId) {
   <main class="login">
     <section class="card" aria-labelledby="login-title">
       <div class="brand">
-        <div class="brand__mark" aria-hidden="true">А</div>
-        <div>
-          <p class="brand__title">{{ APP_NAME }}</p>
-          <p class="brand__tag">{{ APP_TAGLINE }}</p>
-        </div>
+        <AppLogo :size="40" />
+        <p class="brand__title">{{ APP_NAME }}</p>
       </div>
 
       <h1 id="login-title">Вход в систему</h1>
@@ -122,28 +119,10 @@ function enterAs(role: RoleId) {
   gap: var(--space-3);
 }
 
-.brand__mark {
-  flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius);
-  background: var(--brand-mark-bg);
-  color: var(--text-on-accent);
-  font-weight: 800;
-}
-
 .brand__title {
   margin: 0;
   font-weight: 700;
   color: var(--text-primary);
-}
-
-.brand__tag {
-  margin: 2px 0 0;
-  font-size: var(--font-size-xs);
-  color: var(--text-secondary);
 }
 
 h1 {

@@ -59,9 +59,7 @@ export interface FileStore {
 }
 
 export interface SnapshotOptions<T> {
-  /** Demo data; written only into a database that had no module data at all. */
-  seed: () => T
-  /** Initial state for a module added to an existing database. */
+  /** Initial state when the database has no data for the module. */
   empty: () => T
 }
 
@@ -70,14 +68,27 @@ export interface Snapshot<T> {
   save(state: T): void
 }
 
+export interface SeedFile {
+  bucket: string
+  id: string
+  file: StoredFile
+}
+
+/** Initial content for a brand-new database (the local demo dataset). */
+export interface DatabaseSeed {
+  /** State factories by snapshot key; modules without one start from `empty`. */
+  snapshots: Readonly<Record<string, () => unknown>>
+  files?: () => SeedFile[]
+}
+
 export interface StorageOptions {
-  /** Fill a brand-new database with demo data. */
-  seedDemo?: boolean
+  /** Applied only when the database has no snapshots at all. */
+  seed?: DatabaseSeed
 }
 
 export function createStorage(db: Database, options: StorageOptions = {}) {
   const { count } = db.prepare('SELECT COUNT(*) AS count FROM snapshots').get() as { count: number }
-  const shouldSeed = count === 0 && options.seedDemo !== false
+  const seed = count === 0 ? options.seed : undefined
   const selectSnapshot = db.prepare('SELECT value FROM snapshots WHERE key = ?')
   const upsertSnapshot = db.prepare(
     `INSERT INTO snapshots (key, value, updated_at) VALUES (?, ?, ?)
@@ -94,12 +105,17 @@ export function createStorage(db: Database, options: StorageOptions = {}) {
     upsertSnapshot.run(key, JSON.stringify(state), new Date().toISOString())
   }
 
+  for (const { bucket, id, file } of seed?.files?.() ?? []) {
+    upsertFile.run(bucket, id, file.mimeType, file.data)
+  }
+
   return {
     db,
 
     snapshot<T>(key: string, init: SnapshotOptions<T>): Snapshot<T> {
       const row = selectSnapshot.get(key) as { value: string } | undefined
-      const state = row ? (JSON.parse(row.value) as T) : shouldSeed ? init.seed() : init.empty()
+      const seeded = seed?.snapshots[key]
+      const state = row ? (JSON.parse(row.value) as T) : seeded ? (seeded() as T) : init.empty()
       if (!row) save(key, state)
       return { state, save: (next) => save(key, next) }
     },

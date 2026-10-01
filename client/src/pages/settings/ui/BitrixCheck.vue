@@ -33,7 +33,7 @@ async function check() {
         <dt>Режим</dt>
         <dd>
           <span class="ui-badge" :class="result.mode === 'live' ? 'ui-badge--ok' : 'ui-badge--warn'">
-            {{ result.mode === 'live' ? 'Битрикс24' : 'Демо-хранилище (mock)' }}
+            {{ result.mode === 'live' ? 'Битрикс24' : 'Битрикс не подключён (локальное хранилище)' }}
           </span>
         </dd>
       </div>

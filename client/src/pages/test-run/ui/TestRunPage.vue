@@ -12,7 +12,7 @@ import {
 import { ApiError, errorMessage } from '@/shared/api'
 import { formatDateRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
-import { UiButton } from '@/shared/ui'
+import { AppLogo, UiButton } from '@/shared/ui'
 import { useAutosave } from '../model/use-autosave'
 import RunResult from './RunResult.vue'
 
@@ -244,7 +244,7 @@ onBeforeUnmount(() => {
 <template>
   <main class="run">
     <header class="run__brand">
-      <span class="run__logo" aria-hidden="true">А</span>
+      <AppLogo :size="28" />
       <span>АММИР · Проверка знаний</span>
     </header>
 
@@ -430,17 +430,6 @@ onBeforeUnmount(() => {
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
   font-weight: 600;
-}
-
-.run__logo {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius);
-  background: var(--brand-mark-bg);
-  color: var(--text-on-accent);
-  font-weight: 800;
 }
 
 .run__card {

@@ -7,7 +7,6 @@ import {
   materialMimeType,
   type StorageCheck,
 } from '../../shared.js'
-import { SEED_FILE_PREFIX } from './seed.js'
 
 export interface StorageFolder {
   folderId: string
@@ -51,13 +50,13 @@ function cleanName(name: string): string {
 
 // ─── Mock ─────────────────────────────────────────────────────────────────
 
-interface MockFolder {
+export interface MockFolder {
   id: string
   name: string
   parentId: string | null
 }
 
-interface MockFile {
+export interface MockFile {
   id: string
   name: string
   folderId: string
@@ -65,24 +64,25 @@ interface MockFile {
   mimeType: string
 }
 
-interface MockDisk {
+export interface MockDisk {
   seq: number
   folders: MockFolder[]
   files: MockFile[]
 }
 
-const MOCK_ROOT_ID = 'mock-root'
-const MOCK_URL = 'https://bitrix.mock/disk/file/'
+export const MOCK_DISK_KEY = 'training-bitrix-mock'
+export const MOCK_ROOT_ID = 'mock-root'
+export const MOCK_URL = 'https://bitrix.mock/disk/file/'
 
-function emptyDisk(): MockDisk {
+export function emptyMockDisk(): MockDisk {
   return { seq: 0, folders: [{ id: MOCK_ROOT_ID, name: TRAINING_ROOT_FOLDER, parentId: null }], files: [] }
 }
 
 /** Keeps the same model as the real Disk: folders, files and paths `mock-disk/Учебные материалы/...`. */
 export function createMockTrainingStorage(storage: Storage): TrainingStorage {
-  const snapshot = storage.snapshot<MockDisk>('training-bitrix-mock', { seed: emptyDisk, empty: emptyDisk })
+  const snapshot = storage.snapshot<MockDisk>(MOCK_DISK_KEY, { empty: emptyMockDisk })
   const disk = snapshot.state
-  const contents = storage.files('training-bitrix-mock')
+  const contents = storage.files(MOCK_DISK_KEY)
 
   function nextId(prefix: string) {
     disk.seq += 1
@@ -122,7 +122,7 @@ export function createMockTrainingStorage(storage: Storage): TrainingStorage {
   }
 
   function placeholder(file: MockFile): StoredFile {
-    const text = `\uFEFFДемо-файл Битрикс Диска (мок)\r\n${info(file).path}\r\n`
+    const text = `\uFEFFФайл мок-хранилища Битрикс Диска (содержимое не загружалось)\r\n${info(file).path}\r\n`
     return { data: Buffer.from(text, 'utf8'), mimeType: 'text/plain; charset=utf-8' }
   }
 
@@ -160,10 +160,6 @@ export function createMockTrainingStorage(storage: Storage): TrainingStorage {
     async getFile(fileId) {
       const entry = disk.files.find((f) => f.id === fileId)
       if (entry) return contents.get(fileId) ?? placeholder(entry)
-      if (fileId.startsWith(SEED_FILE_PREFIX)) {
-        const text = '\uFEFFДемо-материал модуля «Обучение» (мок Битрикс Диска)\r\n'
-        return { data: Buffer.from(text, 'utf8'), mimeType: 'text/plain; charset=utf-8' }
-      }
       throw new HttpError(404, FILE_UNAVAILABLE)
     },
 

@@ -33,6 +33,7 @@
 :root {
   --midnight: #242d3d;
   --midnight-soft: #2e3a4f;
+  --ammir-navy: #1b1a4f;
   --lavender: #ced9eb;
   --white-smoke: #eef0f3;
   --paper: #ffffff;
@@ -100,6 +101,8 @@
   --accent-subtle: var(--row-selected);
   --focus-ring: rgb(0 136 255 / 18%);
   --brand-mark-bg: var(--dodger);
+  --brand-logo-bg: var(--ammir-navy);
+  --brand-logo-fg: var(--paper);
 
   --neutral-solid: var(--midnight);
   --neutral-solid-hover: var(--midnight-soft);
@@ -238,6 +241,8 @@
     --accent-subtle: #13304f;
     --focus-ring: rgb(61 155 255 / 35%);
     --brand-mark-bg: #0088ff;
+    --brand-logo-bg: #1b1a4f;
+    --brand-logo-fg: #ffffff;
 
     --neutral-solid: #34425a;
     --neutral-solid-hover: #3e4d67;

@@ -9,8 +9,6 @@ import {
   type ReportWorkItem,
 } from '../../shared.js'
 import type { ContractsRepository } from '../contracts/repository.js'
-import { reportsSeed } from './seed.js'
-
 function byDateDesc(a: DailyReport, b: DailyReport) {
   return b.date.localeCompare(a.date)
 }
@@ -50,7 +48,7 @@ function parseDraft(body: Partial<DailyReportDraft>): DailyReportDraft {
 }
 
 export function createReportsRepository(contracts: ContractsRepository, storage: Storage) {
-  const snapshot = storage.snapshot<DailyReport[]>('reports', { seed: reportsSeed, empty: () => [] })
+  const snapshot = storage.snapshot<DailyReport[]>('reports', { empty: () => [] })
   let reports = snapshot.state
 
   const repository = {
