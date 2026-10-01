@@ -1,180 +1,156 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { contractsApi } from '../api/mock'
-import type {
-  Contract,
-  ContractDraft,
-  ContractObject,
-  DeadlineEdit,
-  ObjectDraft,
-} from './types'
-
-function uid(prefix: string) {
-  return `${prefix}-${crypto.randomUUID().slice(0, 8)}`
-}
+import { errorMessage } from '@/shared/api'
+import { contractsApi } from '../api/contracts'
+import type { Contract, ContractDraft, ObjectDraft, ObjectPatch, WorkDraft } from './types'
 
 export const useContractsStore = defineStore('contracts', () => {
   const items = ref<Contract[]>([])
   const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
-  const errorMessage = ref('')
+  const errorText = ref('')
+  const actionError = ref('')
+  const busy = ref(false)
   const selectedContractId = ref<string | null>(null)
-  const expandedObjectIds = ref<Set<string>>(new Set())
+  const selectedObjectId = ref<string | null>(null)
 
   const selectedContract = computed(
     () => items.value.find((c) => c.id === selectedContractId.value) ?? null,
+  )
+
+  const selectedObject = computed(
+    () => selectedContract.value?.objects.find((o) => o.id === selectedObjectId.value) ?? null,
   )
 
   const isEmpty = computed(() => status.value === 'ready' && items.value.length === 0)
 
   async function load() {
     status.value = 'loading'
-    errorMessage.value = ''
+    errorText.value = ''
     try {
       items.value = await contractsApi.list()
       status.value = 'ready'
-      if (!selectedContractId.value && items.value[0]) {
-        selectedContractId.value = items.value[0].id
-        items.value[0].objects.forEach((o) => expandedObjectIds.value.add(o.id))
-      }
+      if (!items.value.some((c) => c.id === selectedContractId.value)) selectContract(null)
     } catch (e) {
       status.value = 'error'
-      errorMessage.value = e instanceof Error ? e.message : 'Ошибка загрузки'
+      errorText.value = errorMessage(e, 'Ошибка загрузки')
     }
   }
 
-  async function persist() {
-    items.value = await contractsApi.saveAll(items.value)
+  function replace(contract: Contract) {
+    const idx = items.value.findIndex((c) => c.id === contract.id)
+    if (idx >= 0) items.value[idx] = contract
+    else items.value = [contract, ...items.value]
   }
 
-  function selectContract(id: string) {
+  async function mutate(action: () => Promise<void>): Promise<boolean> {
+    busy.value = true
+    actionError.value = ''
+    try {
+      await action()
+      return true
+    } catch (e) {
+      actionError.value = errorMessage(e, 'Не удалось сохранить')
+      return false
+    } finally {
+      busy.value = false
+    }
+  }
+
+  function selectContract(id: string | null) {
     selectedContractId.value = id
+    selectedObjectId.value = null
   }
 
-  function toggleObject(id: string) {
-    const next = new Set(expandedObjectIds.value)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    expandedObjectIds.value = next
+  function selectObject(id: string | null, contractId = selectedContractId.value) {
+    selectedContractId.value = contractId
+    selectedObjectId.value = id
   }
 
-  function isObjectExpanded(id: string) {
-    return expandedObjectIds.value.has(id)
+  function createContract(draft: ContractDraft) {
+    return mutate(async () => {
+      const contract = await contractsApi.create(draft)
+      replace(contract)
+      selectContract(contract.id)
+    })
   }
 
-  async function createContract(draft: ContractDraft) {
-    const contract: Contract = {
-      id: uid('c'),
-      name: draft.name.trim(),
-      customer: draft.customer.trim(),
-      year: draft.year,
-      objects: [],
-    }
-    items.value = [contract, ...items.value]
-    selectedContractId.value = contract.id
-    await persist()
+  function updateContract(id: string, draft: ContractDraft) {
+    return mutate(async () => replace(await contractsApi.update(id, draft)))
   }
 
-  async function updateContract(id: string, draft: ContractDraft) {
-    const idx = items.value.findIndex((c) => c.id === id)
-    if (idx < 0) return
-    const current = items.value[idx]
-    items.value[idx] = {
-      ...current,
-      name: draft.name.trim(),
-      customer: draft.customer.trim(),
-      year: draft.year,
-    }
-    await persist()
+  function removeContract(id: string) {
+    return mutate(async () => {
+      await contractsApi.remove(id)
+      items.value = items.value.filter((c) => c.id !== id)
+      if (selectedContractId.value === id) selectContract(null)
+    })
   }
 
-  async function removeContract(id: string) {
-    items.value = items.value.filter((c) => c.id !== id)
-    if (selectedContractId.value === id) {
-      selectedContractId.value = items.value[0]?.id ?? null
-    }
-    await persist()
+  function setContractArchived(id: string, archived: boolean) {
+    return mutate(async () => replace(await contractsApi.setArchived(id, archived)))
   }
 
-  async function addObject(contractId: string, draft: ObjectDraft) {
-    const contract = items.value.find((c) => c.id === contractId)
-    if (!contract) return
-    const object: ContractObject = {
-      id: uid('o'),
-      name: draft.name.trim(),
-      location: draft.location.trim(),
-      plannedStart: draft.plannedStart,
-      plannedEnd: draft.plannedEnd,
-      works: [],
-      deadlineEdits: [],
-    }
-    contract.objects.push(object)
-    expandedObjectIds.value = new Set(expandedObjectIds.value).add(object.id)
-    await persist()
+  function setObjectArchived(contractId: string, objectId: string, archived: boolean) {
+    return mutate(async () => replace(await contractsApi.setObjectArchived(contractId, objectId, archived)))
   }
 
-  async function updateObject(
-    contractId: string,
-    objectId: string,
-    patch: Partial<Pick<ContractObject, 'name' | 'location' | 'plannedStart' | 'plannedEnd' | 'actualStart' | 'actualEnd'>>,
-    editNote = '',
-  ) {
-    const contract = items.value.find((c) => c.id === contractId)
-    const object = contract?.objects.find((o) => o.id === objectId)
-    if (!object) return
-
-    const edits: DeadlineEdit[] = []
-    const deadlineFields = ['plannedStart', 'plannedEnd', 'actualStart', 'actualEnd'] as const
-    for (const field of deadlineFields) {
-      if (patch[field] !== undefined && patch[field] !== object[field]) {
-        edits.push({
-          id: uid('e'),
-          field,
-          previousValue: object[field] ?? '',
-          newValue: patch[field] ?? '',
-          editedAt: new Date().toISOString(),
-          note: editNote || 'Срок изменён',
-        })
-      }
-    }
-
-    Object.assign(object, patch)
-    if (edits.length) object.deadlineEdits = [...edits, ...object.deadlineEdits]
-    await persist()
+  function addObject(contractId: string, draft: ObjectDraft) {
+    return mutate(async () => {
+      const before = new Set(selectedContract.value?.objects.map((o) => o.id))
+      const contract = await contractsApi.addObject(contractId, draft)
+      replace(contract)
+      const created = contract.objects.find((o) => !before.has(o.id))
+      if (created) selectedObjectId.value = created.id
+    })
   }
 
-  async function removeObject(contractId: string, objectId: string) {
-    const contract = items.value.find((c) => c.id === contractId)
-    if (!contract) return
-    contract.objects = contract.objects.filter((o) => o.id !== objectId)
-    const next = new Set(expandedObjectIds.value)
-    next.delete(objectId)
-    expandedObjectIds.value = next
-    await persist()
+  function updateObject(contractId: string, objectId: string, patch: ObjectPatch, note = '') {
+    return mutate(async () => replace(await contractsApi.updateObject(contractId, objectId, patch, note)))
   }
 
-  async function retryWithSimulatedError() {
-    contractsApi.simulateErrorOnce()
-    await load()
+  function removeObject(contractId: string, objectId: string) {
+    return mutate(async () => {
+      replace(await contractsApi.removeObject(contractId, objectId))
+      if (selectedObjectId.value === objectId) selectedObjectId.value = null
+    })
+  }
+
+  function addWork(contractId: string, objectId: string, draft: WorkDraft) {
+    return mutate(async () => replace(await contractsApi.addWork(contractId, objectId, draft)))
+  }
+
+  function updateWork(contractId: string, objectId: string, workId: string, draft: WorkDraft) {
+    return mutate(async () => replace(await contractsApi.updateWork(contractId, objectId, workId, draft)))
+  }
+
+  function removeWork(contractId: string, objectId: string, workId: string) {
+    return mutate(async () => replace(await contractsApi.removeWork(contractId, objectId, workId)))
   }
 
   return {
     items,
     status,
-    errorMessage,
+    errorText,
+    actionError,
+    busy,
     selectedContractId,
     selectedContract,
-    expandedObjectIds,
+    selectedObjectId,
+    selectedObject,
     isEmpty,
     load,
     selectContract,
-    toggleObject,
-    isObjectExpanded,
+    selectObject,
     createContract,
     updateContract,
     removeContract,
+    setContractArchived,
+    setObjectArchived,
     addObject,
     updateObject,
     removeObject,
-    retryWithSimulatedError,
+    addWork,
+    updateWork,
+    removeWork,
   }
 })

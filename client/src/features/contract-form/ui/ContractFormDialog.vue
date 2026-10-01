@@ -45,7 +45,7 @@ function onSubmit() {
     :title="contract ? 'Редактировать контракт' : 'Новый контракт'"
     @close="emit('close')"
   >
-    <form class="form" @submit.prevent="onSubmit">
+    <form class="ui-form" @submit.prevent="onSubmit">
       <UiInput v-model="form.name" label="Название контракта" required placeholder="Договор №…" />
       <UiInput v-model="form.customer" label="Заказчик" required placeholder="ООО «…»" />
       <UiInput
@@ -55,24 +55,10 @@ function onSubmit() {
         required
         @update:model-value="form.year = Number($event)"
       />
-      <div class="form__actions">
+      <div class="ui-form__actions">
         <UiButton variant="ghost" type="button" @click="emit('close')">Отмена</UiButton>
         <UiButton variant="primary" type="submit">Сохранить</UiButton>
       </div>
     </form>
   </UiDialog>
 </template>
-
-<style scoped>
-.form {
-  display: grid;
-  gap: 0.9rem;
-}
-
-.form__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.35rem;
-}
-</style>

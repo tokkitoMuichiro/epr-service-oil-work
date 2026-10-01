@@ -1,39 +1,69 @@
 # ERP АММИР
 
-Внутренняя ERP-система компании **АММИР**: контракты и графики объектов, персонал, полевые отчёты, оборудование.
+Внутренняя ERP-система компании **АММИР**: контракты и графики объектов, персонал и бригады, полевые отчёты, оборудование.
 
-Стек: **Vite + Vue 3 + TypeScript + Pinia + Vue Router** (клиент) + **Node.js** API. Архитектура фронта — Feature-Sliced Design (FSD). UI на русском. Хостинг — VDS.
+Стек: **Vite + Vue 3 + TypeScript + Pinia + Vue Router** (клиент, Feature-Sliced Design) + **Express 5 + TypeScript** (API). UI на русском. Хостинг — VDS.
 
-Визуальный стиль и токены — из модуля учёта оборудования ([`-quipment-accounting`](https://github.com/tokkitoMuichiro/-quipment-accounting)): Montserrat, midnight/dodger, radius 2px.
+Визуальный стиль — из модуля учёта оборудования ([`-quipment-accounting`](https://github.com/tokkitoMuichiro/-quipment-accounting)): Montserrat, midnight `#242d3d` / dodger `#0088ff`, radius 2px.
 
-## Структура репозитория
+## Структура
 
 ```
-client/   # Vite Vue SPA (FSD)
-server/   # Node.js API (Express): /health + stubs /api/reports* + /api/equipment*
+client/   # Vite Vue SPA (FSD: app, pages, widgets, features, entities, shared)
+server/   # Express API: модули contracts, reports, equipment, personnel (+ brigades, assignments)
+shared/   # Общие типы и чистая доменная логика (права, валидация, даты); @shared/* в клиенте
+scripts/  # dev-all.mjs — запуск API и клиента одной командой
+deploy/   # systemd unit и пример nginx
+docs/     # контекст проекта, передача агенту, деплой
 ```
 
 ## Запуск локально
 
 ```bash
 npm install
-npm run dev:client   # http://127.0.0.1:4567
-npm run dev:server   # http://127.0.0.1:4568/health
+npm run dev:all      # API http://127.0.0.1:4568 + клиент http://127.0.0.1:4567
 ```
 
-Или оба сразу: `npm run dev:all`. Только клиент: `npm run dev`.
+По отдельности: `npm run dev:server`, `npm run dev:client`. Клиент проксирует `/api` и `/health` на `127.0.0.1:4568` (переопределяется `API_PROXY_TARGET`).
 
 ```bash
-npm run build
+npm run check        # vue-tsc + tsc + тесты (node:test через tsx)
+npm run build        # client/dist + server/dist
+CLIENT_DIST=client/dist npm start   # один процесс: API + SPA
 ```
 
-## Текущий MVP-срез
+Деплой на VDS — [docs/deploy.md](docs/deploy.md).
 
-- Оболочка + переключатель ролей (Админ / Мастер / Кладовщик / Офис); на мобильном — шапка + выезжающее меню
-- **Контракты**: список, CRUD, объекты, линейный график
-- **Ежедневные отчёты**: объекты из контрактов, мастер нового отчёта, архив, mock Disk
-- **Оборудование**: список с фильтрами (серийное/неномерное, состояние), базы включая «Ремонт», передачи (принять/отменить), права по ролям как в исходном модуле
-- **Персонал**: заглушка с маскировкой СНИЛС
-- Данные — in-memory mock (loading / error / empty)
-- API: `GET /health`, stubs `GET/POST /api/reports*`, stubs `GET /api/equipment*`
-- Лёгкий PWA shell (manifest + SW)
+## Роли
+
+Демо-переключатель в оболочке (сохраняется в `localStorage`), роль передаётся заголовком `x-erp-role`, права проверяются на сервере.
+
+| Роль | Доступ |
+|------|--------|
+| Админ | Всё; **ПДн (СНИЛС, паспорт, дата рождения) — только эта роль** |
+| Мастер | Свои позиции оборудования, планирование бригад, отчёты |
+| Кладовщик | Оборудование своих баз по матрице прав модуля учёта |
+| Офис | Просмотр, персонал, планирование бригад |
+
+«Бригадир» — назначение внутри бригады, не системная роль.
+
+## Модули
+
+- **Контракты** — CRUD договоров и объектов, линейный график план/факт, журнал правки сроков, полосы назначений бригад и кнопка «Бригада».
+- **Персонал** — сотрудники, документы об обучении со сроками (истекает / просрочен), статусы работает / запланирован / свободен, бригады (один человек — одна бригада), мок-папка Bitrix Disk «учет персонала».
+- **Ежедневные отчёты** — объекты из контрактов, мастер отчёта, архив, путь на мок-диске, подстановка состава бригад на дату.
+- **Оборудование** — список, базы (включая «Ремонт»), передачи с подтверждением, история операций, документы, экспорт в Excel и мок-выгрузка в Битрикс, матрица прав.
+
+Данные хранятся в памяти сервера (демо-сиды, сброс при перезапуске). Интеграция с Битрикс — мок.
+
+## API (кратко)
+
+| Путь | Назначение |
+|------|------------|
+| `GET /health` | Проверка живости |
+| `/api/contracts` | Договоры, `/:id/objects` — объекты |
+| `/api/reports` | `/objects?q`, `/:objectId/dates`, `/:objectId/:date`, `POST /` |
+| `/api/equipment` | `/state`, `/transfers`, `/:id/condition|accept|cancel|history|documents`, `/export.xls`, `/export/bitrix` |
+| `/api/personnel` | Сотрудники, `/:id/documents` |
+| `/api/brigades` | Бригады |
+| `/api/assignments` | Назначения бригад на объекты, `/crew?objectId&date` |

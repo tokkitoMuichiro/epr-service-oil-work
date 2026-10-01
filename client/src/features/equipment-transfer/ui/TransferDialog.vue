@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import {
+  assetDisplayName,
+  identityLabel,
+  positionsLabel,
   useEquipmentStore,
+  type BulkTransferResult,
   type EquipmentItem,
   type OwnerType,
-  type TransferDraft,
 } from '@/entities/equipment'
 import { UiButton, UiDialog } from '@/shared/ui'
 
-const props = defineProps<{ open: boolean; item: EquipmentItem | null }>()
+const props = defineProps<{ open: boolean; items: EquipmentItem[] }>()
 const emit = defineEmits<{ close: []; saved: [] }>()
 
 const store = useEquipmentStore()
@@ -19,164 +22,190 @@ const form = reactive({
   toWarehouseId: '',
   quantity: 1,
 })
+const result = ref<BulkTransferResult | null>(null)
+
+const single = computed(() => (props.items.length === 1 ? props.items[0] : null))
+const isBulk = computed(() => props.items.length > 1)
+
+function ownsAll(ownerType: OwnerType, ownerId: string) {
+  return props.items.every((i) =>
+    i.ownerType === ownerType && (ownerType === 'USER' ? i.ownerUserId : i.ownerWarehouseId) === ownerId,
+  )
+}
+
+const recipients = computed(() => store.people.filter((p) => !ownsAll('USER', p.id)))
+
+const bases = computed(() => store.warehouses.filter((w) => !ownsAll('WAREHOUSE', w.id)))
+
+const isRepairTarget = computed(
+  () => form.toOwnerType === 'WAREHOUSE' && form.toWarehouseId === store.repairWarehouse?.id,
+)
 
 const error = computed(() => {
-  if (!props.item) return 'Нет позиции'
+  if (!props.items.length) return 'Не выбраны позиции'
   if (form.toOwnerType === 'USER' && !form.toUserId) return 'Выберите получателя'
   if (form.toOwnerType === 'WAREHOUSE' && !form.toWarehouseId) return 'Выберите базу'
-  if (props.item.type === 'CONSUMABLE' && form.quantity < 1) return 'Количество ≥ 1'
-  if (props.item.type === 'CONSUMABLE' && form.quantity > props.item.quantity) {
-    return `Доступно только ${props.item.quantity} шт.`
+  const item = single.value
+  if (item?.type === 'CONSUMABLE' && !(form.quantity >= 1 && form.quantity <= item.quantity)) {
+    return `Укажите количество от 1 до ${item.quantity}`
   }
+  if (isRepairTarget.value && props.items.some((i) => i.category === 'CARD')) return 'Карты не отправляют в ремонт'
   return ''
 })
 
-const isRepairTarget = computed(() => {
-  if (form.toOwnerType !== 'WAREHOUSE') return false
-  return store.warehouses.find((w) => w.id === form.toWarehouseId)?.slug === 'repair'
-})
-
 watch(
-  () => [props.open, props.item?.id] as const,
-  ([open]) => {
-    if (!open || !props.item) return
+  () => props.open,
+  (open) => {
+    if (!open) return
+    store.clearActionError()
+    result.value = null
     form.toOwnerType = 'USER'
-    form.toUserId =
-      store.people.find((p: { id: string }) => p.id !== store.auth.user.id)?.id ?? ''
-    form.toWarehouseId =
-      store.warehouses.find((w: { id: string; isSystem: boolean }) => !w.isSystem)?.id ?? ''
-    form.quantity = props.item.type === 'SERIAL' ? 1 : Math.min(1, props.item.quantity)
+    form.toUserId = ''
+    form.toWarehouseId = ''
+    form.quantity = single.value?.quantity ?? 1
   },
 )
 
+function itemName(id: string) {
+  const item = props.items.find((i) => i.id === id)
+  return item ? assetDisplayName(item) : id
+}
+
 async function save() {
-  if (!props.item || error.value) return
-  const draft: TransferDraft = {
-    equipmentId: props.item.id,
-    quantity: props.item.type === 'SERIAL' ? 1 : form.quantity,
+  if (error.value) return
+  const target = {
     toOwnerType: form.toOwnerType,
     toUserId: form.toOwnerType === 'USER' ? form.toUserId : undefined,
     toWarehouseId: form.toOwnerType === 'WAREHOUSE' ? form.toWarehouseId : undefined,
   }
-  await store.createTransfer(draft)
+  if (single.value) {
+    const item = single.value
+    const isDone = await store.createTransfer({
+      ...target,
+      equipmentId: item.id,
+      quantity: item.type === 'SERIAL' ? 1 : form.quantity,
+    })
+    if (!isDone) return
+    emit('saved')
+    emit('close')
+    return
+  }
+  const outcome = await store.bulkTransfer({ ...target, ids: props.items.map((i) => i.id) })
+  if (!outcome) return
   emit('saved')
-  emit('close')
+  if (outcome.failed.length) result.value = outcome
+  else emit('close')
 }
 </script>
 
 <template>
-  <UiDialog :open="open" title="Передача оборудования" @close="emit('close')">
-    <form v-if="item" class="form" @submit.prevent="save">
+  <UiDialog :open="open" :title="isBulk ? 'Массовая передача' : 'Передача'" @close="emit('close')">
+    <div v-if="result" class="ui-form">
       <p class="summary">
-        <strong>{{ item.name }}</strong>
-        <span v-if="item.factoryNumber"> · № {{ item.factoryNumber }}</span>
-        <span v-else> · {{ item.quantity }} шт.</span>
+        Передано: <strong>{{ positionsLabel(result.transferred) }}</strong>. Не удалось:
+        <strong>{{ result.failed.length }}</strong>.
+      </p>
+      <ul class="failed">
+        <li v-for="f in result.failed" :key="f.id">
+          <strong>{{ itemName(f.id) }}</strong>
+          <span>{{ f.message }}</span>
+        </li>
+      </ul>
+      <div class="ui-form__actions">
+        <UiButton variant="primary" @click="emit('close')">Готово</UiButton>
+      </div>
+    </div>
+
+    <form v-else class="ui-form" novalidate @submit.prevent="save">
+      <p v-if="single" class="summary">
+        <strong>{{ assetDisplayName(single) }}</strong>
+        <span v-if="single.type === 'SERIAL'"> · {{ identityLabel(single) }}</span>
+        <span v-else> · {{ single.quantity }} шт.</span>
+      </p>
+      <p v-else class="summary">
+        Выбрано: <strong>{{ positionsLabel(items.length) }}</strong>. Неномерные позиции передаются целиком.
       </p>
 
-      <label>
-        <span>Куда</span>
-        <select v-model="form.toOwnerType">
-          <option value="USER">Сотруднику</option>
-          <option value="WAREHOUSE">На базу</option>
-        </select>
+      <div class="ui-form__row">
+        <label>
+          <span>Куда</span>
+          <select v-model="form.toOwnerType">
+            <option value="USER">Сотруднику</option>
+            <option value="WAREHOUSE">На базу</option>
+          </select>
+        </label>
+        <label v-if="form.toOwnerType === 'USER'">
+          <span>Получатель</span>
+          <select v-model="form.toUserId">
+            <option disabled value="">Выберите</option>
+            <option v-for="p in recipients" :key="p.id" :value="p.id">{{ p.fullName }}</option>
+          </select>
+        </label>
+        <label v-else>
+          <span>База</span>
+          <select v-model="form.toWarehouseId">
+            <option disabled value="">Выберите</option>
+            <option v-for="w in bases" :key="w.id" :value="w.id">
+              {{ w.name }}{{ w.isSystem ? ' (системная)' : '' }}
+            </option>
+          </select>
+        </label>
+      </div>
+
+      <label v-if="single?.type === 'CONSUMABLE'">
+        <span>Количество (из {{ single.quantity }})</span>
+        <input v-model.number="form.quantity" type="number" min="1" :max="single.quantity" />
       </label>
 
-      <label v-if="form.toOwnerType === 'USER'">
-        <span>Получатель</span>
-        <select v-model="form.toUserId">
-          <option disabled value="">Выберите</option>
-          <option v-for="p in store.people" :key="p.id" :value="p.id">{{ p.fullName }}</option>
-        </select>
-      </label>
-      <label v-else>
-        <span>База</span>
-        <select v-model="form.toWarehouseId">
-          <option disabled value="">Выберите</option>
-          <option v-for="w in store.warehouses" :key="w.id" :value="w.id">
-            {{ w.name }}{{ w.isSystem ? ' (системная)' : '' }}
-          </option>
-        </select>
-      </label>
-
-      <label v-if="item.type === 'CONSUMABLE'">
-        <span>Количество (из {{ item.quantity }})</span>
-        <input v-model.number="form.quantity" type="number" min="1" :max="item.quantity" />
-      </label>
-
-      <p class="note">
+      <p class="ui-form__note">
         <template v-if="isRepairTarget">
-          На базу «Ремонт» передача выполняется сразу, без подтверждения.
+          На базу «Ремонт» передача выполняется сразу, состояние станет «В ремонте».
         </template>
         <template v-else>
-          Позиция останется у отправителя со статусом «Ждёт принятия», пока получатель не
-          подтвердит.
+          Позиция останется у отправителя со статусом «Ждёт принятия», пока получатель не подтвердит.
         </template>
       </p>
 
-      <p v-if="error" class="hint">{{ error }}</p>
+      <p v-if="error" class="ui-form__hint">{{ error }}</p>
+      <p v-else-if="store.actionError" class="ui-form__hint" role="alert">{{ store.actionError }}</p>
 
-      <div class="actions">
+      <div class="ui-form__actions">
         <UiButton type="button" variant="ghost" @click="emit('close')">Отмена</UiButton>
-        <UiButton type="submit" variant="primary" :disabled="Boolean(error)">Передать</UiButton>
+        <UiButton type="submit" variant="primary" :disabled="Boolean(error) || store.busy">Передать</UiButton>
       </div>
     </form>
   </UiDialog>
 </template>
 
 <style scoped>
-.form {
-  display: grid;
-  gap: 14px;
-}
-
 .summary {
   margin: 0;
   padding: 12px 14px;
-  background: var(--table-head);
-  border: 1px solid var(--line);
+  background: var(--table-head-bg);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-}
-
-label {
-  display: grid;
-  gap: 6px;
-}
-
-label span {
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-input,
-select {
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  min-height: var(--control-height);
-  padding: 0 12px;
-  background: var(--paper);
-  color: var(--ink);
-  width: 100%;
-}
-
-.note {
-  margin: 0;
-  color: var(--muted);
-  font-size: var(--font-size-sm);
   line-height: 1.45;
 }
 
-.hint {
+.failed {
+  display: grid;
+  gap: 6px;
   margin: 0;
-  color: var(--bad);
-  font-size: var(--font-size-sm);
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-xs);
 }
 
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+.failed li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--status-bad-solid);
+  background: var(--status-bad-bg);
+  border-radius: var(--radius);
+}
+
+.failed span {
+  color: var(--status-bad-fg);
 }
 </style>

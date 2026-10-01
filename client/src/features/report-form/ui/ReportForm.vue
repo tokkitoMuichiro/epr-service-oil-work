@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import { assignmentsApi, type CrewMember, type ObjectCrew } from '@/entities/brigade'
 import type { DailyReport, DailyReportDraft, DronePeriod } from '@/entities/daily-report'
-import { UiButton, UiInput, UiTextarea } from '@/shared/ui'
+import { errorMessage } from '@/shared/api'
+import { IconClose, UiButton, UiInput, UiTextarea } from '@/shared/ui'
+import { isIsoDate, todayIso } from '@shared/dates'
 
 const props = defineProps<{
   objectId: string
@@ -23,7 +26,7 @@ const formError = ref('')
 function emptyDraft(): DailyReportDraft {
   return {
     objectId: props.objectId,
-    date: new Date().toISOString().slice(0, 10),
+    date: todayIso(),
     authorName: '',
     workStartFrom: '08:00',
     workStartTo: '08:30',
@@ -83,6 +86,57 @@ watch(
   },
   { immediate: true },
 )
+
+const crew = ref<ObjectCrew[]>([])
+const crewStatus = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
+const crewError = ref('')
+let crewRequest = 0
+
+async function loadCrew(objectId: string, date: string) {
+  const request = ++crewRequest
+  crewStatus.value = 'loading'
+  crewError.value = ''
+  try {
+    const result = await assignmentsApi.crew(objectId, date)
+    if (request !== crewRequest) return
+    crew.value = result
+    crewStatus.value = 'ready'
+  } catch (e) {
+    if (request !== crewRequest) return
+    crew.value = []
+    crewStatus.value = 'error'
+    crewError.value = errorMessage(e, 'Не удалось загрузить назначения')
+  }
+}
+
+watch(
+  () => [props.objectId, draft.date] as const,
+  ([objectId, date]) => {
+    if (isIsoDate(date)) void loadCrew(objectId, date)
+  },
+  { immediate: true },
+)
+
+function onSite(list: CrewMember[]) {
+  return list.filter((p) => p.employment !== 'vacation')
+}
+
+const crewOnVacation = computed(() =>
+  crew.value.flatMap((c) => [...c.masters, ...c.foremen, ...c.members]).filter((p) => p.employment === 'vacation'),
+)
+
+function fillFromCrew() {
+  const masters = onSite(crew.value.flatMap((c) => c.masters))
+  const foremen = onSite(crew.value.flatMap((c) => c.foremen))
+  const workers = onSite(crew.value.flatMap((c) => c.members))
+  const names = (list: { fullName: string }[]) => list.map((p) => p.fullName).join(', ')
+  if (masters.length) draft.staffItr = `${masters.length} / ${names(masters)}`
+  if (foremen.length) draft.staffForemen = `${foremen.length} / ${names(foremen)}`
+  if (workers.length) {
+    const brigades = crew.value.map((c) => `«${c.brigadeName}»`).join(', ')
+    draft.staffWorkers = `${workers.length} / ${brigades}: ${names(workers)}`
+  }
+}
 
 const stepLabel = computed(() => {
   const labels = ['Смена', 'Персонал и этап', 'Техника и объёмы', 'СИЗ и план']
@@ -163,7 +217,7 @@ defineExpose({ applyInitial })
 <template>
   <form class="report-form" @submit.prevent="onSubmit">
     <div class="report-form__object">
-      <span class="muted">Объект</span>
+      <span class="ui-overline">Объект</span>
       <strong>{{ objectTitle }}</strong>
     </div>
 
@@ -204,12 +258,38 @@ defineExpose({ applyInitial })
         <div v-for="(period, index) in draft.dronePeriods" :key="index" class="drone__row">
           <UiInput v-model="period.from" label="С" type="time" />
           <UiInput v-model="period.to" label="По" type="time" />
-          <UiButton type="button" variant="ghost" @click="removeDronePeriod(index)">−</UiButton>
+          <UiButton type="button" variant="ghost" size="icon" aria-label="Удалить период" title="Удалить период" @click="removeDronePeriod(index)"><IconClose :size="18" /></UiButton>
         </div>
       </div>
     </div>
 
     <div v-show="step === 2" class="step">
+      <div class="crew">
+        <template v-if="crewStatus === 'loading'">Загрузка назначений бригад…</template>
+        <template v-else-if="crewStatus === 'error'">
+          <span class="crew__error">{{ crewError }}</span>
+          <UiButton type="button" variant="ghost" size="sm" @click="loadCrew(objectId, draft.date)">
+            Повторить
+          </UiButton>
+        </template>
+        <template v-else-if="!crew.length">На {{ draft.date }} бригады на объект не назначены.</template>
+        <template v-else>
+          <span>
+            На {{ draft.date }}:
+            <strong v-for="(c, i) in crew" :key="c.assignment.id">
+              {{ i ? ', ' : '' }}«{{ c.brigadeName }}» ({{ c.masters.length + c.foremen.length + c.members.length }} чел.{{
+                c.foremen.length ? `, бригадир ${c.foremen.map((f) => f.fullName).join(', ')}` : ''
+              }})
+            </strong>
+            <template v-if="crewOnVacation.length">
+              · в отпуске: {{ crewOnVacation.map((p) => p.fullName).join(', ') }} — в состав не подставляются
+            </template>
+          </span>
+          <UiButton type="button" variant="ghost" size="sm" @click="fillFromCrew">
+            Подставить состав
+          </UiButton>
+        </template>
+      </div>
       <p class="block-title">3. Количество персонала на объекте</p>
       <div class="row three">
         <UiInput v-model="draft.staffItr" label="ИТР" required placeholder="кол-во / ФИО" />
@@ -290,24 +370,20 @@ defineExpose({ applyInitial })
 <style scoped>
 .report-form {
   display: grid;
-  gap: 1rem;
+  gap: var(--space-5);
 }
 
 .report-form__object {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 0.75rem;
+  gap: var(--space-1) var(--space-3);
   align-items: baseline;
-  padding: 0.85rem 1rem;
-  background: rgb(23 16 68 / 4%);
-  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
 }
 
-.muted {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-muted);
+.report-form__object strong {
   font-weight: 600;
 }
 
@@ -318,33 +394,34 @@ defineExpose({ applyInitial })
 
 .wizard {
   display: grid;
-  gap: 0.4rem;
+  gap: var(--space-2);
 }
 
 .wizard__track {
   height: 6px;
-  border-radius: 999px;
-  background: rgb(23 16 68 / 8%);
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
   overflow: hidden;
 }
 
 .wizard__fill {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, var(--dodger), var(--dodger-deep));
+  border-radius: inherit;
+  background: var(--accent);
   transition: width 0.25s ease;
 }
 
 .wizard__label {
   margin: 0;
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
 .step {
   display: grid;
-  gap: 0.85rem;
+  gap: var(--space-4);
   animation: fade-in 0.2s ease;
 }
 
@@ -353,6 +430,7 @@ defineExpose({ applyInitial })
     opacity: 0;
     transform: translateY(4px);
   }
+
   to {
     opacity: 1;
     transform: none;
@@ -361,7 +439,7 @@ defineExpose({ applyInitial })
 
 .row {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
 .row.two {
@@ -373,56 +451,106 @@ defineExpose({ applyInitial })
 }
 
 .block-title {
-  margin: 0.25rem 0 0;
-  font-size: 0.85rem;
+  margin: var(--space-2) 0 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--font-size-xs);
   font-weight: 700;
-  color: var(--color-slate);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
 }
 
 .block-title em {
   font-style: normal;
   font-weight: 500;
-  color: var(--color-text-muted);
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .drone {
   display: grid;
-  gap: 0.55rem;
+  gap: var(--space-3);
 }
 
 .drone__head {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--space-2);
+}
+
+.drone__head .block-title {
+  flex: 1 1 100%;
 }
 
 .drone__row {
   display: grid;
   grid-template-columns: 1fr 1fr auto;
-  gap: 0.55rem;
+  gap: var(--space-2);
   align-items: end;
 }
 
 .error {
   margin: 0;
-  color: var(--color-danger);
-  font-size: 0.88rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--status-bad-border);
+  border-radius: var(--radius);
+  background: var(--status-bad-bg);
+  color: var(--status-bad-fg);
+  font-size: var(--font-size-sm);
+}
+
+.crew {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--status-info-border);
+  border-radius: var(--radius);
+  background: var(--status-info-bg);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.crew__error {
+  color: var(--status-bad-fg);
 }
 
 .nav {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  padding-top: 0.25rem;
+  gap: var(--space-2);
+  margin: 0 calc(-1 * var(--space-5)) calc(-1 * var(--space-5));
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-card);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 860px) {
   .row.two,
-  .row.three,
-  .drone__row {
-    grid-template-columns: 1fr;
+  .row.three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .report-form__toolbar :deep(.btn) {
+    width: 100%;
+  }
+
+  .nav {
+    margin: 0 calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
+    padding: var(--space-3) var(--space-4);
+    box-shadow: 0 -4px 12px var(--scroll-shadow);
+  }
+
+  .nav :deep(.btn) {
+    flex: 1 1 40%;
   }
 }
 </style>

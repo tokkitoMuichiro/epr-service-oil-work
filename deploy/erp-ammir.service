@@ -1,0 +1,23 @@
+[Unit]
+Description=ERP AMMIR (API + SPA)
+After=network.target
+
+[Service]
+Type=simple
+User=erp
+WorkingDirectory=/opt/erp-ammir
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=4568
+Environment=CLIENT_DIST=/opt/erp-ammir/client/dist
+Environment=DB_PATH=/opt/erp-ammir/data/erp.sqlite
+Environment=SEED_DEMO=0
+Environment=TRUST_PROXY=1
+Environment=ADMIN_LOGIN=admin
+# ADMIN_PASSWORD задаётся через `systemctl edit erp-ammir`, не в этом файле
+ExecStart=/usr/bin/node server/dist/server/src/index.js
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

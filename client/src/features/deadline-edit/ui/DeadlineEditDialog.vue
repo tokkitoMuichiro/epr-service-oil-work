@@ -50,13 +50,13 @@ function onSubmit() {
 
 <template>
   <UiDialog :open="open" title="Сроки объекта" @close="emit('close')">
-    <form v-if="object" class="form" @submit.prevent="onSubmit">
+    <form v-if="object" class="ui-form" @submit.prevent="onSubmit">
       <p class="hint">{{ object.name }} · {{ object.location }}</p>
-      <div class="form__row">
+      <div class="ui-form__row">
         <UiInput v-model="form.plannedStart" label="План: начало" type="date" required />
         <UiInput v-model="form.plannedEnd" label="План: окончание" type="date" required />
       </div>
-      <div class="form__row">
+      <div class="ui-form__row">
         <UiInput v-model="form.actualStart" label="Факт: начало" type="date" />
         <UiInput v-model="form.actualEnd" label="Факт: окончание" type="date" />
       </div>
@@ -65,7 +65,7 @@ function onSubmit() {
         label="Примечание к изменению"
         placeholder="Причина сдвига срока…"
       />
-      <div class="form__actions">
+      <div class="ui-form__actions">
         <UiButton variant="ghost" type="button" @click="emit('close')">Отмена</UiButton>
         <UiButton variant="primary" type="submit">Сохранить сроки</UiButton>
       </div>
@@ -74,32 +74,9 @@ function onSubmit() {
 </template>
 
 <style scoped>
-.form {
-  display: grid;
-  gap: 0.9rem;
-}
-
 .hint {
   margin: 0;
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
-}
-
-.form__row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
-
-.form__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-}
-
-@media (max-width: 520px) {
-  .form__row {
-    grid-template-columns: 1fr;
-  }
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
 }
 </style>

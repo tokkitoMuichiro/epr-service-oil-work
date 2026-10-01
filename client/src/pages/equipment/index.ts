@@ -1,1 +1,6 @@
-export { default as EquipmentPage } from './ui/EquipmentPage.vue'
+export { default as EquipmentShell } from './ui/EquipmentShell.vue'
+export { default as EquipmentListPage } from './ui/EquipmentListPage.vue'
+export { default as EquipmentPeoplePage } from './ui/EquipmentPeoplePage.vue'
+export { default as WarehousesPage } from './ui/WarehousesPage.vue'
+export { default as WarehousePage } from './ui/WarehousePage.vue'
+export { default as TransferHistoryPage } from './ui/TransferHistoryPage.vue'

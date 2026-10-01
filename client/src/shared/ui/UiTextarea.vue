@@ -33,25 +33,40 @@ defineEmits<{
 }
 
 .field__label {
-  font-size: var(--font-size-md);
-  font-weight: 600;
-  color: var(--muted);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
 }
 
 .field__input {
-  border: 1px solid var(--line);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  padding: 12px;
-  background: var(--paper);
-  color: var(--ink);
+  padding: 10px 12px;
+  background: var(--surface-card);
+  color: var(--text-primary);
   min-height: var(--control-height);
   width: 100%;
-  resize: vertical;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .field__input:hover:not(:focus) {
+    border-color: var(--border-strong);
+  }
 }
 
 .field__input:focus {
-  border-color: var(--dodger);
+  border-color: var(--accent);
   outline: none;
-  box-shadow: 0 0 0 3px rgb(0 136 255 / 18%);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+textarea.field__input {
+  resize: vertical;
+  line-height: var(--line-height-base);
 }
 </style>

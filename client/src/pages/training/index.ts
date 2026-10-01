@@ -1,0 +1,7 @@
+export { default as TrainingShell } from './ui/TrainingShell.vue'
+export { default as TrainingSummaryPage } from './ui/TrainingSummaryPage.vue'
+export { default as AssignmentsPage } from './ui/AssignmentsPage.vue'
+export { default as TestsPage } from './ui/TestsPage.vue'
+export { default as TestEditorPage } from './ui/TestEditorPage.vue'
+export { default as MaterialsPage } from './ui/MaterialsPage.vue'
+export { default as DirectionsPage } from './ui/DirectionsPage.vue'

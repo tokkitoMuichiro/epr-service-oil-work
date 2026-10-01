@@ -4,7 +4,7 @@ withDefaults(
     variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
     type?: 'button' | 'submit'
     disabled?: boolean
-    size?: 'md' | 'sm'
+    size?: 'md' | 'sm' | 'icon'
   }>(),
   {
     variant: 'secondary',
@@ -18,7 +18,7 @@ withDefaults(
 <template>
   <button
     class="btn"
-    :class="[`btn--${variant}`, size === 'sm' ? 'btn--small' : '']"
+    :class="[`btn--${variant}`, size === 'sm' ? 'btn--small' : '', size === 'icon' ? 'btn--icon' : '']"
     :type="type"
     :disabled="disabled"
   >
@@ -31,23 +31,29 @@ withDefaults(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  border: 0;
+  gap: var(--space-2);
+  border: 1px solid transparent;
   border-radius: var(--radius);
-  padding: 12px 18px;
+  padding: 0 var(--space-4);
   min-height: var(--control-height);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: var(--line-height-tight);
+  text-transform: none;
+  white-space: nowrap;
   cursor: pointer;
-  background: var(--midnight);
-  color: var(--paper);
-  transition: filter 0.15s ease;
+  background: var(--neutral-solid);
+  color: var(--text-on-accent);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.05s ease;
 }
 
-.btn:hover:not(:disabled) {
-  filter: brightness(1.06);
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .btn:disabled {
@@ -56,32 +62,65 @@ withDefaults(
 }
 
 .btn--primary {
-  background: var(--dodger);
-  box-shadow: var(--shadow-accent);
-  color: var(--paper);
+  background: var(--accent-strong);
+  color: var(--text-on-accent);
 }
 
 .btn--secondary {
-  background: var(--midnight);
-  color: var(--paper);
+  background: var(--neutral-solid);
+  color: var(--text-on-accent);
 }
 
 .btn--ghost {
-  background: transparent;
-  color: var(--ink);
-  border: 1px solid var(--line);
-  box-shadow: none;
+  background: var(--surface-card);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 
 .btn--danger {
-  background: var(--bad);
-  box-shadow: none;
-  color: var(--paper);
+  background: var(--danger-solid);
+  color: var(--text-on-accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn--primary:hover:not(:disabled) {
+    background: var(--accent-strong-hover);
+  }
+
+  .btn--secondary:hover:not(:disabled) {
+    background: var(--neutral-solid-hover);
+  }
+
+  .btn--ghost:hover:not(:disabled) {
+    background: var(--surface-sunken);
+  }
+
+  .btn--danger:hover:not(:disabled) {
+    background: var(--danger-solid-hover);
+  }
 }
 
 .btn--small {
-  padding: 8px 12px;
+  padding: 0 var(--space-3);
   font-size: var(--font-size-sm);
   min-height: var(--control-height-sm);
+}
+
+.btn--icon {
+  width: var(--tap-size);
+  min-width: var(--tap-size);
+  height: var(--tap-size);
+  padding: 0;
+}
+
+@media (forced-colors: active) {
+  .btn {
+    border-color: ButtonText;
+  }
+
+  .btn:disabled {
+    color: GrayText;
+    border-color: GrayText;
+  }
 }
 </style>
