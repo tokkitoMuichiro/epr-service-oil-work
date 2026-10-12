@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { errorMessage } from '@/shared/api'
+import { reloadStatus } from '@/shared/lib/load-status'
 import { trainingApi } from '../api/training'
 import {
   programLabel,
@@ -69,7 +70,7 @@ export const useTrainingStore = defineStore('training', () => {
   }
 
   function load(): Promise<void> {
-    status.value = 'loading'
+    status.value = reloadStatus(status.value)
     errorText.value = ''
     loading = fetchCatalog()
       .then(() => {

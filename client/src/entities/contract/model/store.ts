@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { errorMessage } from '@/shared/api'
+import { reloadStatus } from '@/shared/lib/load-status'
 import { contractsApi, type ScheduleExportParams } from '../api/contracts'
 import type {
   Contract,
@@ -34,7 +35,7 @@ export const useContractsStore = defineStore('contracts', () => {
   const isEmpty = computed(() => status.value === 'ready' && items.value.length === 0)
 
   async function load() {
-    status.value = 'loading'
+    status.value = reloadStatus(status.value)
     errorText.value = ''
     try {
       const [contracts, days] = await Promise.all([contractsApi.list(), contractsApi.reportDays()])

@@ -13,7 +13,7 @@ const adminLogin = process.env.ADMIN_LOGIN?.trim()
 const adminPassword = process.env.ADMIN_PASSWORD
 
 const seed = wantsDemo ? await loadDemoSeed() : null
-if (wantsDemo && !seed) console.warn('Демо-данные не найдены (server/src/demo): новая база будет пустой')
+if (wantsDemo && !seed) console.warn('Демо-данные не найдены (server/src/testing/fixtures): новая база будет пустой')
 
 const db = openDatabase(dbPath)
 const app = createApp({

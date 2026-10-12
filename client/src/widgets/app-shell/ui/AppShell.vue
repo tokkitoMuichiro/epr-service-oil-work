@@ -108,22 +108,7 @@ const equipmentGroup = computed<NavGroup | null>(() => {
 
 const navGroups = computed(() => [trainingGroup.value, equipmentGroup.value].filter((g): g is NavGroup => g !== null))
 
-const tabItems = computed(() => [
-  ...topLinks.value.map((link) => ({
-    to: link.to,
-    label: link.label,
-    icon: link.icon,
-    badge: 0,
-    active: isNavActive(link.to, link.exact),
-  })),
-  ...navGroups.value.map((group) => ({
-    to: group.base,
-    label: group.label,
-    icon: group.icon,
-    badge: group.badge ?? 0,
-    active: isNavActive(group.base),
-  })),
-])
+const hasNavBadge = computed(() => navGroups.value.some((group) => Boolean(group.badge)))
 
 const isRail = computed(() => isTablet.value && isCollapsed.value)
 const roleInitial = computed(() => (roleStore.user?.fullName || roleStore.currentRoleLabel).charAt(0).toUpperCase())
@@ -267,7 +252,6 @@ onUnmounted(() => {
     :class="{
       'shell--nav-open': mobileOpen,
       'shell--rail': isRail,
-      'shell--has-tabbar': tabItems.length > 1,
     }"
   >
     <header class="shell__topbar" aria-label="Верхняя панель">
@@ -275,13 +259,16 @@ onUnmounted(() => {
         ref="menuButton"
         class="topbar__button"
         type="button"
-        aria-label="Меню"
+        :aria-label="hasNavBadge ? 'Меню, есть входящие передачи' : 'Меню'"
         title="Меню"
         :aria-expanded="mobileOpen"
         aria-controls="app-sidebar"
         @click="mobileOpen ? closeMobile() : openMobile()"
       >
-        <IconMenu :size="22" />
+        <span class="nav__icon-wrap">
+          <IconMenu :size="22" />
+          <span v-if="hasNavBadge" class="nav__dot" aria-hidden="true" />
+        </span>
       </button>
       <div class="topbar__title">{{ pageTitle }}</div>
       <button
@@ -443,23 +430,6 @@ onUnmounted(() => {
       </p>
       <RouterView />
     </main>
-
-    <nav v-if="tabItems.length > 1" class="tabbar" aria-label="Разделы">
-      <RouterLink
-        v-for="tab in tabItems"
-        :key="tab.to"
-        class="tabbar__item"
-        :class="{ 'tabbar__item--active': tab.active }"
-        :to="tab.to"
-        :aria-current="tab.active ? 'page' : undefined"
-      >
-        <span class="tabbar__icon">
-          <component :is="tab.icon" :size="22" />
-          <span v-if="tab.badge" class="tabbar__badge">{{ tab.badge }}</span>
-        </span>
-        <span class="tabbar__label">{{ tab.label }}</span>
-      </RouterLink>
-    </nav>
   </div>
 </template>
 
@@ -479,8 +449,7 @@ onUnmounted(() => {
 
 .shell__topbar,
 .shell__backdrop,
-.drawer__close,
-.tabbar {
+.drawer__close {
   display: none;
 }
 
@@ -760,6 +729,7 @@ onUnmounted(() => {
   min-width: 0;
   min-height: 0;
   overflow: auto;
+  scrollbar-gutter: stable;
   padding: var(--space-8) var(--space-8) 48px;
   padding-right: calc(var(--space-8) + var(--safe-right));
 }
@@ -808,12 +778,6 @@ onUnmounted(() => {
   .shell--rail {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: calc(var(--header-height) + var(--safe-top)) minmax(0, 1fr);
-  }
-
-  .shell--has-tabbar {
-    grid-template-rows: calc(var(--header-height) + var(--safe-top)) minmax(0, 1fr) calc(
-        var(--tabbar-height) + var(--safe-bottom)
-      );
   }
 
   .shell__topbar {
@@ -914,67 +878,6 @@ onUnmounted(() => {
       calc(var(--space-3) + var(--safe-left));
   }
 
-  .shell--has-tabbar .shell__main {
-    padding-bottom: var(--space-5);
-  }
-
-  .tabbar {
-    display: flex;
-    align-items: stretch;
-    padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
-    background: var(--surface-card);
-    border-top: 1px solid var(--border-subtle);
-    z-index: var(--z-header);
-  }
-
-  .tabbar__item {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    padding: var(--space-1) 2px;
-    color: var(--text-secondary);
-    font-size: var(--font-size-2xs);
-    font-weight: 600;
-  }
-
-  .tabbar__item--active {
-    color: var(--text-link);
-    box-shadow: inset 0 2px 0 var(--accent);
-  }
-
-  .tabbar__icon {
-    position: relative;
-    display: inline-grid;
-  }
-
-  .tabbar__badge {
-    position: absolute;
-    top: -4px;
-    left: calc(100% - 8px);
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
-    display: grid;
-    place-items: center;
-    border-radius: var(--radius-pill);
-    background: var(--accent-strong);
-    color: var(--text-on-accent);
-    font-size: var(--font-size-2xs);
-    font-weight: 700;
-    line-height: 1;
-  }
-
-  .tabbar__label {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   .rail__toggle {
     display: none;
   }
@@ -993,16 +896,14 @@ onUnmounted(() => {
 @media (forced-colors: active) {
   .nav__link--active,
   .nav__sublink--active,
-  .rail-popover__link--active,
-  .tabbar__item--active {
+  .rail-popover__link--active {
     border-left: 3px solid Highlight;
     forced-color-adjust: none;
     background: Highlight;
     color: HighlightText;
   }
 
-  .nav__dot,
-  .tabbar__badge {
+  .nav__dot {
     border: 1px solid CanvasText;
   }
 }

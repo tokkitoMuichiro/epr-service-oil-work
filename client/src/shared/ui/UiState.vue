@@ -90,6 +90,13 @@ withDefaults(
   place-items: stretch;
   text-align: left;
   padding: var(--space-4) 0;
+  animation: state-appear 0.2s ease 0.3s both;
+}
+
+@keyframes state-appear {
+  from {
+    opacity: 0;
+  }
 }
 
 .state__caption {

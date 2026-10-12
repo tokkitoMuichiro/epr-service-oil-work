@@ -24,5 +24,12 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: npm run check
+      - run: npm run typecheck
+      - name: Tests
+        run: |
+          npm test 2>&1 | tee test.log
+          if ! grep -Eq '^(# skip|ℹ skipped) 0$' test.log; then
+            echo "::error::Есть пропущенные тесты — CI требует, чтобы выполнялись все"
+            exit 1
+          fi
       - run: npm run build

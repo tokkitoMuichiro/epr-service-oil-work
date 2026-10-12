@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { errorMessage } from '@/shared/api'
+import { reloadStatus } from '@/shared/lib/load-status'
 import { accessApi } from '../api/access'
 import { useRoleStore } from './store'
 import { canViewBlock, type AccessBlock, type AccessMatrix, type Permission, type RoleId } from './types'
@@ -36,7 +37,7 @@ export const useAccessStore = defineStore('access', () => {
   }
 
   function load(): Promise<void> {
-    status.value = 'loading'
+    status.value = reloadStatus(status.value)
     errorText.value = ''
     loading = fetchView()
       .then(() => {

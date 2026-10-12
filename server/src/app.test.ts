@@ -7,8 +7,8 @@ import path from 'node:path'
 import { after, before, describe, it } from 'node:test'
 import { createApp, type AppOptions } from './app.js'
 import { openDatabase } from './db.js'
-import { loadDemoSeed } from './demo-seed.js'
 import { demoUserOf } from './modules/auth/repository.js'
+import { demoSeed } from './testing/fixtures/index.js'
 import { unzip } from './testing/unzip.js'
 import {
   validateBrigadeDraft,
@@ -26,8 +26,6 @@ import {
 } from './shared.js'
 
 const TODAY = '2026-09-29'
-const demoSeed = await loadDemoSeed()
-const needsDemo = { skip: demoSeed ? false : 'нет демо-данных в server/src/demo' }
 const DEMO_ADMIN = demoUserOf('admin').id
 const DEMO_MASTER = demoUserOf('master').id
 const DEMO_KEEPER = demoUserOf('storekeeper').id
@@ -49,7 +47,7 @@ function sessionCookie(response: Response): string {
 }
 
 async function startApp(options: AppOptions = {}) {
-  const server: Server = createApp({ today: () => TODAY, devLogin: true, seed: demoSeed ?? undefined, ...options }).listen(0, '127.0.0.1')
+  const server: Server = createApp({ today: () => TODAY, devLogin: true, seed: demoSeed, ...options }).listen(0, '127.0.0.1')
   await new Promise<void>((resolve) => server.once('listening', resolve))
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   const cookies = new Map<RoleId, string>()
@@ -123,7 +121,7 @@ after(async () => {
   await api.close()
 })
 
-describe('api', needsDemo, () => {
+describe('api', () => {
   it('reports health and unknown API routes', async () => {
     assert.equal((await call('GET', '/health')).json.ok, true)
     const missing = await call('GET', '/api/nope')
@@ -708,7 +706,7 @@ describe('authentication', () => {
   })
 })
 
-describe('training', needsDemo, () => {
+describe('training', () => {
   let training: Api
 
   before(async () => {
@@ -852,7 +850,7 @@ describe('training', needsDemo, () => {
 })
 
 describe('storage', () => {
-  it('keeps data across a restart and seeds only an empty database', needsDemo, async () => {
+  it('keeps data across a restart and seeds only an empty database', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'erp-db-'))
     const file = path.join(dir, 'erp.sqlite')
     try {
