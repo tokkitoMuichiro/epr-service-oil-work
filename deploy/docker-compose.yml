@@ -8,7 +8,7 @@ services:
     environment:
       APP_VERSION: ${IMAGE_TAG}
     ports:
-      - "127.0.0.1:4568:4568"
+      - "127.0.0.1:${HOST_PORT:-4568}:4568"
     volumes:
       - erp-data:/data
     stop_grace_period: 20s

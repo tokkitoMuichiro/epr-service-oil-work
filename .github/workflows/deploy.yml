@@ -34,6 +34,22 @@ jobs:
       - name: Validate tag
         run: '[[ "$TAG" =~ ^[A-Za-z0-9._-]+$ ]]'
 
+      - name: Check secrets
+        env:
+          HOST: ${{ secrets.VDS_HOST }}
+          USER: ${{ secrets.VDS_USER }}
+          SSH_KEY: ${{ secrets.VDS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VDS_KNOWN_HOSTS }}
+        run: |
+          missing=""
+          for name in HOST USER SSH_KEY KNOWN_HOSTS; do
+            [ -n "${!name}" ] || missing="$missing VDS_$name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Не заданы секреты окружения production:$missing"
+            exit 1
+          fi
+
       - name: SSH key
         env:
           SSH_KEY: ${{ secrets.VDS_SSH_KEY }}
