@@ -544,8 +544,8 @@ defineExpose({ applyInitial })
   }
 
   .nav {
-    margin: 0 calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
-    padding: var(--space-3) var(--space-4);
+    margin: 0 calc(-1 * var(--space-3)) calc(-1 * var(--space-3));
+    padding: var(--space-2) var(--space-3);
     box-shadow: 0 -4px 12px var(--scroll-shadow);
   }
 

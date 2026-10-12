@@ -52,6 +52,62 @@ export interface DailyReport extends DailyReportDraft {
 
 export type ReportsMode = 'create' | 'archive'
 
+/** A day with a daily report: the only source of actual progress on the schedule. */
+export interface ReportDay {
+  objectId: string
+  date: string
+  /** Contract works mentioned in the report volumes. */
+  workIds: string[]
+  /** Reported volume per work id for this day. */
+  volumes: Record<string, number>
+}
+
+export function reportDaysOf(reports: Pick<DailyReport, 'objectId' | 'date' | 'workItems'>[]): ReportDay[] {
+  return reports
+    .map((r) => {
+      const volumes: Record<string, number> = {}
+      for (const w of r.workItems) {
+        if (w.itemId) volumes[w.itemId] = (volumes[w.itemId] ?? 0) + (Number(w.volume) || 0)
+      }
+      return { objectId: r.objectId, date: r.date, workIds: Object.keys(volumes), volumes }
+    })
+    .sort((a, b) => a.objectId.localeCompare(b.objectId) || a.date.localeCompare(b.date))
+}
+
+export function reportDatesFor(days: ReportDay[], objectId: string, workId?: string): string[] {
+  return reportEntriesFor(days, objectId, workId).map((e) => e.date)
+}
+
+export interface ReportEntry {
+  date: string
+  /** Reported volume of the work; `null` for the whole object. */
+  volume: number | null
+}
+
+export function reportEntriesFor(days: ReportDay[], objectId: string, workId?: string): ReportEntry[] {
+  return days
+    .filter((d) => d.objectId === objectId && (!workId || d.workIds.includes(workId)))
+    .map((d) => ({ date: d.date, volume: workId ? (d.volumes[workId] ?? 0) : null }))
+}
+
+export interface ReportBucket {
+  from: string
+  to: string
+  days: number
+  volume: number | null
+}
+
+/** Groups report entries into calendar columns (e.g. months of a year view); empty columns are skipped. */
+export function bucketReports(entries: ReportEntry[], columns: { start: string; end: string }[]): ReportBucket[] {
+  return columns.flatMap((column) => {
+    const inside = entries.filter((e) => e.date >= column.start && e.date <= column.end)
+    if (!inside.length) return []
+    const volumes = inside.map((e) => e.volume)
+    const volume = volumes.every((v) => v === null) ? null : volumes.reduce<number>((sum, v) => sum + (v ?? 0), 0)
+    return [{ from: column.start, to: column.end, days: inside.length, volume }]
+  })
+}
+
 export function reportStoragePath(objectId: string, date: string): string {
   return `mock-disk/Ежедневные отчёты/${objectId}/${date}.txt`
 }

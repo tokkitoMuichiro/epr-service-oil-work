@@ -3,7 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { ROLES, usersApi, useRoleStore, type User } from '@/entities/role'
 import { errorMessage } from '@/shared/api'
 import { formatDateRu } from '@/shared/lib/date'
-import { UiButton } from '@/shared/ui'
+import { useMobilePagination } from '@/shared/lib/pagination'
+import { UiButton, UiPagination } from '@/shared/ui'
 import UserDialog from './UserDialog.vue'
 
 const session = useRoleStore()
@@ -16,6 +17,7 @@ const editing = ref<User | null>(null)
 const sorted = computed(() =>
   [...users.value].sort((a, b) => Number(b.active) - Number(a.active) || a.fullName.localeCompare(b.fullName, 'ru')),
 )
+const pager = useMobilePagination(sorted)
 
 function roleLabel(id: string) {
   return ROLES.find((r) => r.id === id)?.label ?? id
@@ -58,32 +60,43 @@ onMounted(load)
       {{ error }}
       <UiButton size="sm" variant="ghost" @click="load">Повторить</UiButton>
     </p>
-    <div v-else class="users__table ui-table-wrap">
-      <table class="ui-table">
-        <thead>
-          <tr>
-            <th>Пользователь</th>
-            <th>Логин</th>
-            <th>Роль</th>
-            <th class="hide-mobile">Создан</th>
-            <th>Статус</th>
-            <th aria-label="Действия" />
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="u in sorted" :key="u.id" :class="{ 'is-inactive': !u.active, 'is-current': u.id === session.user?.id }">
-            <td><strong>{{ u.fullName }}</strong></td>
-            <td>{{ u.login }}</td>
-            <td>{{ roleLabel(u.role) }}</td>
-            <td class="hide-mobile">{{ formatDateRu(u.createdAt.slice(0, 10)) }}</td>
-            <td>{{ u.active ? 'Активен' : 'Отключён' }}</td>
-            <td class="actions">
-              <UiButton size="sm" variant="ghost" @click="open(u)">Изменить</UiButton>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <template v-else>
+      <div class="users__table ui-table-wrap ui-table-wrap--stack">
+        <table class="ui-table">
+          <thead>
+            <tr>
+              <th>Пользователь</th>
+              <th>Логин</th>
+              <th>Роль</th>
+              <th class="hide-mobile">Создан</th>
+              <th>Статус</th>
+              <th aria-label="Действия" />
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="u in pager.pageItems"
+              :key="u.id"
+              :class="{ 'is-inactive': !u.active, 'is-current': u.id === session.user?.id }"
+            >
+              <td class="ui-cell--main"><strong>{{ u.fullName }}</strong></td>
+              <td class="users__login">
+                {{ u.login }}<span class="users__role"> · {{ roleLabel(u.role) }}</span>
+              </td>
+              <td class="hide-mobile">{{ roleLabel(u.role) }}</td>
+              <td class="hide-mobile">{{ formatDateRu(u.createdAt.slice(0, 10)) }}</td>
+              <td class="ui-cell--aside">
+                <span class="ui-badge" :class="u.active ? 'ui-badge--ok' : ''">{{ u.active ? 'Активен' : 'Отключён' }}</span>
+              </td>
+              <td class="actions">
+                <UiButton size="sm" variant="ghost" @click="open(u)">Изменить</UiButton>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <UiPagination v-if="pager.isPaged" v-model:page="pager.page" :total="pager.total" :page-size="pager.pageSize" />
+    </template>
 
     <UserDialog :open="isDialogOpen" :user="editing" @close="isDialogOpen = false" @saved="onSaved" />
   </div>
@@ -120,6 +133,10 @@ onMounted(load)
   font-weight: 600;
 }
 
+.users__role {
+  display: none;
+}
+
 .actions {
   text-align: right;
 }
@@ -138,8 +155,43 @@ onMounted(load)
 }
 
 @media (max-width: 860px) {
+  .users__bar :deep(.btn) {
+    flex: 1 1 auto;
+  }
+
+  .users__table {
+    border: 0;
+  }
+
   .hide-mobile {
     display: none;
+  }
+
+  .ui-table td {
+    white-space: normal;
+  }
+
+  .ui-table td.users__login {
+    grid-column: 2;
+    color: var(--text-secondary);
+  }
+
+  .users__role {
+    display: inline;
+  }
+
+  .ui-table td.actions {
+    grid-column: 3;
+    justify-self: end;
+    margin-left: var(--space-2);
+  }
+
+  .is-current {
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
+  .is-current td:first-child {
+    box-shadow: none;
   }
 }
 </style>

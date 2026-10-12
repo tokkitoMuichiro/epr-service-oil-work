@@ -1,9 +1,17 @@
 export {
   DEADLINE_FIELD_LABEL,
+  OBJECT_STATUSES,
+  OBJECT_STATUS_LABEL,
+  OBJECT_STATUS_MOVES,
   WORK_UNITS,
+  contractProgress,
+  isObjectArchived,
+  isRollback,
+  objectStatus,
   scheduleVariance,
   validateContractDraft,
   validateObjectDates,
+  validateObjectStatusChange,
   validateWorkDraft,
   type Contract,
   type ContractDraft,
@@ -11,7 +19,10 @@ export {
   type DeadlineEdit,
   type DeadlineField,
   type ObjectDraft,
+  type ContractProgress,
   type ObjectPatch,
+  type ObjectStatus,
+  type ObjectStatusChange,
   type ScheduleVariance,
   type WorkDraft,
   type WorkItem,
@@ -19,6 +30,10 @@ export {
   type WorkUnit,
 } from '@shared/contracts'
 export {
+  PROGRESS_LABEL,
+  PROGRESS_TONE,
+  dateRuns,
+  type ProgressTone,
   SCHEDULE_SCALES,
   SCHEDULE_SCALE_LABEL,
   availableScales,
@@ -42,6 +57,14 @@ export {
   type SchedulePeriod,
   type ScheduleScale,
 } from '@shared/schedule'
+export {
+  bucketReports,
+  reportDatesFor,
+  reportEntriesFor,
+  type ReportBucket,
+  type ReportDay,
+  type ReportEntry,
+} from '@shared/reports'
 export {
   QUALIFICATION_TYPES as OBJECT_QUALIFICATION_TYPES,
   TANK_CLEANING_QUALIFICATIONS,

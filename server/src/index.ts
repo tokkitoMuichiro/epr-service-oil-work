@@ -1,6 +1,7 @@
 import { createApp } from './app.js'
 import { openDatabase } from './db.js'
 import { loadDemoSeed } from './demo-seed.js'
+import { closeGracefully } from './lifecycle.js'
 
 const port = Number(process.env.PORT) || 4568
 const host = process.env.HOST || '0.0.0.0'
@@ -14,9 +15,11 @@ const adminPassword = process.env.ADMIN_PASSWORD
 const seed = wantsDemo ? await loadDemoSeed() : null
 if (wantsDemo && !seed) console.warn('Демо-данные не найдены (server/src/demo): новая база будет пустой')
 
+const db = openDatabase(dbPath)
 const app = createApp({
   clientDist: process.env.CLIENT_DIST,
-  db: openDatabase(dbPath),
+  version: process.env.APP_VERSION,
+  db,
   seed: seed ?? undefined,
   devLogin: !isProduction && process.env.DEV_LOGIN !== '0',
   admin: adminLogin && adminPassword ? { login: adminLogin, password: adminPassword } : undefined,
@@ -41,6 +44,21 @@ if (isProduction && (process.env.BITRIX_MODE?.trim() || 'mock') === 'mock') {
   console.warn('BITRIX_MODE=mock: материалы обучения хранятся в базе, а не на Диске Битрикс24')
 }
 
-app.listen(port, host, () => {
+const server = app.listen(port, host, () => {
   console.log(`API listening on http://${host}:${port}, database: ${dbPath}`)
 })
+
+let isStopping = false
+function stop(signal: NodeJS.Signals) {
+  if (isStopping) return
+  isStopping = true
+  console.log(`${signal}: stopping`)
+  closeGracefully({ server, db })
+    .then(() => process.exit(0))
+    .catch((error: unknown) => {
+      console.error('Shutdown failed', error)
+      process.exit(1)
+    })
+}
+process.on('SIGTERM', stop)
+process.on('SIGINT', stop)

@@ -78,7 +78,7 @@ function placement(bar: GridBar) {
       'bar--clip-start': place.clippedStart,
       'bar--clip-end': place.clippedEnd,
       [`bar--${bar.kind}`]: true,
-      [`tone--${bar.tone ?? 'neutral'}`]: bar.kind === 'fact',
+      [`tone--${bar.tone ?? 'neutral'}`]: bar.kind === 'report',
       'bar--action': Boolean(bar.isClickable),
     },
   }
@@ -146,7 +146,9 @@ function onBarClick(event: MouseEvent, row: T, bar: GridBar) {
                 :style="placement(bar)?.style"
                 :title="bar.title"
                 @click="onBarClick($event, row, bar)"
-              />
+              >
+                <span v-if="bar.label" class="bar__label">{{ bar.label }}</span>
+              </component>
             </template>
           </div>
         </div>
@@ -163,7 +165,7 @@ function onBarClick(event: MouseEvent, row: T, bar: GridBar) {
 
 .grid {
   --label-width: 250px;
-  --row-height: 52px;
+  --row-height: 44px;
   min-width: 820px;
 }
 
@@ -183,7 +185,7 @@ function onBarClick(event: MouseEvent, row: T, bar: GridBar) {
   position: sticky;
   top: 0;
   z-index: 3;
-  min-height: 40px;
+  min-height: 36px;
   background: var(--table-head-bg);
 }
 
@@ -335,8 +337,29 @@ function onBarClick(event: MouseEvent, row: T, bar: GridBar) {
   border: 1px solid var(--chart-plan-border);
 }
 
-.bar--fact {
-  top: calc(50% + 2px);
+.bar--report {
+  top: calc(50% + 1px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  overflow: hidden;
+  border-radius: var(--radius);
+  box-shadow: inset 0 0 0 1px var(--surface-card);
+  color: var(--chart-report-fg);
+}
+
+.bar__label {
+  overflow: hidden;
+  padding: 0 2px;
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  text-overflow: clip;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 
 .bar--clip-start {
@@ -379,7 +402,7 @@ function onBarClick(event: MouseEvent, row: T, bar: GridBar) {
 @media (max-width: 560px) {
   .grid {
     --label-width: 140px;
-    --row-height: 56px;
+    --row-height: 48px;
     min-width: 620px;
   }
 

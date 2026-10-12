@@ -16,8 +16,9 @@ import { AssignTestDialog } from '@/features/training-assign'
 import { errorMessage } from '@/shared/api'
 import { copyText } from '@/shared/lib/clipboard'
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/date'
+import { useMobilePagination } from '@/shared/lib/pagination'
 import { todayIso } from '@shared/dates'
-import { UiButton, UiDialog, UiState } from '@/shared/ui'
+import { UiButton, UiDialog, UiPagination, UiState } from '@/shared/ui'
 
 const store = useTrainingStore()
 const access = useAccessStore()
@@ -63,6 +64,8 @@ const visible = computed(() => {
     return !q || `${a.workerName} ${a.testTitle}`.toLocaleLowerCase('ru').includes(q)
   })
 })
+
+const pager = useMobilePagination(visible, { resetOn: [search, statusFilter, kindFilter, programFilter] })
 
 function flash(text: string) {
   notice.value = text
@@ -154,51 +157,54 @@ function onAssigned() {
       <UiButton variant="primary" @click="load">Повторить</UiButton>
     </UiState>
     <UiState v-else-if="!visible.length" title="Назначений нет" text="Измените фильтры или назначьте проверку." />
-    <div v-else class="ui-table-wrap">
-      <table class="ui-table">
-        <thead>
-          <tr>
-            <th>Сотрудник</th>
-            <th>Тест</th>
-            <th class="hide-md">Тип</th>
-            <th>Срок</th>
-            <th>Статус</th>
-            <th class="hide-md">Попытки</th>
-            <th v-if="canAssign" />
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="a in visible" :key="a.id">
-            <td>
-              <strong>{{ a.workerName }}</strong>
-              <small class="assignments__sub">{{ a.programLabel }}</small>
-            </td>
-            <td>
-              {{ a.testTitle }}
-              <small class="assignments__sub">Назначил {{ a.assignedBy }}, {{ formatDateTimeRu(a.assignedAt) }}</small>
-            </td>
-            <td class="hide-md">
-              {{ ASSIGNMENT_KIND_LABEL[a.kind] }}
-              <small v-if="a.reason" class="assignments__sub" :title="a.reasonNote">{{ EXTRAORDINARY_REASON_LABEL[a.reason] }}</small>
-            </td>
-            <td>{{ formatDateRu(a.dueDate) }}</td>
-            <td>
-              <AssignmentStatusBadge :status="a.status" />
-              <small v-if="a.cancelReason" class="assignments__sub">{{ a.cancelReason }}</small>
-            </td>
-            <td class="hide-md">{{ a.attemptsUsed }} из {{ a.attemptsAllowed }}</td>
-            <td v-if="canAssign" class="assignments__actions">
-              <template v-if="isActiveAssignment(a, today)">
-                <UiButton variant="ghost" size="sm" :disabled="busyId === a.id" @click="copyLink(a, false)">Ссылка</UiButton>
-                <UiButton variant="ghost" size="sm" :disabled="busyId === a.id" @click="copyLink(a, true)">С текстом</UiButton>
-                <UiButton variant="ghost" size="sm" :disabled="busyId === a.id" @click="reissue(a)">Перевыпустить</UiButton>
-                <UiButton variant="ghost" size="sm" :disabled="busyId === a.id" @click="openCancel(a)">Отозвать</UiButton>
-              </template>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <template v-else>
+      <div class="ui-table-wrap ui-table-wrap--stack">
+        <table class="ui-table">
+          <thead>
+            <tr>
+              <th>Сотрудник</th>
+              <th>Тест</th>
+              <th class="hide-md">Тип</th>
+              <th>Срок</th>
+              <th>Статус</th>
+              <th>Попытки</th>
+              <th v-if="canAssign" />
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="a in pager.pageItems" :key="a.id">
+              <td class="ui-cell--main">
+                <strong>{{ a.workerName }}</strong>
+                <small class="assignments__sub">{{ a.programLabel }}</small>
+              </td>
+              <td>
+                {{ a.testTitle }}
+                <small class="assignments__sub ui-hide-mobile">Назначил {{ a.assignedBy }}, {{ formatDateTimeRu(a.assignedAt) }}</small>
+              </td>
+              <td class="hide-md">
+                {{ ASSIGNMENT_KIND_LABEL[a.kind] }}
+                <small v-if="a.reason" class="assignments__sub" :title="a.reasonNote">{{ EXTRAORDINARY_REASON_LABEL[a.reason] }}</small>
+              </td>
+              <td class="assignments__due" data-label="Срок">{{ formatDateRu(a.dueDate) }}</td>
+              <td class="ui-cell--aside">
+                <AssignmentStatusBadge :status="a.status" />
+                <small v-if="a.cancelReason" class="assignments__sub ui-hide-mobile">{{ a.cancelReason }}</small>
+              </td>
+              <td class="assignments__attempts" data-label="Попытки">{{ a.attemptsUsed }} из {{ a.attemptsAllowed }}</td>
+              <td v-if="canAssign" class="assignments__actions ui-cell--actions">
+                <template v-if="isActiveAssignment(a, today)">
+                  <UiButton variant="ghost" size="sm" :disabled="busyId === a.id" @click="copyLink(a, false)">Ссылка</UiButton>
+                  <UiButton variant="ghost" size="sm" :disabled="busyId === a.id" @click="copyLink(a, true)">С текстом</UiButton>
+                  <UiButton variant="ghost" size="sm" :disabled="busyId === a.id" @click="reissue(a)">Перевыпустить</UiButton>
+                  <UiButton variant="ghost" size="sm" :disabled="busyId === a.id" @click="openCancel(a)">Отозвать</UiButton>
+                </template>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <UiPagination v-if="pager.isPaged" v-model:page="pager.page" :total="pager.total" :page-size="pager.pageSize" />
+    </template>
 
     <AssignTestDialog :open="isAssignOpen" @close="isAssignOpen = false" @assigned="onAssigned" />
 
@@ -267,10 +273,25 @@ function onAssigned() {
 }
 
 @media (max-width: 860px) {
-  .assignments__toolbar .ui-control,
-  .assignments__toolbar :deep(.btn) {
-    flex: 1 1 100%;
+  .assignments {
+    gap: var(--space-3);
+  }
+
+  .assignments__toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .assignments__toolbar .ui-control {
+    width: 100%;
     min-width: 0;
+  }
+
+  .assignments__toolbar .ui-control[type='search'] {
+    grid-column: 1 / -1;
+  }
+
+  .assignments__toolbar :deep(.btn) {
     margin-left: 0;
   }
 
@@ -278,7 +299,20 @@ function onAssigned() {
     display: none;
   }
 
-  .assignments__actions {
+  .ui-table td.assignments__due {
+    grid-column: 2;
+  }
+
+  .ui-table td.assignments__attempts {
+    grid-column: 3;
+    justify-self: end;
+    margin-left: var(--space-2);
+    white-space: nowrap;
+  }
+
+  .ui-table td.assignments__actions:not(:empty) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     white-space: normal;
   }
 }

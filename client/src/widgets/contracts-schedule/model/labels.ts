@@ -1,27 +1,7 @@
-import type { ProgressState, SchedulePeriod } from '@/entities/contract'
+import type { ProgressTone, SchedulePeriod } from '@/entities/contract'
 import { formatDateRu, formatDayMonth, monthFullName } from '@/shared/lib/date'
 
-export const PROGRESS_LABEL: Record<ProgressState, string> = {
-  planned: 'Запланировано',
-  late_start: 'Не начато',
-  in_progress: 'В работе',
-  overdue: 'Отставание',
-  done_early: 'Досрочно',
-  done_on_time: 'Выполнено',
-  done_late: 'С опозданием',
-}
-
-export type ProgressTone = 'neutral' | 'active' | 'ok' | 'warn' | 'bad'
-
-export const PROGRESS_TONE: Record<ProgressState, ProgressTone> = {
-  planned: 'neutral',
-  late_start: 'bad',
-  in_progress: 'active',
-  overdue: 'bad',
-  done_early: 'ok',
-  done_on_time: 'ok',
-  done_late: 'warn',
-}
+export { PROGRESS_LABEL, PROGRESS_TONE, type ProgressTone } from '@/entities/contract'
 
 export const PROGRESS_BADGE: Record<ProgressTone, string> = {
   neutral: 'ui-badge--neutral',
@@ -43,6 +23,12 @@ const numberFormat = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }
 
 export function formatVolume(value: number): string {
   return numberFormat.format(value)
+}
+
+/** Fits a volume into a narrow day cell: 85 → «85», 12.5 → «12,5», 1450 → «1,5к». */
+export function formatCellVolume(value: number): string {
+  if (Math.abs(value) >= 1000) return `${numberFormat.format(Math.round(value / 100) / 10)}к`
+  return numberFormat.format(Math.round(value * 10) / 10)
 }
 
 export function volumePercent(actual: number, planned: number): number {

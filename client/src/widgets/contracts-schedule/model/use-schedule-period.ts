@@ -59,6 +59,17 @@ export function useSchedulePeriod(bounds: Ref<DateSpan | null>, focus: Ref<DateS
     anchor.value = clampDay(today, bounds.value)
   }
 
+  /** Switches to the scale (or the widest available) and shows today clamped into the focus span. */
+  function prefer(next: ScheduleScale) {
+    const list = scales.value
+    scale.value = list.includes(next) ? next : list[list.length - 1]
+    const span = focus.value
+    let day = today
+    if (span && today < span.from) day = span.from
+    else if (span && today > span.to) day = span.to
+    anchor.value = clampDay(day, bounds.value)
+  }
+
   watch(scales, (list) => {
     if (!list.includes(scale.value)) scale.value = list[list.length - 1]
   })
@@ -75,5 +86,5 @@ export function useSchedulePeriod(bounds: Ref<DateSpan | null>, focus: Ref<DateS
     { immediate: true },
   )
 
-  return { today, scale, scales, period, options, canPrev, canNext, canToday, setScale, step, goTo, goToday }
+  return { today, scale, scales, period, options, canPrev, canNext, canToday, setScale, step, goTo, goToday, prefer }
 }

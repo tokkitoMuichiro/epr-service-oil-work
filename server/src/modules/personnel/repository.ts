@@ -186,6 +186,10 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
     const found = contracts.findObject(draft.objectId)
     if (!found || found.contract.id !== draft.contractId) notFound('Объект договора не найден')
     if (found.contract.archived || found.object.archived) conflict('Объект в архиве — назначение невозможно')
+    const { actualEnd } = found.object
+    if (actualEnd && draft.to > actualEnd) {
+      conflict(`Объект завершён ${formatIsoDate(actualEnd)} — назначить бригаду позже этой даты нельзя`)
+    }
     const clash = assignmentConflict(draft, state.assignments, editingId)
     if (clash) {
       const place = contracts.findObject(clash.objectId)?.object.name ?? clash.objectId
@@ -462,6 +466,12 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
       dropFutureAssignments((a) => a.objectId === objectId)
     },
 
+    closeAssignmentsForObject(objectId: string, lastDay: string): void {
+      state.assignments = state.assignments
+        .filter((a) => a.objectId !== objectId || a.from <= lastDay)
+        .map((a) => (a.objectId === objectId && a.to > lastDay ? { ...a, to: lastDay } : a))
+    },
+
     /** Crew on duty: fired workers are excluded, vacation is reported through `employment`. */
     crew(objectId: string, date: string): ObjectCrew[] {
       return state.assignments
@@ -501,6 +511,7 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
       'removeAssignment',
       'removeAssignmentsForObject',
       'removeFutureAssignmentsForObject',
+      'closeAssignmentsForObject',
     ],
     () => snapshot.save(state),
   )

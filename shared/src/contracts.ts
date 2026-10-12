@@ -103,6 +103,93 @@ export function workStatus(dates: Pick<WorkItem, 'actualStart' | 'actualEnd'>): 
   return 'planned'
 }
 
+export type ObjectStatus = WorkStatus
+
+export const OBJECT_STATUSES: ObjectStatus[] = ['planned', 'in_progress', 'done']
+
+export const OBJECT_STATUS_LABEL: Record<ObjectStatus, string> = {
+  planned: 'Запланирован',
+  in_progress: 'В работе',
+  done: 'Завершён',
+}
+
+/** Forward along the lifecycle, or one step back to fix a mistaken change. */
+export const OBJECT_STATUS_MOVES: Record<ObjectStatus, readonly ObjectStatus[]> = {
+  planned: ['in_progress'],
+  in_progress: ['done', 'planned'],
+  done: ['in_progress'],
+}
+
+export interface ObjectStatusChange {
+  status: ObjectStatus
+  /** Day the work started or finished; ignored when the change is rolled back. */
+  date?: string
+  note?: string
+}
+
+type ActualDates = Pick<ContractObject, 'actualStart' | 'actualEnd'>
+
+export function objectStatus(object: ActualDates): ObjectStatus {
+  return workStatus(object)
+}
+
+/** A finished object leaves the active schedule; manual archiving covers cancelled ones. */
+export function isObjectArchived(
+  contract: Pick<Contract, 'archived'>,
+  object: ActualDates & Pick<ContractObject, 'archived'>,
+): boolean {
+  return Boolean(contract.archived || object.archived || object.actualEnd)
+}
+
+export function isRollback(from: ObjectStatus, to: ObjectStatus): boolean {
+  return OBJECT_STATUSES.indexOf(to) < OBJECT_STATUSES.indexOf(from)
+}
+
+export function validateObjectStatusChange(
+  object: ActualDates,
+  change: ObjectStatusChange,
+  today: string,
+): string | null {
+  const from = objectStatus(object)
+  if (!OBJECT_STATUS_MOVES[from].includes(change.status)) {
+    return `Нельзя перевести объект из «${OBJECT_STATUS_LABEL[from]}» в «${OBJECT_STATUS_LABEL[change.status]}»`
+  }
+  if (isRollback(from, change.status)) return null
+  if (!change.date) return change.status === 'done' ? 'Укажите дату завершения' : 'Укажите дату начала работ'
+  if (change.date > today) return 'Дата не может быть в будущем'
+  if (change.status === 'done' && object.actualStart && change.date < object.actualStart) {
+    return 'Дата завершения раньше начала работ'
+  }
+  return null
+}
+
+/** Actual dates after a validated change; `undefined` means the date is cleared. */
+export function nextActualDates(object: ActualDates, change: ObjectStatusChange): ActualDates {
+  if (change.status === 'planned') return { actualStart: undefined, actualEnd: undefined }
+  if (change.status === 'done') return { actualStart: object.actualStart, actualEnd: change.date }
+  if (objectStatus(object) === 'done') return { actualStart: object.actualStart, actualEnd: undefined }
+  return { actualStart: change.date, actualEnd: undefined }
+}
+
+export interface ContractProgress {
+  total: number
+  planned: number
+  inProgress: number
+  done: number
+  status: ObjectStatus | 'empty'
+}
+
+export function contractProgress(contract: Pick<Contract, 'objects'>): ContractProgress {
+  const counts = { planned: 0, in_progress: 0, done: 0 }
+  for (const object of contract.objects) counts[objectStatus(object)] += 1
+  const total = contract.objects.length
+  let status: ContractProgress['status'] = 'empty'
+  if (total && counts.done === total) status = 'done'
+  else if (counts.in_progress || counts.done) status = 'in_progress'
+  else if (total) status = 'planned'
+  return { total, planned: counts.planned, inProgress: counts.in_progress, done: counts.done, status }
+}
+
 export function validateWorkDraft(draft: WorkDraft): string | null {
   if (!draft.title.trim()) return 'Укажите наименование работы'
   if (!isWorkUnit(draft.unit)) return 'Выберите единицу измерения'

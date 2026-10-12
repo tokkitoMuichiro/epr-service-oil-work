@@ -9,14 +9,17 @@ import { createApp, type AppOptions } from './app.js'
 import { openDatabase } from './db.js'
 import { loadDemoSeed } from './demo-seed.js'
 import { demoUserOf } from './modules/auth/repository.js'
+import { unzip } from './testing/unzip.js'
 import {
   validateBrigadeDraft,
   type AssignmentIssue,
   type Brigade,
   type BrigadeAssignment,
   type Contract,
+  type DailyReport,
   type EquipmentState,
   type ObjectCrew,
+  type ReportDay,
   type RoleId,
   type User,
   type Worker,
@@ -86,6 +89,11 @@ async function startApp(options: AppOptions = {}) {
     return { status: response.status, headers: response.headers, text, json: isJson ? JSON.parse(text) : null }
   }
 
+  async function download(url: string, who: Who = 'admin') {
+    const response = await raw('GET', url, who)
+    return { status: response.status, headers: response.headers, data: Buffer.from(await response.arrayBuffer()) }
+  }
+
   function upload(url: string, method: string, body: string, who: Who = 'admin') {
     return raw(method, url, who, { headers: { 'Content-Type': 'application/octet-stream' }, body })
   }
@@ -94,18 +102,20 @@ async function startApp(options: AppOptions = {}) {
     await new Promise<void>((resolve, reject) => server.close((e) => (e ? reject(e) : resolve())))
   }
 
-  return { base, call, upload, close }
+  return { base, call, download, upload, close }
 }
 
 type Api = Awaited<ReturnType<typeof startApp>>
 
 let api: Api
 let call: Api['call']
+let download: Api['download']
 let upload: Api['upload']
 
 before(async () => {
   api = await startApp()
   call = api.call
+  download = api.download
   upload = api.upload
 })
 
@@ -126,8 +136,18 @@ describe('api', needsDemo, () => {
     const contracts = (await call('GET', '/api/contracts')).json.items as Contract[]
     const brigades = (await call('GET', '/api/brigades')).json.items as Brigade[]
     assert.equal(workers.length, 30)
-    assert.equal(contracts.length, 6)
-    assert.equal(contracts.flatMap((c) => c.objects).length, 20)
+    assert.equal(contracts.length, 5)
+    assert.equal(contracts.flatMap((c) => c.objects).length, 11)
+
+    const reports = (await call('GET', '/api/reports')).json.items as DailyReport[]
+    for (const object of contracts.flatMap((c) => c.objects)) {
+      const own = reports.filter((r) => r.objectId === object.id)
+      if (object.actualStart) assert.ok(own.length > 0, `${object.name}: no reports`)
+      for (const work of object.works) {
+        const reported = own.flatMap((r) => r.workItems).filter((w) => w.itemId === work.id).reduce((s, w) => s + w.volume, 0)
+        assert.equal(reported, work.actualVolume, `${object.name} / ${work.title}`)
+      }
+    }
     assert.ok(brigades.some((b) => b.masterIds.length > 1))
     assert.ok(brigades.some((b) => b.foremanIds.length > 1))
     for (const b of brigades) assert.equal(validateBrigadeDraft(b, brigades, b.id), null, b.name)
@@ -386,12 +406,11 @@ describe('api', needsDemo, () => {
     assert.ok(master.items.every((i) => !i.fillComment))
     assert.ok(master.transfers.length < admin.transfers.length)
 
-    assert.equal((await call('GET', '/api/equipment/export.xls', 'office')).status, 403)
-    const xls = await call('GET', '/api/equipment/export.xls', 'admin')
-    assert.equal(xls.status, 200)
-    assert.match(xls.headers.get('content-type') ?? '', /ms-excel/)
-    assert.match(xls.text, /<Workbook/)
-    assert.match(xls.text, /Транспорт/)
+    assert.equal((await call('GET', '/api/equipment/export.xlsx', 'office')).status, 403)
+    const xlsx = await download('/api/equipment/export.xlsx')
+    assert.equal(xlsx.status, 200)
+    assert.match(xlsx.headers.get('content-type') ?? '', /spreadsheetml\.sheet/)
+    assert.match(unzip(xlsx.data).get('xl/worksheets/sheet1.xml') ?? '', /Транспорт/)
   })
 
   it('requires a note and moves items to repair on IN_REPAIR', async () => {
@@ -556,6 +575,58 @@ describe('api', needsDemo, () => {
     })
     assert.equal(toArchived.status, 409)
     assert.match(toArchived.json.error, /в архиве/)
+  })
+
+  it('moves an object through its lifecycle and closes brigade assignments on completion', async () => {
+    const assignment = ((await call('GET', '/api/assignments')).json.items as BrigadeAssignment[]).find((a) => a.id === 'a-1')
+    assert.ok(assignment)
+    const base = `/api/contracts/${assignment.contractId}/objects/${assignment.objectId}`
+    const objectOf = (result: CallResult) =>
+      (result.json.item as Contract).objects.find((o) => o.id === assignment.objectId)
+    const setStatus = (body: object, who: RoleId = 'admin') => call('PATCH', `${base}/status`, who, body)
+
+    assert.equal((await setStatus({ status: 'done', date: TODAY }, 'office')).status, 403)
+    const current = objectOf(await call('GET', `/api/contracts/${assignment.contractId}`))
+    if (!current?.actualStart) assert.equal((await setStatus({ status: 'in_progress', date: TODAY })).status, 200)
+    assert.equal((await setStatus({ status: 'in_progress', date: TODAY })).status, 400)
+    assert.equal((await setStatus({ status: 'done', date: '2099-01-01' })).status, 400)
+
+    const done = await setStatus({ status: 'done', date: TODAY })
+    assert.equal(done.status, 200, done.text)
+    assert.equal(objectOf(done)?.actualEnd, TODAY)
+    assert.equal(objectOf(done)?.deadlineEdits[0].field, 'actualEnd')
+    const left = ((await call('GET', `/api/assignments?objectId=${assignment.objectId}`)).json.items as BrigadeAssignment[])
+    assert.ok(left.every((a) => a.to <= TODAY))
+
+    const late = await call('POST', '/api/assignments', 'admin', {
+      ...assignment,
+      from: TODAY,
+      to: '2026-12-31',
+    })
+    assert.equal(late.status, 409)
+    assert.match(late.json.error, /завершён/)
+    assert.equal((await call('PATCH', base, 'admin', { actualEnd: '' })).status, 400)
+
+    const reopened = await setStatus({ status: 'in_progress' })
+    assert.equal(reopened.status, 200)
+    assert.equal(objectOf(reopened)?.actualEnd, undefined)
+  })
+
+  it('exposes report days and exports schedules to Excel', async () => {
+    const days = (await call('GET', '/api/contracts/report-days')).json.items as ReportDay[]
+    const reported = days.find((d) => d.workIds.length)
+    assert.ok(reported)
+
+    const summary = await download('/api/contracts/export.xlsx')
+    assert.equal(summary.status, 200)
+    assert.match(summary.headers.get('content-type') ?? '', /spreadsheetml\.sheet/)
+    assert.match(summary.headers.get('content-disposition') ?? '', /attachment; .*\.xlsx/)
+    assert.match(unzip(summary.data).get('xl/workbook.xml') ?? '', /name="Сводный график"/)
+
+    const object = unzip((await download(`/api/contracts/export.xlsx?objectId=${reported.objectId}`)).data)
+    assert.match(object.get('xl/worksheets/sheet1.xml') ?? '', /Объект целиком/)
+    assert.match(object.get('xl/workbook.xml') ?? '', /name="Отчёты"/)
+    assert.equal((await call('GET', '/api/contracts/export.xlsx?objectId=missing')).status, 404)
   })
 })
 

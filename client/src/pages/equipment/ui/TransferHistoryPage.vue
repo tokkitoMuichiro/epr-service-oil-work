@@ -2,7 +2,8 @@
 import { computed, ref } from 'vue'
 import { TRANSFER_STATUS_LABEL, pluralRu, useEquipmentStore, type TransferStatus } from '@/entities/equipment'
 import { formatDateTimeRu } from '@/shared/lib/date'
-import { UiState } from '@/shared/ui'
+import { useMobilePagination } from '@/shared/lib/pagination'
+import { UiPagination, UiState } from '@/shared/ui'
 
 const store = useEquipmentStore()
 
@@ -24,6 +25,8 @@ const rows = computed(() => {
   const sign = order.value === 'desc' ? -1 : 1
   return list.sort((a, b) => sign * a.createdAt.localeCompare(b.createdAt))
 })
+
+const pager = useMobilePagination(rows, { resetOn: [query, actor, status, order] })
 
 function tone(value: TransferStatus) {
   if (value === 'PENDING') return 'warn'
@@ -55,7 +58,7 @@ function tone(value: TransferStatus) {
 
       <UiState v-if="!rows.length" title="Передач нет" text="Измените фильтры или дождитесь первых передач." />
 
-      <div v-else class="table-wrap ui-table-wrap">
+      <div v-else class="table-wrap ui-table-wrap ui-table-wrap--stack">
         <table class="ui-table">
           <thead>
             <tr>
@@ -69,23 +72,30 @@ function tone(value: TransferStatus) {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="t in rows" :key="t.id">
-              <td class="nowrap" data-label="Дата">{{ formatDateTimeRu(t.createdAt) }}</td>
-              <td data-label="Позиция">
+            <tr v-for="t in pager.pageItems" :key="t.id">
+              <td class="nowrap transfer__date">{{ formatDateTimeRu(t.createdAt) }}</td>
+              <td class="ui-cell--main">
                 <strong>{{ t.equipmentName }}</strong>
                 <small v-if="t.factoryNumber" class="muted"> · {{ t.factoryNumber }}</small>
               </td>
-              <td data-label="Откуда">{{ t.fromLabel }}</td>
-              <td data-label="Куда">{{ t.toLabel }}</td>
-              <td class="num" data-label="Кол-во">{{ t.quantity }}</td>
-              <td data-label="Кто передал">{{ t.actorName }}</td>
-              <td data-label="Статус">
+              <td class="transfer__route" data-label="Откуда">{{ t.fromLabel }}</td>
+              <td class="transfer__route" data-label="Куда">{{ t.toLabel }}</td>
+              <td class="num transfer__qty" data-label="Кол-во">{{ t.quantity }}</td>
+              <td class="transfer__route" data-label="Передал">{{ t.actorName }}</td>
+              <td class="ui-cell--aside">
                 <span class="ui-badge" :class="`ui-badge--${tone(t.status)}`" :data-tone="tone(t.status)">{{ TRANSFER_STATUS_LABEL[t.status] }}</span>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
+      <UiPagination
+        v-if="pager.isPaged"
+        v-model:page="pager.page"
+        class="pager"
+        :total="pager.total"
+        :page-size="pager.pageSize"
+      />
     </div>
   </div>
 </template>
@@ -136,59 +146,35 @@ function tone(value: TransferStatus) {
   .filters input {
     grid-column: 1 / -1;
   }
-}
 
-@media (max-width: 560px) {
-  .filters {
-    grid-template-columns: minmax(0, 1fr);
+  .count {
+    margin: var(--space-2) 0;
+    font-size: var(--font-size-xs);
   }
 
   .table-wrap {
     border: 0;
-    background: none;
-    overflow: visible;
   }
 
-  .ui-table thead {
-    display: none;
-  }
-
-  .ui-table,
-  .ui-table tbody,
-  .ui-table tr {
-    display: block;
-  }
-
-  .ui-table tr {
-    margin-bottom: var(--space-2);
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius);
-    background: var(--surface-card);
-  }
-
-  .ui-table td {
-    display: grid;
-    grid-template-columns: 110px minmax(0, 1fr);
-    gap: var(--space-2);
-    height: auto;
-    padding: var(--space-1) 0;
-    border: 0;
-    text-align: left;
-    background: none;
-  }
-
-  .ui-table td::before {
-    content: attr(data-label);
-    font-size: var(--font-size-xs);
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+  .ui-table td.transfer__date {
+    grid-column: 2;
     color: var(--text-secondary);
+    font-size: var(--font-size-xs);
   }
 
-  .ui-table td .ui-badge {
-    justify-self: start;
+  .ui-table td.transfer__qty {
+    grid-column: 3;
+    justify-self: end;
+    margin-left: var(--space-2);
+    white-space: nowrap;
+  }
+
+  .ui-table td.transfer__route {
+    order: 1;
+  }
+
+  .pager {
+    margin-top: var(--space-2);
   }
 }
 </style>

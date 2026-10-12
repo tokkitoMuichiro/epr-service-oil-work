@@ -98,7 +98,7 @@ export const equipmentApi = {
   },
 
   exportExcel(): Promise<void> {
-    return downloadFile('/equipment/export.xls', 'Учёт оборудования.xls')
+    return downloadFile('/equipment/export.xlsx', 'Учёт оборудования.xlsx')
   },
 
   async exportToBitrix(): Promise<BitrixExportResult> {

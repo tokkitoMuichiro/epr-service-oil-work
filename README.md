@@ -11,7 +11,8 @@ client/   # SPA (FSD: app, pages, widgets, features, entities, shared)
 server/   # Express API, модули в server/src/modules/<module>
 shared/   # общие типы и доменная логика (права, валидация, статусы)
 scripts/  # dev-all.mjs — API и клиент одной командой
-deploy/   # systemd unit и пример конфигурации nginx
+deploy/   # docker-compose, deploy.sh / backup.sh для VDS, пример nginx
+.github/  # CI (проверки) и Release (образ в GHCR → деплой на VDS)
 ```
 
 ## Разработка
@@ -23,7 +24,15 @@ npm run check        # проверка типов + тесты
 npm run build        # client/dist + server/dist
 ```
 
-## Запуск в продакшене
+## Выпуск
+
+Пуш в `main` → GitHub Actions: проверки и сборка → Docker-образ `ghcr.io/<owner>/erp-ammir:vN` (smoke-тест контейнера) → `deploy/deploy.sh vN` на VDS по SSH. Сервер ничего не собирает. `deploy.sh` делает бэкап базы, перезапускает контейнер и при неудачном healthcheck возвращает прежний тег.
+
+Откат: Actions → **Deploy** → тег (`v12`) или пусто — предыдущий релиз; на сервере — `deploy.sh v12` / `deploy.sh previous`.
+
+Первичная настройка VDS: каталог `/opt/erp-ammir` с `.env` (`IMAGE_REPO=ghcr.io/<owner>/erp-ammir`) и `erp.env` (по шаблону `deploy/erp.env.example`), nginx по `deploy/nginx.conf.example`, cron `0 3 * * * /opt/erp-ammir/backup.sh`. Секреты окружения `production` в GitHub: `VDS_HOST`, `VDS_USER`, `VDS_SSH_KEY`, `VDS_KNOWN_HOSTS`; переменная `VDS_PATH` (по умолчанию `/opt/erp-ammir`).
+
+Локально без Docker:
 
 ```bash
 npm ci && npm run build

@@ -44,6 +44,8 @@ export interface AppOptions {
   /** Base address for knowledge-check links; defaults to the request origin. */
   publicUrl?: string
   bitrix?: BitrixConfig
+  /** Release tag of the running image, shown by `/health`. */
+  version?: string
 }
 
 export function createApp(options: AppOptions = {}) {
@@ -52,7 +54,7 @@ export function createApp(options: AppOptions = {}) {
   const audit = createAuditLog(db)
   const users = createUserRepository(db)
   const access = createAccessStore(storage)
-  const contracts = createContractsRepository(storage)
+  const contracts = createContractsRepository(storage, { today: options.today })
   const reports = createReportsRepository(contracts, storage)
   const equipment = createEquipmentService(storage, {
     users: () => users.list(),
@@ -89,7 +91,7 @@ export function createApp(options: AppOptions = {}) {
   app.use(express.json({ limit: '1mb' }))
 
   app.get('/health', (_req, res) => {
-    res.json({ ok: true, service: 'erp-ammir-api', time: new Date().toISOString() })
+    res.json({ ok: true, service: 'erp-ammir-api', version: options.version ?? 'dev', time: new Date().toISOString() })
   })
 
   const api = express.Router()
@@ -128,7 +130,8 @@ export function createApp(options: AppOptions = {}) {
       isBusy: (objectId) => personnel.isObjectBusy(objectId),
       removed: (objectId) => personnel.removeAssignmentsForObject(objectId),
       archived: (objectId) => personnel.removeFutureAssignmentsForObject(objectId),
-    }),
+      completed: (objectId, lastDay) => personnel.closeAssignmentsForObject(objectId, lastDay),
+    }, { reports: () => reports.list(), today: options.today }),
   )
   api.use('/reports', access.guard('reports'), reportsRouter(reports, contracts))
   api.use('/equipment', equipmentRouter(equipment))

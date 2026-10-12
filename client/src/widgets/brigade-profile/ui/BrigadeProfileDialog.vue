@@ -11,7 +11,7 @@ import {
   type BrigadeAssignment,
   type BrigadeDraft,
 } from '@/entities/brigade'
-import { useContractsStore } from '@/entities/contract'
+import { isObjectArchived, useContractsStore } from '@/entities/contract'
 import { WorkerStatusBadge, usePersonnelStore, type Worker } from '@/entities/personnel'
 import { useAccessStore } from '@/entities/role'
 import { AssignmentDialog, type AssignmentObjectOption } from '@/features/brigade-assignment'
@@ -79,7 +79,7 @@ const objectOptions = computed<AssignmentObjectOption[]>(() =>
       id: o.id,
       contractId: c.id,
       label: `${o.name} · ${o.location}`,
-      isArchived: Boolean(o.archived || c.archived),
+      isArchived: isObjectArchived(c, o),
     })),
   ),
 )

@@ -11,7 +11,8 @@ import {
   type Warehouse,
 } from '@/entities/equipment'
 import { WarehouseFormDialog } from '@/features/warehouse-form'
-import { IconClose, UiButton, UiState } from '@/shared/ui'
+import { useMobilePagination } from '@/shared/lib/pagination'
+import { IconClose, UiButton, UiPagination, UiState } from '@/shared/ui'
 
 const store = useEquipmentStore()
 
@@ -25,6 +26,8 @@ const categories: AssetCategory[] = ['EQUIPMENT', 'VEHICLE', 'CARD']
 const bases = computed(() =>
   [...store.warehouses].sort((a, b) => Number(b.isSystem) - Number(a.isSystem) || a.name.localeCompare(b.name, 'ru')),
 )
+
+const pager = useMobilePagination(bases)
 
 function countOn(id: string, category: AssetCategory) {
   return store.itemsOnWarehouse(id).filter((i) => i.category === category).length
@@ -63,7 +66,7 @@ async function remove(w: Warehouse) {
 <template>
   <div class="page">
     <div class="page__bar">
-      <p class="muted intro">
+      <p class="muted intro ui-hide-mobile">
         Кладовщик принимает передачи на свою базу и передаёт с неё оборудование. База «Ремонт» — системная: сюда
         попадает всё со статусом «В ремонте».
       </p>
@@ -78,7 +81,7 @@ async function remove(w: Warehouse) {
     <UiState v-if="!bases.length" title="Баз пока нет" text="Создайте первую производственную базу." />
 
     <ul v-else class="bases">
-      <li v-for="w in bases" :key="w.id" class="base" :class="{ 'base--system': w.isSystem }">
+      <li v-for="w in pager.pageItems" :key="w.id" class="base" :class="{ 'base--system': w.isSystem }">
         <RouterLink class="base__link" :to="{ name: 'equipment-warehouse', params: { id: w.id } }">
           <div class="base__head">
             <strong>{{ w.name }}</strong>
@@ -111,6 +114,7 @@ async function remove(w: Warehouse) {
         </div>
       </li>
     </ul>
+    <UiPagination v-if="pager.isPaged" v-model:page="pager.page" :total="pager.total" :page-size="pager.pageSize" />
 
     <WarehouseFormDialog :open="isFormOpen" :warehouse="editing" @close="isFormOpen = false" />
   </div>
@@ -211,20 +215,30 @@ async function remove(w: Warehouse) {
   justify-self: start;
 }
 
+@media (max-width: 860px) {
+  .bases {
+    gap: var(--space-2);
+  }
+
+  .base__link {
+    gap: var(--space-1);
+    padding: var(--space-3);
+    font-size: var(--font-size-xs);
+  }
+
+  .base__actions {
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
+  }
+}
+
 @media (max-width: 560px) {
   .bases {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .base__link,
-  .base__actions {
-    padding-right: var(--space-4);
-    padding-left: var(--space-4);
-  }
-
   .base__actions :deep(.btn) {
     flex: 1 1 auto;
-    min-height: var(--tap-size);
   }
 }
 </style>

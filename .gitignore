@@ -24,6 +24,8 @@ data/
 .env
 .env.*
 !.env.example
+erp.env
+releases.log
 
 # Internal documentation and agent context: local only
 docs/

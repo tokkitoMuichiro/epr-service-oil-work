@@ -139,4 +139,23 @@ withDefaults(
 .skeleton__cell--short {
   width: 50%;
 }
+
+@media (max-width: 860px) {
+  .state {
+    padding: var(--space-6) var(--space-4);
+  }
+
+  .state__icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .state--loading {
+    padding: var(--space-2) 0;
+  }
+
+  .skeleton__row {
+    min-height: 40px;
+  }
+}
 </style>

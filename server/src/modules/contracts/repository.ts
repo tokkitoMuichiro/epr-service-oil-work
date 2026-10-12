@@ -1,20 +1,29 @@
 import { persisted, type Storage } from '../../db.js'
-import { badRequest, notFound, nowIso, trimmed, uid } from '../../http.js'
+import { badRequest, conflict, notFound, nowIso, trimmed, uid } from '../../http.js'
 import {
   DEADLINE_FIELDS,
   TANK_CLEANING_QUALIFICATIONS,
+  OBJECT_STATUSES,
   isIsoDate,
   isQualificationTypeId,
+  isRollback,
+  nextActualDates,
+  objectStatus,
+  todayIso,
   validateContractDraft,
   validateObjectDates,
+  validateObjectStatusChange,
   validateWorkDraft,
   workStatus,
   type Contract,
   type ContractDraft,
   type ContractObject,
   type DeadlineEdit,
+  type DeadlineField,
   type ObjectDraft,
   type ObjectPatch,
+  type ObjectStatus,
+  type ObjectStatusChange,
   type ReportObjectRef,
   type WorkDraft,
   type WorkItem,
@@ -30,7 +39,8 @@ function qualificationIds(value: unknown): string[] {
   return [...new Set(value)]
 }
 
-export function createContractsRepository(storage: Storage) {
+export function createContractsRepository(storage: Storage, deps: { today?: () => string } = {}) {
+  const today = deps.today ?? (() => todayIso())
   const snapshot = storage.snapshot<Contract[]>('contracts', { empty: () => [] })
   let contracts = snapshot.state
 
@@ -58,6 +68,10 @@ export function createContractsRepository(storage: Storage) {
     const error = validateWorkDraft(draft)
     if (error) badRequest(error)
     return { id, ...draft, status: workStatus(draft) }
+  }
+
+  function deadlineEdit(field: DeadlineField, previousValue: string, newValue: string, note: string): DeadlineEdit {
+    return { id: uid('e'), field, previousValue, newValue, editedAt: nowIso(), note }
   }
 
   function parseDraft(body: Partial<ContractDraft>): ContractDraft {
@@ -160,17 +174,12 @@ export function createContractsRepository(storage: Storage) {
         if (!(field in body)) continue
         const value = optionalDate(body[field], 'Срок') ?? ''
         if (value === (object[field] ?? '')) continue
-        edits.push({
-          id: uid('e'),
-          field,
-          previousValue: object[field] ?? '',
-          newValue: value,
-          editedAt: nowIso(),
-          note: trimmed(body.note) || 'Срок изменён',
-        })
-        if (field === 'plannedStart' || field === 'plannedEnd') next[field] = value
-        else if (value) next[field] = value
-        else delete next[field]
+        if (field === 'actualStart' || field === 'actualEnd') {
+          if (!object[field] || !value) badRequest('Фактические сроки задаются сменой статуса объекта')
+          if (value > today()) badRequest('Фактическая дата не может быть в будущем')
+        }
+        edits.push(deadlineEdit(field, object[field] ?? '', value, trimmed(body.note) || 'Срок изменён'))
+        next[field] = value
       }
       const error = validateObjectDates(next)
       if (error) badRequest(error)
@@ -178,6 +187,34 @@ export function createContractsRepository(storage: Storage) {
       if (edits.length) next.deadlineEdits = [...edits, ...object.deadlineEdits]
       const contract = get(contractId)
       contract.objects = contract.objects.map((o) => (o.id === objectId ? next : o))
+      return structuredClone(contract)
+    },
+
+    setObjectStatus(contractId: string, objectId: string, body: Partial<ObjectStatusChange>): Contract {
+      const contract = get(contractId)
+      const object = getObject(contractId, objectId)
+      if (contract.archived || object.archived) conflict('Объект в архиве — сначала верните его из архива')
+      if (!OBJECT_STATUSES.includes(body.status as ObjectStatus)) badRequest('Неизвестный статус объекта')
+      const change: ObjectStatusChange = {
+        status: body.status as ObjectStatus,
+        date: optionalDate(body.date, 'Дата'),
+        note: trimmed(body.note),
+      }
+      const error = validateObjectStatusChange(object, change, today())
+      if (error) badRequest(error)
+
+      const rollback = isRollback(objectStatus(object), change.status)
+      const defaultNote = rollback ? 'Статус возвращён' : change.status === 'done' ? 'Объект завершён' : 'Работы начаты'
+      const dates = nextActualDates(object, change)
+      const edits: DeadlineEdit[] = []
+      for (const field of ['actualStart', 'actualEnd'] as const) {
+        const value = dates[field]
+        if (value === object[field]) continue
+        edits.push(deadlineEdit(field, object[field] ?? '', value ?? '', change.note || defaultNote))
+        if (value) object[field] = value
+        else delete object[field]
+      }
+      object.deadlineEdits = [...edits, ...object.deadlineEdits]
       return structuredClone(contract)
     },
 
@@ -232,6 +269,7 @@ export function createContractsRepository(storage: Storage) {
       'remove',
       'addObject',
       'updateObject',
+      'setObjectStatus',
       'addWork',
       'updateWork',
       'removeWork',

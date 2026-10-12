@@ -36,10 +36,23 @@ const canAddHere = computed(() =>
 function select(id: string) {
   void router.replace({ query: { ...route.query, userId: id } })
 }
+
+function personLabel(id: string, fullName: string) {
+  return `${fullName}${id === store.persona.id ? ' (вы)' : ''}`
+}
 </script>
 
 <template>
   <div class="layout">
+    <label class="picker">
+      <span class="ui-overline">Сотрудник</span>
+      <select class="ui-control" :value="userId" @change="select(($event.target as HTMLSelectElement).value)">
+        <option v-for="p in store.people" :key="p.id" :value="p.id">
+          {{ personLabel(p.id, p.fullName) }} — {{ positionsLabel(store.itemsOfUser(p.id).length) }}
+        </option>
+      </select>
+    </label>
+
     <aside class="people">
       <input v-model="search" class="people__search ui-control" type="search" placeholder="Поиск сотрудника" aria-label="Поиск сотрудника" />
       <button
@@ -50,7 +63,7 @@ function select(id: string) {
         :class="{ 'people__item--active': p.id === userId }"
         @click="select(p.id)"
       >
-        <strong>{{ p.fullName }}{{ p.id === store.persona.id ? ' (вы)' : '' }}</strong>
+        <strong>{{ personLabel(p.id, p.fullName) }}</strong>
         <span class="num">{{ positionsLabel(store.itemsOfUser(p.id).length) }}</span>
       </button>
       <p v-if="!people.length" class="muted">Никого не найдено</p>
@@ -63,8 +76,8 @@ function select(id: string) {
         <UiButton v-if="canAddHere" variant="primary" @click="isCreateOpen = true">{{ addLabel(category) }}</UiButton>
       </div>
       <div class="panel">
-        <h2 class="panel__title">{{ person.fullName }}</h2>
-        <p class="panel__text">Позиции, которые числятся за сотрудником.</p>
+        <h2 class="panel__title ui-hide-mobile">{{ person.fullName }}</h2>
+        <p class="panel__text ui-hide-mobile">Позиции, которые числятся за сотрудником.</p>
         <EquipmentBoard :items="items" :category="category" :show-owner="false" empty-text="За сотрудником ничего не числится." />
       </div>
     </div>
@@ -135,28 +148,23 @@ function select(id: string) {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
+.picker {
+  display: none;
+}
+
 @media (max-width: 860px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  .picker {
+    display: grid;
+    gap: var(--space-1);
   }
 
   .people {
-    position: static;
-    display: flex;
-    max-height: none;
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
-    scrollbar-width: none;
-  }
-
-  .people__search {
-    flex: 0 0 200px;
-  }
-
-  .people__item {
-    flex: 0 0 auto;
-    min-width: 170px;
-    scroll-snap-align: start;
+    display: none;
   }
 }
 </style>

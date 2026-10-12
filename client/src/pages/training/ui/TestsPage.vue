@@ -11,7 +11,8 @@ import {
   type TestStatus,
 } from '@/entities/training'
 import { formatDateTimeRu } from '@/shared/lib/date'
-import { UiState } from '@/shared/ui'
+import { useMobilePagination } from '@/shared/lib/pagination'
+import { UiPagination, UiState } from '@/shared/ui'
 
 const STATUS_TONE: Record<TestStatus, string> = { draft: 'warn', published: 'ok', archived: '' }
 
@@ -36,12 +37,14 @@ const visible = computed(() => {
     .filter((t) => !elVoltage.value || t.electrical?.voltage === elVoltage.value)
     .filter((t) => !q || t.title.toLocaleLowerCase('ru').includes(q))
 })
+
+const pager = useMobilePagination(visible, { resetOn: [search, programFilter, statusFilter, elKind, elGroup, elVoltage] })
 </script>
 
 <template>
   <div class="tests">
     <div class="tests__toolbar">
-      <input v-model="search" class="ui-control" type="search" placeholder="Поиск по названию" aria-label="Поиск" />
+      <input v-model="search" class="tests__search ui-control" type="search" placeholder="Поиск по названию" aria-label="Поиск" />
       <select v-model="programFilter" class="ui-control" aria-label="Программа">
         <option value="">Все программы</option>
         <option v-for="p in store.programs" :key="p.id" :value="p.id">{{ store.labelOf(p.id) }}</option>
@@ -68,39 +71,45 @@ const visible = computed(() => {
     </div>
 
     <UiState v-if="!visible.length" title="Тестов нет" text="Создайте тест: добавьте вопросы и опубликуйте его." />
-    <div v-else class="ui-table-wrap">
-      <table class="ui-table">
-        <thead>
-          <tr>
-            <th>Тест</th>
-            <th>Программа</th>
-            <th class="hide-md">Вопросов</th>
-            <th>Статус</th>
-            <th class="hide-md">Изменён</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="t in visible" :key="t.id">
-            <td>
-              <RouterLink :to="`/training/tests/${t.id}`" class="tests__title">{{ t.title }}</RouterLink>
-              <small v-if="t.electrical" class="tests__sub">{{ describeElectricalScope(t.electrical) }}</small>
-            </td>
-            <td>{{ store.labelOf(t.programId) }}</td>
-            <td class="hide-md">{{ t.questionCount }}</td>
-            <td>
-              <span class="ui-badge" :class="STATUS_TONE[t.status] ? `ui-badge--${STATUS_TONE[t.status]}` : ''">
-                {{ TEST_STATUS_LABEL[t.status] }}
-              </span>
-              <small v-if="t.status !== 'draft'" class="tests__sub">версия {{ t.version }}</small>
-            </td>
-            <td class="hide-md">
-              {{ formatDateTimeRu(t.updatedAt) }}
-              <small class="tests__sub">{{ t.updatedBy }}</small>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <template v-else>
+      <div class="ui-table-wrap ui-table-wrap--stack">
+        <table class="ui-table">
+          <thead>
+            <tr>
+              <th>Тест</th>
+              <th>Программа</th>
+              <th class="hide-md">Вопросов</th>
+              <th>Статус</th>
+              <th class="hide-md">Изменён</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="t in pager.pageItems" :key="t.id">
+              <td class="ui-cell--main">
+                <RouterLink :to="`/training/tests/${t.id}`" class="tests__title">{{ t.title }}</RouterLink>
+                <small v-if="t.electrical" class="tests__sub">{{ describeElectricalScope(t.electrical) }}</small>
+              </td>
+              <td class="tests__program">
+                {{ store.labelOf(t.programId) }}
+                <span class="tests__meta">· вопросов: {{ t.questionCount }}</span>
+              </td>
+              <td class="hide-md">{{ t.questionCount }}</td>
+              <td class="ui-cell--aside">
+                <span class="ui-badge" :class="STATUS_TONE[t.status] ? `ui-badge--${STATUS_TONE[t.status]}` : ''">
+                  {{ TEST_STATUS_LABEL[t.status] }}
+                </span>
+                <small v-if="t.status !== 'draft'" class="tests__sub">версия {{ t.version }}</small>
+              </td>
+              <td class="hide-md">
+                {{ formatDateTimeRu(t.updatedAt) }}
+                <small class="tests__sub">{{ t.updatedBy }}</small>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <UiPagination v-if="pager.isPaged" v-model:page="pager.page" :total="pager.total" :page-size="pager.pageSize" />
+    </template>
   </div>
 </template>
 
@@ -146,6 +155,11 @@ const visible = computed(() => {
   font-size: var(--font-size-xs);
 }
 
+.tests__meta {
+  display: none;
+  color: var(--text-secondary);
+}
+
 @media (hover: hover) and (pointer: fine) {
   .tests__new:hover {
     background: var(--accent-strong-hover);
@@ -153,11 +167,31 @@ const visible = computed(() => {
 }
 
 @media (max-width: 860px) {
-  .tests__toolbar .ui-control,
-  .tests__new {
-    flex: 1 1 100%;
+  .tests {
+    gap: var(--space-3);
+  }
+
+  .tests__toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tests__toolbar .ui-control {
+    width: 100%;
     min-width: 0;
+  }
+
+  .tests__search {
+    grid-column: 1 / -1;
+  }
+
+  .tests__new {
+    grid-column: 1 / -1;
     margin-left: 0;
+  }
+
+  .tests__meta {
+    display: inline;
   }
 
   .hide-md {

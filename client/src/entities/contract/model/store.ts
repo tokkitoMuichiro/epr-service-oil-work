@@ -1,11 +1,21 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { errorMessage } from '@/shared/api'
-import { contractsApi } from '../api/contracts'
-import type { Contract, ContractDraft, ObjectDraft, ObjectPatch, WorkDraft } from './types'
+import { contractsApi, type ScheduleExportParams } from '../api/contracts'
+import type {
+  Contract,
+  ContractDraft,
+  ObjectDraft,
+  ObjectPatch,
+  ObjectStatusChange,
+  ReportDay,
+  WorkDraft,
+} from './types'
 
 export const useContractsStore = defineStore('contracts', () => {
   const items = ref<Contract[]>([])
+  const reportDays = ref<ReportDay[]>([])
+  const isExporting = ref(false)
   const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const errorText = ref('')
   const actionError = ref('')
@@ -27,7 +37,9 @@ export const useContractsStore = defineStore('contracts', () => {
     status.value = 'loading'
     errorText.value = ''
     try {
-      items.value = await contractsApi.list()
+      const [contracts, days] = await Promise.all([contractsApi.list(), contractsApi.reportDays()])
+      items.value = contracts
+      reportDays.value = days
       status.value = 'ready'
       if (!items.value.some((c) => c.id === selectedContractId.value)) selectContract(null)
     } catch (e) {
@@ -108,6 +120,10 @@ export const useContractsStore = defineStore('contracts', () => {
     return mutate(async () => replace(await contractsApi.updateObject(contractId, objectId, patch, note)))
   }
 
+  function setObjectStatus(contractId: string, objectId: string, change: ObjectStatusChange) {
+    return mutate(async () => replace(await contractsApi.setObjectStatus(contractId, objectId, change)))
+  }
+
   function removeObject(contractId: string, objectId: string) {
     return mutate(async () => {
       replace(await contractsApi.removeObject(contractId, objectId))
@@ -127,8 +143,23 @@ export const useContractsStore = defineStore('contracts', () => {
     return mutate(async () => replace(await contractsApi.removeWork(contractId, objectId, workId)))
   }
 
+  async function exportSchedule(params: ScheduleExportParams, fallbackName: string) {
+    isExporting.value = true
+    actionError.value = ''
+    try {
+      await contractsApi.exportSchedule(params, fallbackName)
+    } catch (e) {
+      actionError.value = errorMessage(e, 'Не удалось выгрузить график')
+    } finally {
+      isExporting.value = false
+    }
+  }
+
   return {
     items,
+    reportDays,
+    isExporting,
+    exportSchedule,
     status,
     errorText,
     actionError,
@@ -148,6 +179,7 @@ export const useContractsStore = defineStore('contracts', () => {
     setObjectArchived,
     addObject,
     updateObject,
+    setObjectStatus,
     removeObject,
     addWork,
     updateWork,

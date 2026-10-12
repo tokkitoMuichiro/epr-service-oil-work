@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { param, rawBody, requestUser, sendFile, trimmed, uploadedFile } from '../../http.js'
 import { EQUIPMENT_DOCUMENT_MAX_BYTES, todayIso, type EquipmentCondition } from '../../shared.js'
+import { XLSX_MIME } from '../../excel.js'
 import { equipmentWorkbook } from './excel.js'
 import type { EquipmentService } from './service.js'
 
@@ -13,12 +14,9 @@ export function equipmentRouter(service: EquipmentService) {
     res.json(service.state(requestUser(req)))
   })
 
-  router.get('/export.xls', (req, res) => {
-    const workbook = equipmentWorkbook(service.exportRows(requestUser(req)))
-    const fileName = encodeURIComponent(`Учёт оборудования ${todayIso()}.xls`)
-    res.setHeader('Content-Type', 'application/vnd.ms-excel; charset=utf-8')
-    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${fileName}`)
-    res.send(workbook)
+  router.get('/export.xlsx', (req, res) => {
+    const data = equipmentWorkbook(service.exportRows(requestUser(req)))
+    sendFile(res, { data, mimeType: XLSX_MIME }, `Учёт оборудования ${todayIso()}.xlsx`)
   })
 
   router.post('/export/bitrix', (req, res) => {

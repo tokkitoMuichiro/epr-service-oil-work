@@ -45,7 +45,7 @@ watch(
     <header class="hero">
       <p class="ui-overline hero__eyebrow">Внутренняя система</p>
       <h1>{{ APP_NAME }}</h1>
-      <p class="hero__lead">
+      <p class="hero__lead ui-hide-mobile">
         Контракты, бригады, полевые отчёты и оборудование в одном рабочем контуре АММИР.
       </p>
     </header>
@@ -84,7 +84,7 @@ watch(
       <div class="strip__item">
         <span class="ui-overline">Текущая роль</span>
         <strong>{{ currentRoleLabel }}</strong>
-        <p>
+        <p class="ui-hide-mobile">
           Роль назначает администратор в настройках. «Бригадир» — назначение в бригаде, не отдельная роль входа.
         </p>
       </div>
@@ -248,8 +248,40 @@ watch(
 }
 
 @media (max-width: 860px) {
+  .page {
+    gap: var(--space-3);
+  }
+
   .hero {
-    padding: var(--space-5);
+    padding: var(--space-4);
+  }
+
+  .hero h1 {
+    margin-top: var(--space-1);
+  }
+
+  .modules {
+    gap: var(--space-2);
+  }
+
+  .module {
+    gap: var(--space-3);
+    min-height: 64px;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .module__icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .module__body strong {
+    font-size: var(--font-size-base);
+  }
+
+  .module__body > span {
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-tight);
   }
 
   .strip {
@@ -267,13 +299,8 @@ watch(
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .module {
-    min-height: 72px;
-    padding: var(--space-3) var(--space-4);
-  }
-
   .strip__item {
-    padding: var(--space-4);
+    padding: var(--space-3);
   }
 }
 

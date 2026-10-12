@@ -48,13 +48,7 @@ function onSubmit() {
     <form class="ui-form" @submit.prevent="onSubmit">
       <UiInput v-model="form.name" label="Название контракта" required placeholder="Договор №…" />
       <UiInput v-model="form.customer" label="Заказчик" required placeholder="ООО «…»" />
-      <UiInput
-        :model-value="String(form.year)"
-        label="Год"
-        type="number"
-        required
-        @update:model-value="form.year = Number($event)"
-      />
+      <p v-if="!contract" class="ui-form__note">Объекты, объёмы и сроки добавляются после создания контракта.</p>
       <div class="ui-form__actions">
         <UiButton variant="ghost" type="button" @click="emit('close')">Отмена</UiButton>
         <UiButton variant="primary" type="submit">Сохранить</UiButton>

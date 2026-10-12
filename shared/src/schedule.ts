@@ -72,8 +72,8 @@ export function periodsInRange(scale: ScheduleScale, from: string, to: string): 
 export function availableScales(from: string, to: string): ScheduleScale[] {
   const days = daysBetweenIso(from, to) + 1
   const scales: ScheduleScale[] = ['week']
-  if (days > 31) scales.push('month')
-  if (days > 366) scales.push('year')
+  if (days > 7) scales.push('month')
+  if (days > 31) scales.push('year')
   return scales
 }
 
@@ -124,6 +124,40 @@ export type ProgressState =
   | 'done_early'
   | 'done_on_time'
   | 'done_late'
+
+export const PROGRESS_LABEL: Record<ProgressState, string> = {
+  planned: 'Запланировано',
+  late_start: 'Не начато',
+  in_progress: 'В работе',
+  overdue: 'Отставание',
+  done_early: 'Досрочно',
+  done_on_time: 'Выполнено',
+  done_late: 'С опозданием',
+}
+
+export type ProgressTone = 'neutral' | 'active' | 'ok' | 'warn' | 'bad'
+
+export const PROGRESS_TONE: Record<ProgressState, ProgressTone> = {
+  planned: 'neutral',
+  late_start: 'bad',
+  in_progress: 'active',
+  overdue: 'bad',
+  done_early: 'ok',
+  done_on_time: 'ok',
+  done_late: 'warn',
+}
+
+/** Merges days into runs of consecutive dates, e.g. report days into bars. */
+export function dateRuns(days: string[]): DateSpan[] {
+  const sorted = [...new Set(days)].sort()
+  const runs: DateSpan[] = []
+  for (const day of sorted) {
+    const last = runs[runs.length - 1]
+    if (last && addDaysIso(last.to, 1) === day) last.to = day
+    else runs.push({ from: day, to: day })
+  }
+  return runs
+}
 
 export interface ScheduledDates {
   plannedStart: string
@@ -178,6 +212,7 @@ export function contractSpan(contract: Contract): DateSpan | null {
   return spanOf(contract.objects.flatMap(objectDates))
 }
 
-export function scheduleBounds(contracts: Contract[]): DateSpan | null {
-  return spanOf(contracts.flatMap((c) => c.objects.flatMap(objectDates)))
+/** `extraDays` — e.g. report days that fall outside the planned and actual dates. */
+export function scheduleBounds(contracts: Contract[], extraDays: string[] = []): DateSpan | null {
+  return spanOf([...contracts.flatMap((c) => c.objects.flatMap(objectDates)), ...extraDays])
 }

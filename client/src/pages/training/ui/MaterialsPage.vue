@@ -12,7 +12,8 @@ import {
 import { errorMessage } from '@/shared/api'
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
-import { UiButton, UiDialog, UiFileDrop, UiState } from '@/shared/ui'
+import { useMobilePagination } from '@/shared/lib/pagination'
+import { UiButton, UiDialog, UiFileDrop, UiPagination, UiState } from '@/shared/ui'
 
 interface MaterialForm {
   id: string | null
@@ -41,6 +42,8 @@ const visible = computed(() => {
     .filter((m) => !programFilter.value || m.programIds.includes(programFilter.value))
     .filter((m) => !q || `${m.title} ${m.fileName}`.toLocaleLowerCase('ru').includes(q))
 })
+
+const pager = useMobilePagination(visible, { resetOn: [search, programFilter, showArchived] })
 
 function openNew() {
   formError.value = ''
@@ -153,40 +156,43 @@ function openHref(material: TrainingMaterial) {
     </p>
 
     <UiState v-if="!visible.length" title="Материалов нет" text="Загрузите файл или добавьте ссылку на файл в Битрикс." />
-    <div v-else class="ui-table-wrap">
-      <table class="ui-table">
-        <thead>
-          <tr>
-            <th>Материал</th>
-            <th class="hide-md">Программы</th>
-            <th class="hide-md">Изменён</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="m in visible" :key="m.id" :class="{ 'is-archived': m.isArchived }">
-            <td>
-              <a :href="openHref(m)" target="_blank" rel="noopener" class="materials__title">{{ m.title }}</a>
-              <small class="materials__sub">
-                {{ m.fileName }} · {{ formatFileSize(m.size) }} · {{ m.source === 'upload' ? 'загружен' : 'ссылка на Битрикс' }}
-              </small>
-              <span v-if="m.isUnavailable" class="ui-badge ui-badge--bad">Файл недоступен в Битрикс</span>
-              <span v-if="m.isArchived" class="ui-badge">В архиве</span>
-            </td>
-            <td class="hide-md">{{ m.programIds.map((id) => store.labelOf(id)).join(', ') }}</td>
-            <td class="hide-md">
-              {{ formatDateTimeRu(m.updatedAt) }}
-              <small class="materials__sub">{{ m.updatedBy }}</small>
-            </td>
-            <td class="materials__actions">
-              <UiButton variant="ghost" size="sm" @click="openEdit(m)">Изменить</UiButton>
-              <UiButton variant="ghost" size="sm" @click="toggleArchive(m)">{{ m.isArchived ? 'Вернуть' : 'В архив' }}</UiButton>
-              <UiButton variant="ghost" size="sm" @click="remove(m)">Удалить</UiButton>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <template v-else>
+      <div class="ui-table-wrap ui-table-wrap--stack">
+        <table class="ui-table">
+          <thead>
+            <tr>
+              <th>Материал</th>
+              <th>Программы</th>
+              <th class="hide-md">Изменён</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="m in pager.pageItems" :key="m.id" :class="{ 'is-archived': m.isArchived }">
+              <td class="ui-cell--main">
+                <a :href="openHref(m)" target="_blank" rel="noopener" class="materials__title">{{ m.title }}</a>
+                <small class="materials__sub">
+                  {{ m.fileName }} · {{ formatFileSize(m.size) }} · {{ m.source === 'upload' ? 'загружен' : 'ссылка на Битрикс' }}
+                </small>
+                <span v-if="m.isUnavailable" class="ui-badge ui-badge--bad">Файл недоступен в Битрикс</span>
+                <span v-if="m.isArchived" class="ui-badge">В архиве</span>
+              </td>
+              <td data-label="Программы">{{ m.programIds.map((id) => store.labelOf(id)).join(', ') }}</td>
+              <td class="hide-md">
+                {{ formatDateTimeRu(m.updatedAt) }}
+                <small class="materials__sub">{{ m.updatedBy }}</small>
+              </td>
+              <td class="materials__actions ui-cell--actions">
+                <UiButton variant="ghost" size="sm" @click="openEdit(m)">Изменить</UiButton>
+                <UiButton variant="ghost" size="sm" @click="toggleArchive(m)">{{ m.isArchived ? 'Вернуть' : 'В архив' }}</UiButton>
+                <UiButton variant="ghost" size="sm" @click="remove(m)">Удалить</UiButton>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <UiPagination v-if="pager.isPaged" v-model:page="pager.page" :total="pager.total" :page-size="pager.pageSize" />
+    </template>
 
     <UiDialog :open="form !== null" :title="form?.id ? 'Материал' : 'Новый материал'" wide @close="form = null">
       <form v-if="form" class="ui-form" novalidate @submit.prevent="submit">
@@ -313,11 +319,24 @@ function openHref(material: TrainingMaterial) {
 }
 
 @media (max-width: 860px) {
-  .materials__toolbar .ui-control,
-  .materials__toolbar :deep(.btn) {
-    flex: 1 1 100%;
-    margin-left: 0;
+  .materials {
+    gap: var(--space-3);
+  }
+
+  .materials__toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .materials__toolbar .ui-control {
+    width: 100%;
     min-width: 0;
+  }
+
+  .materials__toolbar .ui-control[type='search'],
+  .materials__toolbar :deep(.btn) {
+    grid-column: 1 / -1;
+    margin-left: 0;
   }
 
   .materials__programs {
@@ -328,8 +347,8 @@ function openHref(material: TrainingMaterial) {
     display: none;
   }
 
-  .materials__actions {
-    white-space: normal;
+  .materials__sub {
+    overflow-wrap: anywhere;
   }
 }
 </style>

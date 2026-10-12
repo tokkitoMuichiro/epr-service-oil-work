@@ -29,9 +29,9 @@ watch(
   <section class="shell">
     <header class="shell__header">
       <div>
-        <p class="ui-overline shell__eyebrow">Учёт оборудования</p>
+        <p class="ui-overline shell__eyebrow ui-hide-mobile">Учёт оборудования</p>
         <h1>{{ title }}</h1>
-        <p v-if="route.meta.description" class="shell__text">{{ route.meta.description }}</p>
+        <p v-if="route.meta.description" class="shell__text ui-hide-mobile">{{ route.meta.description }}</p>
       </div>
       <div v-if="store.isReady && canExport(store.auth)" class="shell__actions">
         <UiButton variant="ghost" size="sm" :disabled="store.busy" @click="store.exportExcel()">Excel</UiButton>
@@ -123,12 +123,21 @@ watch(
 }
 
 @media (max-width: 860px) {
-  .shell__actions {
-    width: 100%;
+  .shell {
+    gap: var(--space-3);
   }
 
-  .shell__actions :deep(.btn) {
-    flex: 1 1 auto;
+  .shell__header {
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .shell__actions {
+    gap: var(--space-1);
+  }
+
+  .notice {
+    font-size: var(--font-size-sm);
   }
 }
 </style>

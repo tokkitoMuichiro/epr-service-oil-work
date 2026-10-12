@@ -910,12 +910,12 @@ onUnmounted(() => {
   }
 
   .shell__main {
-    padding: var(--space-4) calc(var(--space-4) + var(--safe-right)) calc(var(--space-6) + var(--safe-bottom))
-      calc(var(--space-4) + var(--safe-left));
+    padding: var(--space-3) calc(var(--space-3) + var(--safe-right)) calc(var(--space-5) + var(--safe-bottom))
+      calc(var(--space-3) + var(--safe-left));
   }
 
   .shell--has-tabbar .shell__main {
-    padding-bottom: var(--space-6);
+    padding-bottom: var(--space-5);
   }
 
   .tabbar {

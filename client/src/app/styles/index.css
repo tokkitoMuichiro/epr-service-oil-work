@@ -142,6 +142,7 @@
   --chart-today: var(--dodger);
   --chart-today-bg: rgb(0 136 255 / 12%);
   --chart-neutral: var(--steel-muted);
+  --chart-report-fg: var(--paper);
 
   --shadow-card: 0 8px 24px rgb(36 45 61 / 5%);
   --shadow-raised: 0 8px 24px rgb(36 45 61 / 14%);
@@ -282,6 +283,7 @@
     --chart-today: #3d9bff;
     --chart-today-bg: rgb(61 155 255 / 14%);
     --chart-neutral: #6b778a;
+    --chart-report-fg: #0d1117;
 
     --shadow-card: 0 1px 0 rgb(0 0 0 / 35%);
     --shadow-raised: 0 8px 24px rgb(0 0 0 / 45%);
@@ -935,18 +937,141 @@ textarea::placeholder {
 }
 
 @media (max-width: 860px) {
-  :root {
+  /* [data-theme] — иначе явная светлая тема (0,2,0) перебьёт мобильную шкалу. */
+  :root,
+  :root[data-theme] {
+    --font-size-xs: 11px;
+    --font-size-sm: 12px;
+    --font-size-base: 13px;
+    --font-size-md: 15px;
+    --font-size-lg: 16px;
+    --font-size-xl: 19px;
+    --font-size-2xl: 24px;
     --page-title-size: var(--font-size-xl);
+  }
+
+  .ui-form {
+    gap: var(--space-3);
   }
 
   .ui-form__row {
     grid-template-columns: 1fr;
   }
 
+  .ui-badge {
+    min-height: 20px;
+    padding: 0 6px;
+    gap: 5px;
+  }
+
+  .ui-segmented > button,
+  .ui-segmented > a {
+    padding: 0 var(--space-3);
+  }
+
+  .ui-hide-mobile {
+    display: none !important;
+  }
+
+  /* iOS Safari зумит страницу при фокусе на поле со шрифтом меньше 16px. */
   input:not([type='checkbox'], [type='radio'], [type='range'], [type='file']),
   select,
   textarea {
-    font-size: var(--font-size-md) !important;
+    font-size: 16px !important;
+  }
+
+  /* Таблица-список на телефоне превращается в карточки без горизонтальной прокрутки. */
+  .ui-table-wrap.ui-table-wrap--stack {
+    overflow: visible;
+    border: 0;
+    background: none;
+  }
+
+  .ui-table-wrap--stack .ui-table,
+  .ui-table-wrap--stack .ui-table tbody {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .ui-table-wrap--stack .ui-table thead {
+    display: none;
+  }
+
+  .ui-table-wrap--stack .ui-table tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    row-gap: 2px;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+    background: var(--surface-card);
+  }
+
+  .ui-table-wrap--stack .ui-table td {
+    grid-column: 2 / -1;
+    min-width: 0;
+    height: auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: var(--font-size-sm);
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .ui-table-wrap--stack .ui-table td:empty {
+    display: none;
+  }
+
+  .ui-table-wrap--stack .ui-table td[data-label]::before {
+    content: attr(data-label) ': ';
+    color: var(--text-secondary);
+  }
+
+  .ui-table-wrap--stack .ui-table td.ui-cell--check {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: start;
+    margin-right: var(--space-2);
+  }
+
+  .ui-table-wrap--stack .ui-table td.ui-cell--main {
+    grid-column: 2;
+    grid-row: 1;
+    font-size: var(--font-size-base);
+  }
+
+  .ui-table-wrap--stack .ui-table td.ui-cell--aside {
+    display: grid;
+    justify-items: end;
+    gap: 2px;
+    grid-column: 3;
+    grid-row: 1;
+    align-self: start;
+    justify-self: end;
+    margin-left: var(--space-2);
+    text-align: right;
+  }
+
+  .ui-table-wrap--stack .ui-table td.ui-cell--actions {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin-top: var(--space-1);
+  }
+
+  .ui-table-wrap--stack .ui-table td.ui-cell--actions > * {
+    flex: 1 1 auto;
+    margin: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .ui-sheet__head {
+    min-height: 52px;
   }
 }
 

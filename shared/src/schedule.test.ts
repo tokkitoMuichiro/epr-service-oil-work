@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import type { Contract } from './contracts.js'
+import { bucketReports, reportDatesFor, reportDaysOf, reportEntriesFor } from './reports.js'
 import {
   availableScales,
   barPlacement,
   contractDates,
   contractSpan,
+  dateRuns,
   factEnd,
   periodColumns,
   periodContaining,
@@ -93,9 +95,9 @@ describe('schedule periods', () => {
   })
 
   it('offers month and year scales only for long enough ranges', () => {
-    assert.deepEqual(availableScales('2026-01-01', '2026-01-20'), ['week'])
-    assert.deepEqual(availableScales('2026-01-01', '2026-03-20'), ['week', 'month'])
-    assert.deepEqual(availableScales('2026-01-15', '2027-10-10'), ['week', 'month', 'year'])
+    assert.deepEqual(availableScales('2026-01-01', '2026-01-05'), ['week'])
+    assert.deepEqual(availableScales('2026-01-01', '2026-01-20'), ['week', 'month'])
+    assert.deepEqual(availableScales('2026-01-01', '2026-03-20'), ['week', 'month', 'year'])
   })
 
   it('splits periods into day or month columns', () => {
@@ -180,5 +182,48 @@ describe('schedule bounds', () => {
   it('computes a contract span including works', () => {
     assert.deepEqual(contractSpan(contracts[0]), { from: '2026-01-15', to: '2026-03-10' })
     assert.equal(contractSpan(contracts[2]), null)
+  })
+
+  it('merges report days into runs and skips days without a report', () => {
+    assert.deepEqual(dateRuns([]), [])
+    assert.deepEqual(dateRuns(['2026-03-02', '2026-02-27', '2026-02-28', '2026-03-01', '2026-03-04', '2026-03-02']), [
+      { from: '2026-02-27', to: '2026-03-02' },
+      { from: '2026-03-04', to: '2026-03-04' },
+    ])
+  })
+
+  it('collects report days per object and per work', () => {
+    const days = reportDaysOf([
+      { objectId: 'o-2', date: '2026-03-02', workItems: [] },
+      { objectId: 'o-1', date: '2026-03-02', workItems: [{ itemId: 'w-1', name: '', unit: '', volume: 1 }] },
+      { objectId: 'o-1', date: '2026-03-01', workItems: [{ itemId: 'w-2', name: '', unit: '', volume: 1 }] },
+    ])
+    assert.deepEqual(
+      days.map((d) => `${d.objectId}:${d.date}`),
+      ['o-1:2026-03-01', 'o-1:2026-03-02', 'o-2:2026-03-02'],
+    )
+    assert.deepEqual(reportDatesFor(days, 'o-1'), ['2026-03-01', '2026-03-02'])
+    assert.deepEqual(reportDatesFor(days, 'o-1', 'w-1'), ['2026-03-02'])
+    assert.deepEqual(reportDatesFor(days, 'o-3'), [])
+    assert.deepEqual(days[1].volumes, { 'w-1': 1 })
+  })
+
+  it('sums reported volumes per calendar column and skips empty ones', () => {
+    const days = reportDaysOf([
+      { objectId: 'o-1', date: '2026-03-02', workItems: [{ itemId: 'w-1', name: '', unit: '', volume: 5 }, { itemId: 'w-1', name: '', unit: '', volume: 2 }] },
+      { objectId: 'o-1', date: '2026-03-20', workItems: [{ itemId: 'w-1', name: '', unit: '', volume: 3 }] },
+      { objectId: 'o-1', date: '2026-05-01', workItems: [] },
+    ])
+    const months = periodColumns(periodContaining('year', '2026-01-01'))
+    assert.deepEqual(bucketReports(reportEntriesFor(days, 'o-1', 'w-1'), months), [
+      { from: '2026-03-01', to: '2026-03-31', days: 2, volume: 10 },
+    ])
+    assert.deepEqual(
+      bucketReports(reportEntriesFor(days, 'o-1'), months).map((b) => [b.from, b.days, b.volume]),
+      [
+        ['2026-03-01', 2, null],
+        ['2026-05-01', 1, null],
+      ],
+    )
   })
 })

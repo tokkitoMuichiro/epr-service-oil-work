@@ -17,9 +17,9 @@ onMounted(() => {
 <template>
   <section class="training">
     <header class="training__header">
-      <p class="ui-overline training__eyebrow">Обучение и проверка знаний</p>
+      <p class="ui-overline training__eyebrow ui-hide-mobile">Обучение и проверка знаний</p>
       <h1 class="ui-page-title">{{ title }}</h1>
-      <p v-if="route.meta.description" class="ui-page-lead">{{ route.meta.description }}</p>
+      <p v-if="route.meta.description" class="ui-page-lead ui-hide-mobile">{{ route.meta.description }}</p>
     </header>
 
     <UiState v-if="store.status === 'loading' || store.status === 'idle'" kind="loading" title="Загрузка…" text="Получаем программы и тесты." />
@@ -40,5 +40,11 @@ onMounted(() => {
 
 .training__eyebrow {
   margin: 0 0 var(--space-1);
+}
+
+@media (max-width: 860px) {
+  .training {
+    gap: var(--space-3);
+  }
 }
 </style>

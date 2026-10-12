@@ -1,0 +1,51 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Тег релиза для отката или повторного выката (например v12). Пусто — предыдущий релиз
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    concurrency:
+      group: production
+      cancel-in-progress: false
+    env:
+      TAG: ${{ inputs.tag || 'previous' }}
+      VDS_PATH: ${{ vars.VDS_PATH || '/opt/erp-ammir' }}
+      TARGET: ${{ secrets.VDS_USER }}@${{ secrets.VDS_HOST }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate tag
+        run: '[[ "$TAG" =~ ^[A-Za-z0-9._-]+$ ]]'
+
+      - name: SSH key
+        env:
+          SSH_KEY: ${{ secrets.VDS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VDS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_deploy ~/.ssh/known_hosts
+
+      - name: Upload deploy files
+        run: scp -i ~/.ssh/id_deploy deploy/docker-compose.yml deploy/deploy.sh deploy/backup.sh deploy/erp.env.example "$TARGET:$VDS_PATH/"
+
+      - name: Release
+        run: ssh -i ~/.ssh/id_deploy "$TARGET" "bash '$VDS_PATH/deploy.sh' '$TAG'"

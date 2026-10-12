@@ -1,11 +1,38 @@
-import { http } from '@/shared/api'
-import type { Contract, ContractDraft, ObjectDraft, ObjectPatch, WorkDraft } from '../model/types'
+import { downloadFile, http } from '@/shared/api'
+import type {
+  Contract,
+  ContractDraft,
+  ObjectDraft,
+  ObjectPatch,
+  ObjectStatusChange,
+  ReportDay,
+  WorkDraft,
+} from '../model/types'
 
 type One = { item: Contract }
+
+export interface ScheduleExportParams {
+  contractId?: string
+  objectId?: string
+  isArchive?: boolean
+}
 
 export const contractsApi = {
   async list(): Promise<Contract[]> {
     return (await http.get<{ items: Contract[] }>('/contracts')).items
+  },
+
+  async reportDays(): Promise<ReportDay[]> {
+    return (await http.get<{ items: ReportDay[] }>('/contracts/report-days')).items
+  },
+
+  exportSchedule(params: ScheduleExportParams, fallbackName: string): Promise<void> {
+    const query = new URLSearchParams()
+    if (params.objectId) query.set('objectId', params.objectId)
+    else if (params.contractId) query.set('contractId', params.contractId)
+    if (params.isArchive) query.set('archive', '1')
+    const search = query.toString()
+    return downloadFile(`/contracts/export.xlsx${search ? `?${search}` : ''}`, fallbackName)
   },
 
   async create(draft: ContractDraft): Promise<Contract> {
@@ -34,6 +61,10 @@ export const contractsApi = {
 
   async updateObject(contractId: string, objectId: string, patch: ObjectPatch, note: string): Promise<Contract> {
     return (await http.patch<One>(`/contracts/${contractId}/objects/${objectId}`, { ...patch, note })).item
+  },
+
+  async setObjectStatus(contractId: string, objectId: string, change: ObjectStatusChange): Promise<Contract> {
+    return (await http.patch<One>(`/contracts/${contractId}/objects/${objectId}/status`, change)).item
   },
 
   async removeObject(contractId: string, objectId: string): Promise<Contract> {

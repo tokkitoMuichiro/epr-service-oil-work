@@ -10,7 +10,8 @@ import {
 import { useAccessStore } from '@/entities/role'
 import { todayIso } from '@shared/dates'
 import { ReportForm } from '@/features/report-form'
-import { IconChevron, UiButton, UiInput, UiState } from '@/shared/ui'
+import { useMobilePagination } from '@/shared/lib/pagination'
+import { IconChevron, UiButton, UiInput, UiPagination, UiState } from '@/shared/ui'
 
 const store = useDailyReportsStore()
 const {
@@ -35,6 +36,8 @@ const {
 
 const formSeed = ref<DailyReport | null>(null)
 const searchDraft = ref('')
+const objectPager = useMobilePagination(objects, { resetOn: [searchQuery] })
+const datePager = useMobilePagination(archiveDates, { resetOn: [selectedObjectId] })
 const access = useAccessStore()
 const canEdit = computed(() => access.can('reports_edit'))
 
@@ -120,7 +123,7 @@ function changeObject() {
     <header class="page__header">
       <div>
         <h1>Ежедневные отчёты</h1>
-        <p>
+        <p class="ui-hide-mobile">
           Объекты из контрактов ERP. Отчёты хранятся на сервере.
         </p>
       </div>
@@ -181,7 +184,7 @@ function changeObject() {
             Ничего не найдено
           </p>
           <button
-            v-for="obj in objects"
+            v-for="obj in objectPager.pageItems"
             :key="obj.id"
             type="button"
             class="objects__item"
@@ -194,6 +197,13 @@ function changeObject() {
             <span class="objects__meta">{{ obj.contractName }}</span>
           </button>
         </div>
+        <UiPagination
+          v-if="objectPager.isPaged"
+          v-model:page="objectPager.page"
+          :total="objectPager.total"
+          :page-size="objectPager.pageSize"
+          label="Страницы списка объектов"
+        />
       </aside>
 
       <div ref="workspace" class="workspace">
@@ -267,7 +277,7 @@ function changeObject() {
                 text="По этому объекту ещё нет сохранённых отчётов."
               />
               <button
-                v-for="date in archiveDates"
+                v-for="date in datePager.pageItems"
                 :key="date"
                 type="button"
                 class="date-item"
@@ -277,6 +287,13 @@ function changeObject() {
                 <span class="num">{{ date }}</span>
                 <IconChevron class="date-item__chevron" :size="18" />
               </button>
+              <UiPagination
+                v-if="datePager.isPaged"
+                v-model:page="datePager.page"
+                :total="datePager.total"
+                :page-size="datePager.pageSize"
+                label="Страницы дат отчётов"
+              />
             </div>
 
             <div v-else class="archive__view">
@@ -602,8 +619,27 @@ function changeObject() {
 }
 
 @media (max-width: 860px) {
+  .page {
+    gap: var(--space-3);
+  }
+
   .page__header {
     align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .objects {
+    gap: var(--space-2);
+  }
+
+  .objects__item {
+    gap: 2px;
+    padding: var(--space-2) var(--space-3);
+    box-shadow: none;
+  }
+
+  .date-item {
+    padding: var(--space-2) var(--space-3);
   }
 
   .mode-tabs {
@@ -636,7 +672,7 @@ function changeObject() {
   }
 
   .workspace {
-    padding: var(--space-4);
+    padding: var(--space-3);
   }
 
   .workspace__back {
@@ -671,8 +707,8 @@ function changeObject() {
 
 @media (max-width: 560px) {
   .workspace {
-    margin: 0 calc(-1 * var(--space-4));
-    padding: var(--space-4);
+    margin: 0 calc(-1 * var(--space-3));
+    padding: var(--space-3);
     border-right: 0;
     border-left: 0;
     border-radius: 0;

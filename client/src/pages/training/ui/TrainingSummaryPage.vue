@@ -11,7 +11,8 @@ import {
 } from '@/entities/training'
 import { AssignTestDialog } from '@/features/training-assign'
 import { formatDateRu } from '@/shared/lib/date'
-import { UiButton, UiState } from '@/shared/ui'
+import { useMobilePagination } from '@/shared/lib/pagination'
+import { UiButton, UiPagination, UiState } from '@/shared/ui'
 
 /** One row per worker × programme; a worker without trainings gets a single row with `status: null`. */
 interface SummaryItem {
@@ -76,17 +77,25 @@ const visible = computed(() => {
     )
 })
 
+const pager = useMobilePagination(visible, { resetOn: [search, programFilter, counter] })
+
 const selectable = computed(() => visible.value.filter((i) => !i.status?.activeAssignment))
 
 const selectedSet = computed(() => new Set(selected.value))
+const isAllSelected = computed(() => selectable.value.length > 0 && selectable.value.every((i) => selectedSet.value.has(i.key)))
+
+function dueLabel(status: ProgramStatus | null): string {
+  if (status?.activeAssignment) return `пройти до ${formatDateRu(status.activeAssignment.dueDate)}`
+  if (status?.nextDueAt) return `действует до ${formatDateRu(status.nextDueAt)}`
+  return ''
+}
 
 function toggle(key: string) {
   selected.value = selectedSet.value.has(key) ? selected.value.filter((k) => k !== key) : [...selected.value, key]
 }
 
 function toggleAll() {
-  const keys = selectable.value.map((i) => i.key)
-  selected.value = keys.every((k) => selectedSet.value.has(k)) ? [] : keys
+  selected.value = isAllSelected.value ? [] : selectable.value.map((i) => i.key)
 }
 
 const selectedItems = computed(() => items.value.filter((i) => selectedSet.value.has(i.key)))
@@ -133,67 +142,67 @@ function onAssigned() {
       </div>
 
       <div class="summary__toolbar">
-        <input v-model="search" class="ui-control" type="search" placeholder="Поиск по ФИО" aria-label="Поиск по ФИО" />
+        <input v-model="search" class="summary__search ui-control" type="search" placeholder="Поиск по ФИО" aria-label="Поиск по ФИО" />
         <select v-model="programFilter" class="ui-control" aria-label="Программа">
           <option value="">Все программы</option>
           <option v-for="p in programOptions" :key="p.id" :value="p.id">{{ store.labelOf(p.id) }}</option>
         </select>
         <UiButton v-if="canAssign" variant="primary" :disabled="!selected.length" @click="openBulk">
-          Назначить выбранным ({{ selected.length }})
+          Назначить<span class="ui-hide-mobile">&nbsp;выбранным</span> ({{ selected.length }})
         </UiButton>
+        <label v-if="canAssign && selectable.length" class="summary__select-all">
+          <input type="checkbox" :checked="isAllSelected" @change="toggleAll" />
+          Выбрать все доступные ({{ selectable.length }})
+        </label>
       </div>
 
       <UiState v-if="!visible.length" title="Никого нет" text="По выбранным фильтрам сотрудников нет." />
-      <div v-else class="ui-table-wrap">
-        <table class="ui-table">
-          <thead>
-            <tr>
-              <th v-if="canAssign" class="summary__check">
-                <input
-                  type="checkbox"
-                  aria-label="Выбрать все"
-                  :checked="selectable.length > 0 && selectable.every((i) => selectedSet.has(i.key))"
-                  @change="toggleAll"
-                />
-              </th>
-              <th>Сотрудник</th>
-              <th>Программа</th>
-              <th>Статус</th>
-              <th class="summary__hide-sm">Срок</th>
-              <th v-if="canAssign" />
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in visible" :key="item.key">
-              <td v-if="canAssign" class="summary__check">
-                <input
-                  type="checkbox"
-                  :aria-label="`Выбрать: ${item.row.fullName}`"
-                  :disabled="Boolean(item.status?.activeAssignment)"
-                  :checked="selectedSet.has(item.key)"
-                  @change="toggle(item.key)"
-                />
-              </td>
-              <td>
-                <strong>{{ item.row.fullName }}</strong>
-                <small class="summary__position">{{ item.row.position }}</small>
-              </td>
-              <td>{{ item.status ? store.labelOf(item.status.programId) : '—' }}</td>
-              <td><ProgramStateBadge :state="item.status?.state ?? null" /></td>
-              <td class="summary__hide-sm nowrap">
-                <template v-if="item.status?.activeAssignment">
-                  пройти до {{ formatDateRu(item.status.activeAssignment.dueDate) }}
-                </template>
-                <template v-else-if="item.status?.nextDueAt">действует до {{ formatDateRu(item.status.nextDueAt) }}</template>
-                <template v-else>—</template>
-              </td>
-              <td v-if="canAssign" class="summary__action">
-                <UiButton v-if="!item.status?.activeAssignment" variant="ghost" size="sm" @click="openOne(item)">Назначить</UiButton>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <template v-else>
+        <div class="ui-table-wrap ui-table-wrap--stack">
+          <table class="ui-table">
+            <thead>
+              <tr>
+                <th v-if="canAssign" class="summary__check">
+                  <input type="checkbox" aria-label="Выбрать все" :checked="isAllSelected" @change="toggleAll" />
+                </th>
+                <th>Сотрудник</th>
+                <th>Программа</th>
+                <th>Статус</th>
+                <th>Срок</th>
+                <th v-if="canAssign" />
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in pager.pageItems" :key="item.key">
+                <td v-if="canAssign" class="summary__check ui-cell--check">
+                  <input
+                    type="checkbox"
+                    :aria-label="`Выбрать: ${item.row.fullName}`"
+                    :disabled="Boolean(item.status?.activeAssignment)"
+                    :checked="selectedSet.has(item.key)"
+                    @change="toggle(item.key)"
+                  />
+                </td>
+                <td class="summary__worker ui-cell--main">
+                  <strong>{{ item.row.fullName }}</strong>
+                  <small class="summary__position">{{ item.row.position }}</small>
+                </td>
+                <td class="summary__program" :class="{ 'ui-hide-mobile': !item.status }">
+                  {{ item.status ? store.labelOf(item.status.programId) : '—' }}
+                </td>
+                <td class="ui-cell--aside"><ProgramStateBadge :state="item.status?.state ?? null" /></td>
+                <td class="summary__due nowrap" :class="{ 'ui-hide-mobile': !dueLabel(item.status) }">
+                  {{ dueLabel(item.status) || '—' }}
+                </td>
+                <td v-if="canAssign" class="summary__action">
+                  <UiButton v-if="!item.status?.activeAssignment" variant="ghost" size="sm" @click="openOne(item)">Назначить</UiButton>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <UiPagination v-if="pager.isPaged" v-model:page="pager.page" :total="pager.total" :page-size="pager.pageSize" />
+      </template>
     </template>
 
     <AssignTestDialog
@@ -283,9 +292,16 @@ function onAssigned() {
   width: 44px;
 }
 
-.summary__check input {
+.summary__check input,
+.summary__select-all input {
   width: 18px;
   height: 18px;
+  margin: 0;
+  accent-color: var(--accent-strong);
+}
+
+.summary__select-all {
+  display: none;
 }
 
 .summary__position {
@@ -315,22 +331,91 @@ function onAssigned() {
 }
 
 @media (max-width: 860px) {
+  .summary {
+    gap: var(--space-3);
+  }
+
   .summary__counters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-1);
+  }
+
+  .counter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: var(--tap-size);
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .counter strong {
+    font-size: var(--font-size-lg);
+  }
+
+  .counter span {
+    min-width: 0;
+    font-size: var(--font-size-2xs);
+    line-height: var(--line-height-tight);
+  }
+
+  .summary__toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .summary__toolbar .ui-control {
-    flex: 1 1 100%;
+    width: 100%;
     min-width: 0;
   }
 
+  .summary__search {
+    grid-column: 1 / -1;
+  }
+
   .summary__toolbar :deep(.btn) {
-    flex: 1 1 100%;
     margin-left: 0;
   }
 
-  .summary__hide-sm {
-    display: none;
+  .summary__select-all {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 36px;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  .summary .ui-table td.summary__worker {
+    grid-row: 1 / span 2;
+    align-self: start;
+  }
+
+  .ui-table td.summary__program,
+  .ui-table td.summary__due {
+    grid-column: 2 / -1;
+  }
+
+  .summary__due {
+    color: var(--text-secondary);
+  }
+
+  .summary .ui-table td.summary__action {
+    display: flex;
+    grid-column: 3;
+    grid-row: 2;
+    justify-self: end;
+    margin: var(--space-1) 0 0 var(--space-2);
+  }
+
+  .ui-table td.summary__check {
+    width: auto;
+  }
+
+  .summary__check input {
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
   }
 }
 </style>

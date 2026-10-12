@@ -1,32 +1,45 @@
 <script setup lang="ts">
-import { computed, ref, toRef } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
 import type { BrigadeAssignment } from '@/entities/brigade'
 import {
   DEADLINE_FIELD_LABEL,
+  ObjectStatusBadge,
+  SCHEDULE_SCALES,
+  SCHEDULE_SCALE_LABEL,
   contractDates,
+  contractProgress,
+  bucketReports,
   contractSpan,
-  factEnd,
   objectSpan,
+  objectStatus,
+  periodColumns,
   progressState,
+  reportEntriesFor,
   type Contract,
   type ContractObject,
   type DateSpan,
+  type ObjectStatus,
+  type ReportDay,
+  type ReportEntry,
   type ScheduledDates,
   type WorkItem,
 } from '@/entities/contract'
-import { formatDateRu, formatShortRange } from '@/shared/lib/date'
-import { IconChevron } from '@/shared/ui'
-import { useSchedulePeriod } from '../model/use-schedule-period'
+import { formatDateRu, formatShortRange, monthFullName } from '@/shared/lib/date'
 import {
-  PROGRESS_BADGE,
-  PROGRESS_LABEL,
-  PROGRESS_TONE,
-  formatVolume,
-  volumePercent,
-} from '../model/labels'
+  IconChevron,
+  IconDownload,
+  IconPencil,
+  IconSliders,
+  UiButton,
+  UiMenu,
+  type UiMenuItem,
+  type UiMenuSection,
+} from '@/shared/ui'
+import { useSchedulePeriod } from '../model/use-schedule-period'
+import { PROGRESS_LABEL, PROGRESS_TONE, formatCellVolume, formatVolume, volumePercent } from '../model/labels'
 import type { GridBar, GridRow } from '../model/types'
 import ScheduleGrid from './ScheduleGrid.vue'
-import ScheduleSettings from './ScheduleSettings.vue'
+import PeriodNav from './PeriodNav.vue'
 import DayReportDialog from './DayReportDialog.vue'
 
 const props = withDefaults(
@@ -35,18 +48,33 @@ const props = withDefaults(
     contract: Contract | null
     object: ContractObject | null
     bounds: DateSpan | null
+    isArchive?: boolean
+    /** Objects of the current selection that live in the other tab. */
+    hiddenCount?: number
     assignments?: BrigadeAssignment[]
+    reportDays?: ReportDay[]
     brigadeName?: (id: string) => string
     canPlan?: boolean
     canEdit?: boolean
+    isExporting?: boolean
   }>(),
-  { assignments: () => [], brigadeName: (id: string) => id, canPlan: false, canEdit: false },
+  {
+    isArchive: false,
+    hiddenCount: 0,
+    assignments: () => [],
+    reportDays: () => [],
+    isExporting: false,
+    brigadeName: (id: string) => id,
+    canPlan: false,
+    canEdit: false,
+  },
 )
 
 const emit = defineEmits<{
   selectContract: [contractId: string | null]
   selectObject: [objectId: string | null, contractId: string]
-  editDeadlines: [object: ContractObject]
+  toggleArchive: []
+  changeStatus: [object: ContractObject, status: ObjectStatus]
   editObject: [object: ContractObject]
   addObject: []
   removeObject: [objectId: string]
@@ -55,6 +83,10 @@ const emit = defineEmits<{
   editWork: [object: ContractObject, work: WorkItem]
   assignBrigade: [object: ContractObject]
   editAssignment: [assignment: BrigadeAssignment]
+  editContract: []
+  archiveContract: []
+  removeContract: []
+  exportExcel: []
 }>()
 
 const focus = computed(() => {
@@ -65,6 +97,12 @@ const focus = computed(() => {
 const schedule = useSchedulePeriod(toRef(props, 'bounds'), focus)
 const today = schedule.today
 
+watch(
+  () => [props.object?.id ?? props.contract?.id ?? null, Boolean(props.bounds)] as const,
+  () => schedule.prefer(props.object ? 'month' : 'year'),
+  { immediate: true },
+)
+
 function state(dates: ScheduledDates) {
   const value = progressState(dates, today)
   return { label: PROGRESS_LABEL[value], tone: PROGRESS_TONE[value] }
@@ -72,8 +110,40 @@ function state(dates: ScheduledDates) {
 
 const isDayScale = computed(() => schedule.scale.value !== 'year')
 
-function bars(id: string, dates: ScheduledDates): GridBar[] {
-  const result: GridBar[] = [
+function reportBars(id: string, entries: ReportEntry[], tone: GridBar['tone'], unit = ''): GridBar[] {
+  const volumeText = (volume: number) => `${formatVolume(volume)}${unit ? ` ${unit}` : ''}`
+  if (isDayScale.value) {
+    return entries.map(({ date, volume }) => ({
+      key: `${id}-r-${date}`,
+      kind: 'report',
+      from: date,
+      to: date,
+      label: volume === null ? '' : formatCellVolume(volume),
+      title: `Отчёт за ${formatDateRu(date)}${volume === null ? '' : `: ${volumeText(volume)}`}\nнажмите, чтобы открыть`,
+      tone,
+      isClickable: true,
+    }))
+  }
+  return bucketReports(entries, periodColumns(schedule.period.value)).map((bucket) => ({
+    key: `${id}-r-${bucket.from}`,
+    kind: 'report',
+    from: bucket.from,
+    to: bucket.to,
+    label: bucket.volume === null ? String(bucket.days) : formatCellVolume(bucket.volume),
+    title: [
+      `${monthFullName(bucket.from)}: дней с отчётами ${bucket.days}`,
+      bucket.volume === null ? '' : `выполнено ${volumeText(bucket.volume)}`,
+      'нажмите, чтобы открыть месяц',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    tone,
+    isClickable: true,
+  }))
+}
+
+function bars(id: string, dates: ScheduledDates, entries: ReportEntry[], unit = ''): GridBar[] {
+  return [
     {
       key: `${id}-plan`,
       kind: 'plan',
@@ -81,20 +151,8 @@ function bars(id: string, dates: ScheduledDates): GridBar[] {
       to: dates.plannedEnd,
       title: `План: ${formatDateRu(dates.plannedStart)} – ${formatDateRu(dates.plannedEnd)}`,
     },
+    ...reportBars(id, entries, state(dates).tone, unit),
   ]
-  if (dates.actualStart) {
-    const factTitle = `Факт: ${formatDateRu(dates.actualStart)} – ${dates.actualEnd ? formatDateRu(dates.actualEnd) : 'в работе'}`
-    result.push({
-      key: `${id}-fact`,
-      kind: 'fact',
-      from: dates.actualStart,
-      to: factEnd(dates.actualStart, dates.actualEnd, today),
-      title: isDayScale.value ? `${factTitle}\nнажмите на день, чтобы открыть отчёт` : factTitle,
-      tone: state(dates).tone,
-      isClickable: isDayScale.value,
-    })
-  }
-  return result
 }
 
 interface DatesRow extends GridRow {
@@ -104,46 +162,51 @@ interface DatesRow extends GridRow {
   subtitle: string
   dates: ScheduledDates
   state: ReturnType<typeof state>
+  reportCount: number
 }
 
 interface WorkRow extends GridRow {
-  work: WorkItem
+  /** `null` — the whole object: every report day, whatever works it lists. */
+  work: WorkItem | null
   state: ReturnType<typeof state>
   percent: number
+  reportCount: number
 }
 
 function objectRow(contract: Contract, object: ContractObject): DatesRow {
+  const entries = reportEntriesFor(props.reportDays, object.id)
   return {
     id: object.id,
-    bars: bars(object.id, object),
+    bars: bars(object.id, object, entries),
     contractId: contract.id,
     objectId: object.id,
     title: object.name,
     subtitle: object.location,
     dates: object,
     state: state(object),
+    reportCount: entries.length,
   }
 }
 
 const summaryRows = computed<DatesRow[]>(() =>
   props.contracts.flatMap((contract) => {
     const dates = contractDates(contract)
-    const group: DatesRow[] = dates
-      ? [
-          {
-            id: contract.id,
-            bars: [],
-            isGroup: true,
-            contractId: contract.id,
-            objectId: null,
-            title: contract.name,
-            subtitle: contract.customer,
-            dates,
-            state: state(dates),
-          },
-        ]
-      : []
-    return [...group, ...contract.objects.map((object) => objectRow(contract, object))]
+    if (!dates) return []
+    const group: DatesRow = {
+      id: contract.id,
+      bars: [],
+      isGroup: true,
+      contractId: contract.id,
+      objectId: null,
+      title: contract.name,
+      subtitle: contract.customer,
+      dates,
+      state: state(dates),
+      reportCount: 0,
+    }
+    const rows = contract.objects.map((object) => objectRow(contract, object))
+    group.reportCount = rows.reduce((sum, row) => sum + row.reportCount, 0)
+    return [group, ...rows]
   }),
 )
 
@@ -151,7 +214,46 @@ const objectRows = computed<DatesRow[]>(() =>
   props.contract ? props.contract.objects.map((object) => objectRow(props.contract!, object)) : [],
 )
 
+const objectReportDays = computed(() => (props.object ? reportEntriesFor(props.reportDays, props.object.id) : []))
+
+const workRows = computed<WorkRow[]>(() => {
+  const { object } = props
+  if (!object) return []
+  const whole: WorkRow = {
+    id: `${object.id}-all`,
+    bars: bars(object.id, object, objectReportDays.value),
+    isGroup: true,
+    work: null,
+    state: state(object),
+    percent: 0,
+    reportCount: objectReportDays.value.length,
+  }
+  return [
+    whole,
+    ...object.works.map((work) => {
+      const entries = reportEntriesFor(props.reportDays, object.id, work.id)
+      return {
+        id: work.id,
+        bars: bars(work.id, work, entries, work.unit),
+        work,
+        state: state(work),
+        percent: volumePercent(work.actualVolume, work.plannedVolume),
+        reportCount: entries.length,
+      }
+    }),
+  ]
+})
+
+function reportCountLabel(count: number): string {
+  return count ? `дней с отчётами: ${count}` : 'отчётов нет'
+}
+
 const reportTarget = ref<{ objectId: string; title: string; date: string } | null>(null)
+
+function openReport(object: ContractObject | null, date: string) {
+  if (!object) return
+  reportTarget.value = { objectId: object.id, date, title: `${object.name} · ${object.location}` }
+}
 
 function findObject(objectId: string) {
   for (const contract of props.contracts) {
@@ -161,34 +263,34 @@ function findObject(objectId: string) {
   return null
 }
 
-function openReport(objectId: string, date: string) {
-  const object = findObject(objectId)
-  reportTarget.value = {
-    objectId,
-    date,
-    title: object ? `${object.name} · ${object.location}` : objectId,
-  }
+/** In the year view a report cell covers a month: open that month instead of a single report. */
+function openMonth(bar: GridBar): boolean {
+  if (isDayScale.value) return false
+  schedule.setScale('month')
+  schedule.goTo(bar.from)
+  return true
 }
 
-function onDatesBarClick(row: DatesRow, _bar: GridBar, day: string) {
-  if (row.objectId) openReport(row.objectId, day)
+function onDatesBarClick(row: DatesRow, bar: GridBar, day: string) {
+  if (openMonth(bar)) return
+  if (row.objectId) openReport(findObject(row.objectId), day)
 }
 
-function onWorkBarClick(_row: WorkRow, _bar: GridBar, day: string) {
-  if (props.object) openReport(props.object.id, day)
+function onWorkBarClick(_row: WorkRow, bar: GridBar, day: string) {
+  if (openMonth(bar)) return
+  openReport(props.object, day)
 }
 
 const objectsTotal = computed(() => props.contracts.reduce((sum, c) => sum + c.objects.length, 0))
-
-const workRows = computed<WorkRow[]>(() =>
-  (props.object?.works ?? []).map((work) => ({
-    id: work.id,
-    bars: bars(work.id, work),
-    work,
-    state: state(work),
-    percent: volumePercent(work.actualVolume, work.plannedVolume),
-  })),
-)
+const status = computed(() => (props.object ? objectStatus(props.object) : null))
+const progress = computed(() => (props.contract ? contractProgress(props.contract) : null))
+const health = computed(() => {
+  if (!props.object) return null
+  const value = progressState(props.object, today)
+  const isNotable = ['late_start', 'overdue', 'done_late', 'done_early'].includes(value)
+  return isNotable ? { label: PROGRESS_LABEL[value], tone: PROGRESS_TONE[value] } : null
+})
+const isLocked = computed(() => Boolean(props.contract?.archived || props.object?.archived))
 
 const objectAssignments = computed(() =>
   props.object && props.contract
@@ -199,94 +301,183 @@ const objectAssignments = computed(() =>
 )
 
 const headerSpan = computed(() => (focus.value ? formatShortRange(focus.value.from, focus.value.to) : 'сроки не заданы'))
+
+const primary = computed<{ label: string; run: () => void } | null>(() => {
+  const { contract, object } = props
+  if (!props.canEdit || !contract || !object || isLocked.value) return null
+  if (status.value === 'planned') return { label: 'Начать работы', run: () => emit('changeStatus', object, 'in_progress') }
+  if (status.value === 'in_progress') return { label: 'Завершить объект', run: () => emit('changeStatus', object, 'done') }
+  return null
+})
+
+function item(id: string, label: string, extra: Partial<UiMenuItem> = {}): UiMenuItem {
+  return { id, label, ...extra }
+}
+
+const editSections = computed<UiMenuSection[]>(() => {
+  const { contract, object, canEdit, canPlan } = props
+  const sections: UiMenuSection[] = []
+  if (contract && object) {
+    const items: UiMenuItem[] = []
+    if (canEdit) items.push(item('object:edit', 'Параметры и сроки'))
+    if (canEdit && !isLocked.value) items.push(item('object:add-work', 'Добавить работу'))
+    if (canPlan && !isLocked.value && status.value !== 'done') items.push(item('object:assign', 'Назначить бригаду'))
+    if (canEdit && !isLocked.value && status.value === 'in_progress') {
+      items.push(item('status:planned', 'Отменить начало работ'))
+    }
+    if (canEdit && !isLocked.value && status.value === 'done') items.push(item('status:in_progress', 'Вернуть в работу'))
+    if (canEdit && !contract.archived && status.value !== 'done') {
+      items.push(item('object:archive', object.archived ? 'Вернуть из архива' : 'В архив без завершения'))
+    }
+    if (canEdit) items.push(item('object:remove', 'Удалить объект', { tone: 'danger' }))
+    sections.push({ title: 'Объект', items })
+  } else if (contract && canEdit) {
+    const items = [
+      item('contract:edit', 'Название и заказчик'),
+      item('contract:archive', contract.archived ? 'Вернуть из архива' : 'В архив'),
+      item('contract:remove', 'Удалить контракт', { tone: 'danger' }),
+    ]
+    if (!props.isArchive && !contract.archived) items.unshift(item('contract:add-object', 'Добавить объект'))
+    sections.push({ title: 'Контракт', items })
+  }
+  return sections.filter((s) => s.items.length)
+})
+
+const viewSections = computed<UiMenuSection[]>(() => [
+  {
+    title: 'Масштаб',
+    items: SCHEDULE_SCALES.map((scale) =>
+      item(`scale:${scale}`, SCHEDULE_SCALE_LABEL[scale], {
+        checked: scale === schedule.scale.value,
+        disabled: !schedule.scales.value.includes(scale),
+      }),
+    ),
+  },
+  { items: [item('view:today', 'Перейти к сегодня', { disabled: !schedule.canToday.value })] },
+])
+
+function onMenu(id: string) {
+  const { object } = props
+  const [group, action] = id.split(':')
+  if (group === 'scale') return schedule.setScale(action as (typeof SCHEDULE_SCALES)[number])
+  if (id === 'view:today') return schedule.goToday()
+  if (group === 'contract') {
+    if (action === 'add-object') emit('addObject')
+    else if (action === 'edit') emit('editContract')
+    else if (action === 'archive') emit('archiveContract')
+    else if (action === 'remove') emit('removeContract')
+    return
+  }
+  if (!object) return
+  if (group === 'status') return emit('changeStatus', object, action as ObjectStatus)
+  if (action === 'edit') emit('editObject', object)
+  else if (action === 'add-work') emit('addWork', object)
+  else if (action === 'assign') emit('assignBrigade', object)
+  else if (action === 'archive') emit('archiveObject', object)
+  else if (action === 'remove') emit('removeObject', object.id)
+}
+
+const backLabel = computed(() => {
+  if (props.object && props.contract) return props.contract.name
+  return props.isArchive ? 'Архив — все договоры' : 'Все договоры'
+})
 </script>
 
 <template>
   <div class="schedule">
-    <header class="schedule__head">
-      <div class="schedule__title">
+    <header class="head">
+      <div class="head__title">
         <button
           v-if="contract"
           type="button"
           class="back"
-          @click="object ? emit('selectContract', contract.id) : emit('selectContract', null)"
+          @click="emit('selectContract', object ? contract.id : null)"
         >
-          <IconChevron class="back__icon" :size="16" />{{ object ? contract.name : 'Сводный график по всем договорам' }}
+          <IconChevron class="back__icon" :size="14" />
+          <span>{{ backLabel }}</span>
         </button>
-        <h2>{{ object?.name ?? contract?.name ?? 'Сводный график' }}</h2>
-        <p>
-          <template v-if="object">{{ object.location || 'Без адреса' }}</template>
-          <template v-else-if="contract">Заказчик: {{ contract.customer }}</template>
-          <template v-else>Договоров: {{ contracts.length }} · объектов: {{ objectsTotal }}</template>
-          · {{ headerSpan }}
-          <span v-if="object" class="ui-badge" :class="PROGRESS_BADGE[state(object).tone]">
-            {{ state(object).label }}
-          </span>
-          <span v-if="object?.archived || contract?.archived" class="ui-badge ui-badge--neutral">Архив</span>
+        <h2>{{ object?.name ?? contract?.name ?? (isArchive ? 'Архив' : 'Сводный график') }}</h2>
+        <p class="head__meta">
+          <template v-if="object && status">
+            <ObjectStatusBadge :status="status" />
+            <span v-if="health" :class="`text--${health.tone}`">{{ health.label }}</span>
+            <span>· {{ object.location || 'без адреса' }}</span>
+            <span>· {{ reportCountLabel(objectReportDays.length) }}</span>
+          </template>
+          <template v-else-if="contract && progress">
+            <span>{{ contract.customer }}</span>
+            <span v-if="progress.total">
+              · объектов {{ progress.total }}: в работе {{ progress.inProgress }}, план {{ progress.planned }}, завершено
+              {{ progress.done }}
+            </span>
+          </template>
+          <span v-else>Договоров: {{ contracts.length }} · объектов: {{ objectsTotal }}</span>
+          <span>· {{ headerSpan }}</span>
+          <span v-if="contract?.archived || object?.archived" class="ui-badge ui-badge--neutral">Архив</span>
         </p>
       </div>
-      <div class="schedule__tools">
-        <div v-if="contract && (canEdit || (object && canPlan))" class="schedule__actions">
-          <template v-if="object">
-            <button v-if="canEdit" type="button" @click="emit('addWork', object)">+ Работа</button>
-            <button
-              v-if="canPlan && !object.archived && !contract.archived"
-              type="button"
-              @click="emit('assignBrigade', object)"
-            >
-              Бригада
-            </button>
-            <template v-if="canEdit">
-              <button type="button" @click="emit('editDeadlines', object)">Сроки</button>
-              <button type="button" @click="emit('editObject', object)">Изменить</button>
-              <button v-if="!contract.archived" type="button" @click="emit('archiveObject', object)">
-                {{ object.archived ? 'Из архива' : 'В архив' }}
-              </button>
-              <button type="button" class="danger" @click="emit('removeObject', object.id)">Удалить</button>
-            </template>
-          </template>
-          <button v-else-if="!contract.archived" type="button" @click="emit('addObject')">+ Объект</button>
-        </div>
-        <ScheduleSettings
-          :scale="schedule.scale.value"
-          :scales="schedule.scales.value"
+      <div class="head__tools" :class="{ 'head__tools--stacked': primary }">
+        <UiButton v-if="primary" variant="primary" size="sm" class="head__primary" @click="primary.run">
+          {{ primary.label }}
+        </UiButton>
+        <PeriodNav
           :period="schedule.period.value"
           :options="schedule.options.value"
           :can-prev="schedule.canPrev.value"
           :can-next="schedule.canNext.value"
-          :can-today="schedule.canToday.value"
-          @set-scale="schedule.setScale"
           @step="schedule.step"
           @go-to="schedule.goTo"
-          @go-today="schedule.goToday"
         />
+        <UiMenu :sections="viewSections" label="Вид графика" class="head__view" @select="onMenu">
+          <template #icon><IconSliders :size="18" /></template>
+        </UiMenu>
+        <UiButton
+          variant="ghost"
+          size="sm"
+          class="head__export"
+          aria-label="Выгрузить в Excel"
+          :disabled="isExporting"
+          :title="object ? 'Выгрузить график объекта в Excel' : 'Выгрузить график в Excel'"
+          @click="emit('exportExcel')"
+        >
+          <IconDownload :size="16" />
+          <span>Excel</span>
+        </UiButton>
+        <UiMenu
+          v-if="editSections.length"
+          class="head__edit"
+          :sections="editSections"
+          :label="object ? 'Редактировать объект' : 'Редактировать контракт'"
+          @select="onMenu"
+        >
+          <template #icon><IconPencil :size="18" /></template>
+        </UiMenu>
       </div>
     </header>
 
-    <ul class="legend">
+    <ul class="legend" aria-label="Обозначения">
       <li><i class="legend__plan" />План</li>
-      <li><i class="tone--active" />В работе</li>
-      <li><i class="tone--ok" />Выполнено в срок</li>
-      <li><i class="tone--warn" />С опозданием</li>
-      <li><i class="tone--bad" />Отставание</li>
-      <li><i class="legend__today" />Сегодня</li>
-      <li class="legend__hint">
-        <template v-if="object">
-          Клик по работе — изменить объёмы{{ isDayScale ? ' · клик по факту — отчёт за день' : '' }}
-        </template>
-        <template v-else>
-          Клик по объекту — его график{{ isDayScale ? ' · клик по факту — отчёт за день' : '' }}
-        </template>
+      <li class="legend__group">
+        <span :title="isDayScale ? 'В ячейке — объём работы по отчёту за день' : 'В ячейке месяца — объём работы или число дней с отчётами'">
+          Факт по отчётам{{ isDayScale ? ' (объём за день)' : ' (за месяц)' }}:
+        </span>
+        <span><i class="legend__report tone--active" />в работе</span>
+        <span><i class="legend__report tone--ok" />в срок</span>
+        <span><i class="legend__report tone--warn" />с опозданием</span>
+        <span><i class="legend__report tone--bad" />отставание</span>
       </li>
+      <li><i class="legend__today" />Сегодня</li>
     </ul>
 
     <template v-if="!object">
-      <div v-if="contract && !contract.objects.length" class="schedule__empty">
-        В договоре пока нет объектов.
-        <button v-if="canEdit" type="button" @click="emit('addObject')">Добавить объект</button>
+      <div v-if="contract && !contract.objects.length" class="empty">
+        <p>{{ isArchive ? 'В архиве нет объектов этого договора.' : 'Активных объектов нет.' }}</p>
+        <UiButton v-if="canEdit && !isArchive && !contract.archived" variant="primary" size="sm" @click="emit('addObject')">
+          Добавить объект
+        </UiButton>
       </div>
-      <div v-else-if="!contract && !summaryRows.length" class="schedule__empty">
-        По договорам ещё нет объектов со сроками.
+      <div v-else-if="!contract && !summaryRows.length" class="empty">
+        <p>{{ isArchive ? 'Архив пуст — завершённые объекты появятся здесь.' : 'Нет активных объектов со сроками.' }}</p>
       </div>
       <ScheduleGrid
         v-else
@@ -295,81 +486,72 @@ const headerSpan = computed(() => (focus.value ? formatShortRange(focus.value.fr
         :rows="contract ? objectRows : summaryRows"
         @bar-click="onDatesBarClick"
       >
-        <template #head>{{ contract ? 'Объект · сроки' : 'Договор / объект · сроки' }}</template>
+        <template #head>{{ contract ? 'Объект' : 'Договор / объект' }}</template>
         <template #label="{ row }">
-          <component
-            :is="row.objectId ? 'button' : 'div'"
-            :type="row.objectId ? 'button' : undefined"
-            class="cell"
-            :class="{
-              'cell--nested': !contract && !row.isGroup,
-              'cell--group': row.isGroup,
-              'cell--link': row.objectId,
-            }"
-            :title="row.objectId ? `${row.title}\n${row.subtitle}\nнажмите, чтобы открыть график объекта` : row.title"
-            @click="row.objectId && emit('selectObject', row.objectId, row.contractId)"
+          <button
+            type="button"
+            class="cell cell--link"
+            :class="{ 'cell--nested': !contract && !row.isGroup, 'cell--group': row.isGroup }"
+            :title="`${row.title}\n${row.subtitle}\nПлан: ${formatShortRange(row.dates.plannedStart, row.dates.plannedEnd)}\nФакт: ${formatShortRange(row.dates.actualStart, row.dates.actualEnd)}\n${reportCountLabel(row.reportCount)}`"
+            @click="row.objectId ? emit('selectObject', row.objectId, row.contractId) : emit('selectContract', row.contractId)"
           >
             <strong>{{ row.title }}</strong>
-            <span>П: {{ formatShortRange(row.dates.plannedStart, row.dates.plannedEnd) }}</span>
             <span>
-              Ф: {{ formatShortRange(row.dates.actualStart, row.dates.actualEnd) }}
+              {{ formatShortRange(row.dates.plannedStart, row.dates.plannedEnd) }}
               · <em :class="`text--${row.state.tone}`">{{ row.state.label }}</em>
             </span>
-          </component>
+          </button>
         </template>
       </ScheduleGrid>
+      <button v-if="hiddenCount" type="button" class="switch" @click="emit('toggleArchive')">
+        {{ isArchive ? `Активных объектов: ${hiddenCount} — открыть` : `Завершённых и архивных объектов: ${hiddenCount} — открыть архив` }}
+      </button>
     </template>
 
     <template v-else>
-      <div v-if="!object.works.length" class="schedule__empty">
-        По объекту ещё не заведены работы.
-        <button v-if="canEdit" type="button" @click="emit('addWork', object)">Добавить работу</button>
-      </div>
-      <ScheduleGrid
-        v-else
-        :period="schedule.period.value"
-        :today="today"
-        :rows="workRows"
-        @bar-click="onWorkBarClick"
-      >
-        <template #head>Работа · сроки · объём</template>
+      <ScheduleGrid :period="schedule.period.value" :today="today" :rows="workRows" @bar-click="onWorkBarClick">
+        <template #head>Работа · объём</template>
         <template #label="{ row }">
+          <div v-if="!row.work" class="cell cell--group" :title="`Все дни с отчётами по объекту\n${reportCountLabel(row.reportCount)}`">
+            <strong>Объект целиком</strong>
+            <span>
+              {{ reportCountLabel(row.reportCount) }} · <em :class="`text--${row.state.tone}`">{{ row.state.label }}</em>
+            </span>
+          </div>
           <component
+            v-else
             :is="canEdit ? 'button' : 'div'"
             :type="canEdit ? 'button' : undefined"
             class="cell"
             :class="{ 'cell--link': canEdit }"
-            :title="canEdit ? `${row.work.title}\nнажмите, чтобы изменить работу и объёмы` : row.work.title"
+            :title="`${row.work.title}\nПлан: ${formatShortRange(row.work.plannedStart, row.work.plannedEnd)}\nФакт: ${formatShortRange(row.work.actualStart, row.work.actualEnd)}${canEdit ? '\nнажмите, чтобы изменить работу и объёмы' : ''}`"
             @click="canEdit && emit('editWork', object, row.work)"
           >
             <strong>{{ row.work.title }}</strong>
-            <span>П: {{ formatShortRange(row.work.plannedStart, row.work.plannedEnd) }}</span>
-            <span>
-              Ф: {{ formatShortRange(row.work.actualStart, row.work.actualEnd) }}
-              · <em :class="`text--${row.state.tone}`">{{ row.state.label }}</em>
-            </span>
             <span class="volume">
               <span>
-                <b>{{ formatVolume(row.work.actualVolume) }}</b>
-                / {{ formatVolume(row.work.plannedVolume) }} {{ row.work.unit }}
+                <b>{{ formatVolume(row.work.actualVolume) }}</b> / {{ formatVolume(row.work.plannedVolume) }}
+                {{ row.work.unit }}
               </span>
               <span class="progress">
-                <span
-                  class="progress__fill"
-                  :class="`tone--${row.state.tone}`"
-                  :style="{ width: `${Math.min(row.percent, 100)}%` }"
-                />
+                <span class="progress__fill" :class="`tone--${row.state.tone}`" :style="{ width: `${Math.min(row.percent, 100)}%` }" />
               </span>
-              <em>{{ row.percent }}%</em>
+              <em :class="`text--${row.state.tone}`">{{ row.percent }}%</em>
             </span>
           </component>
         </template>
       </ScheduleGrid>
+      <div v-if="!object.works.length" class="empty empty--compact">
+        <p>По объекту ещё не заведены работы — отметки появятся по отчётам в строке «Объект целиком».</p>
+        <UiButton v-if="canEdit && !isLocked" variant="primary" size="sm" @click="emit('addWork', object)">
+          Добавить работу
+        </UiButton>
+      </div>
 
       <div class="extras">
         <section class="extras__block">
           <h3>Бригады</h3>
-          <p v-if="!objectAssignments.length" class="muted">Бригады не назначены.</p>
+          <p v-if="!objectAssignments.length" class="muted">Не назначены.</p>
           <ul v-else>
             <li v-for="a in objectAssignments" :key="a.id">
               <component
@@ -385,18 +567,21 @@ const headerSpan = computed(() => (focus.value ? formatShortRange(focus.value.fr
             </li>
           </ul>
         </section>
-        <section class="extras__block">
-          <h3>История сроков</h3>
-          <p v-if="!object.deadlineEdits.length" class="muted">Сроки не менялись.</p>
-          <ul v-else>
+        <details class="extras__block history">
+          <summary>
+            <h3>История сроков</h3>
+            <span class="muted">{{ object.deadlineEdits.length || 'нет' }}</span>
+          </summary>
+          <ul v-if="object.deadlineEdits.length">
             <li v-for="edit in object.deadlineEdits" :key="edit.id">
               <strong>{{ formatDateRu(edit.editedAt.slice(0, 10)) }}</strong>
-              · {{ DEADLINE_FIELD_LABEL[edit.field] }}: {{ formatDateRu(edit.previousValue) }} →
-              {{ formatDateRu(edit.newValue) }}
+              · {{ DEADLINE_FIELD_LABEL[edit.field] }}: {{ formatDateRu(edit.previousValue) || '—' }} →
+              {{ formatDateRu(edit.newValue) || '—' }}
               <span v-if="edit.note" class="muted">— {{ edit.note }}</span>
             </li>
           </ul>
-        </section>
+          <p v-else class="muted">Сроки не менялись.</p>
+        </details>
       </div>
     </template>
 
@@ -421,110 +606,89 @@ const headerSpan = computed(() => (focus.value ? formatShortRange(focus.value.fr
   box-shadow: var(--shadow-card);
 }
 
-.schedule__head {
+.head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-4);
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-4);
   flex-wrap: wrap;
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.schedule__tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-3) var(--space-4);
-}
-
-.schedule__title {
+.head__title {
+  flex: 1 1 280px;
   min-width: 0;
 }
 
-.back__icon {
-  transform: rotate(90deg);
-}
-
-.back {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 36px;
-  margin-bottom: var(--space-1);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text-link);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-}
-
-.schedule__title h2 {
+.head__title h2 {
+  overflow: hidden;
   margin: 0;
   font-size: var(--font-size-lg);
   font-weight: 700;
+  line-height: var(--line-height-tight);
   color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.schedule__title p {
+.head__meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  margin: 6px 0 0;
+  gap: 2px 6px;
+  margin: var(--space-1) 0 0;
   font-size: var(--font-size-xs);
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
-.schedule__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
+.head__meta > span[class^='text--'] {
+  font-weight: 700;
 }
 
-.schedule__actions button,
-.schedule__empty button {
-  min-height: var(--control-height-sm);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
-  background: var(--surface-card);
+.head__tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  min-height: 24px;
+  margin-bottom: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--text-link);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   font-weight: 600;
   cursor: pointer;
 }
 
-.schedule__actions .danger {
-  color: var(--status-bad-fg);
+.back span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .schedule__actions button:hover,
-  .schedule__empty button:hover {
-    border-color: var(--border-strong);
-    background: var(--surface-sunken);
-  }
+.back__icon {
+  flex: 0 0 auto;
+  transform: rotate(90deg);
 }
 
 .legend {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-sticky);
   display: flex;
   flex-wrap: wrap;
-  gap: 6px var(--space-4);
+  gap: 4px var(--space-3);
   margin: 0;
-  padding: var(--space-2) var(--space-5);
+  padding: 6px var(--space-4);
   border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface-card);
   list-style: none;
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-2xs);
   font-weight: 600;
   color: var(--text-secondary);
 }
@@ -532,13 +696,13 @@ const headerSpan = computed(() => (focus.value ? formatShortRange(focus.value.fr
 .legend li {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .legend i {
   display: inline-block;
-  width: 18px;
-  height: 8px;
+  width: 14px;
+  height: 6px;
   border-radius: var(--radius-pill);
 }
 
@@ -547,26 +711,63 @@ const headerSpan = computed(() => (focus.value ? formatShortRange(focus.value.fr
   border: 1px solid var(--chart-plan-border);
 }
 
+.legend .legend__group {
+  display: contents;
+}
+
+.legend__group > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend .legend__report {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius);
+}
+
 .legend .legend__today {
   width: 2px;
-  height: 14px;
+  height: 12px;
   border-radius: 0;
   background: var(--chart-today);
 }
 
-.legend .legend__hint {
-  margin-left: auto;
-  font-weight: 500;
-  font-style: italic;
+.empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
 }
 
-.schedule__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  padding: 48px var(--space-5);
-  color: var(--text-secondary);
+.empty p {
+  margin: 0;
+  text-align: center;
+}
+
+.empty--compact {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.head__export {
+  gap: var(--space-1);
+}
+
+.switch {
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-link);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
 }
 
 .cell {
@@ -585,6 +786,9 @@ const headerSpan = computed(() => (focus.value ? formatShortRange(focus.value.fr
 }
 
 .cell--link {
+  align-self: stretch;
+  align-content: center;
+  width: calc(100% + 24px);
   margin: -6px -12px;
   padding: 6px 12px;
   border: 0;
@@ -592,9 +796,6 @@ const headerSpan = computed(() => (focus.value ? formatShortRange(focus.value.fr
   font-family: inherit;
   text-align: left;
   cursor: pointer;
-  width: calc(100% + 24px);
-  align-self: stretch;
-  align-content: center;
 }
 
 .cell--link.cell--nested {
@@ -604,17 +805,6 @@ const headerSpan = computed(() => (focus.value ? formatShortRange(focus.value.fr
 .cell--link:focus-visible strong {
   color: var(--text-link);
   text-decoration: underline;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .cell--link:hover {
-    background: var(--row-selected-bg);
-  }
-
-  .cell--link:hover strong {
-    color: var(--text-link);
-    text-decoration: underline;
-  }
 }
 
 .cell strong {
@@ -646,7 +836,6 @@ const headerSpan = computed(() => (focus.value ? formatShortRange(focus.value.fr
   grid-template-columns: auto minmax(24px, 1fr) auto;
   gap: 6px;
   align-items: center;
-  margin-top: 1px;
   white-space: nowrap;
 }
 
@@ -710,13 +899,13 @@ const headerSpan = computed(() => (focus.value ? formatShortRange(focus.value.fr
 .extras {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-5);
-  padding: var(--space-4) var(--space-5) var(--space-5);
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
 .extras__block h3 {
   margin: 0 0 var(--space-2);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-2xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -725,7 +914,7 @@ const headerSpan = computed(() => (focus.value ? formatShortRange(focus.value.fr
 
 .extras__block ul {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -738,6 +927,41 @@ const headerSpan = computed(() => (focus.value ? formatShortRange(focus.value.fr
   font-size: var(--font-size-sm);
 }
 
+.history summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-height: 24px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.history summary::-webkit-details-marker {
+  display: none;
+}
+
+.history summary h3 {
+  margin: 0;
+}
+
+.history summary::after {
+  content: '▾';
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.history[open] summary {
+  margin-bottom: var(--space-2);
+}
+
+.history[open] summary::after {
+  content: '▴';
+}
+
+.history summary .muted {
+  font-size: var(--font-size-xs);
+}
+
 .crew {
   padding: 0;
   border: 0;
@@ -748,7 +972,7 @@ const headerSpan = computed(() => (focus.value ? formatShortRange(focus.value.fr
 }
 
 button.crew {
-  min-height: 32px;
+  min-height: 28px;
   cursor: pointer;
 }
 
@@ -760,32 +984,91 @@ button.crew strong {
   color: var(--text-secondary);
 }
 
-@media (max-width: 860px) {
-  .schedule__head {
-    padding: var(--space-3) var(--space-4);
+@media (hover: hover) and (pointer: fine) {
+  .cell--link:hover {
+    background: var(--row-selected-bg);
   }
 
-  .schedule__tools {
-    justify-content: flex-start;
+  .cell--link:hover strong {
+    color: var(--text-link);
+    text-decoration: underline;
+  }
+
+  .switch:hover {
+    background: var(--row-hover-bg);
+  }
+}
+
+@media (max-width: 860px) {
+  .head {
+    padding: var(--space-3);
+  }
+
+  .head__tools {
     width: 100%;
   }
 
-  .schedule__actions button {
+  .head__tools :deep(.nav) {
+    flex: 1;
+  }
+
+  .head__primary,
+  .head__export {
     min-height: var(--tap-size);
   }
 
   .legend {
-    position: static;
-    padding: var(--space-2) var(--space-4);
+    padding: 6px var(--space-3);
   }
 
-  .legend .legend__hint {
-    margin-left: 0;
+  .back,
+  .switch,
+  .history summary {
+    min-height: var(--tap-size);
+  }
+
+  .back {
+    margin: -10px 0 -6px;
   }
 
   .extras {
     grid-template-columns: 1fr;
-    padding: var(--space-4);
+    gap: var(--space-3);
+    padding: var(--space-3);
+  }
+}
+
+@media (max-width: 560px) {
+  .head__tools {
+    flex-wrap: wrap;
+  }
+
+  .head__tools--stacked :deep(.nav) {
+    flex: 1 0 100%;
+  }
+
+  .head__primary {
+    order: 1;
+    flex: 1 1 auto;
+  }
+
+  .head__view {
+    order: 2;
+    margin-left: auto;
+  }
+
+  .head__export,
+  .head__edit {
+    order: 3;
+  }
+
+  .head__export {
+    min-width: var(--tap-size);
+    padding: 0;
+  }
+
+  .head__export span {
+    display: none;
   }
 }
 </style>

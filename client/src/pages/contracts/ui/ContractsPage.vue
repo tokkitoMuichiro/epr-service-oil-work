@@ -1,64 +1,99 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useBrigadesStore, type AssignmentDraft, type BrigadeAssignment } from '@/entities/brigade'
 import {
-  useBrigadesStore,
-  type AssignmentDraft,
-  type BrigadeAssignment,
-} from '@/entities/brigade'
-import {
-  contractSpan,
+  isObjectArchived,
   scheduleBounds,
   useContractsStore,
   type Contract,
   type ContractDraft,
   type ContractObject,
-  type ObjectDraft,
+  type ObjectStatus,
+  type ObjectStatusChange,
   type WorkDraft,
   type WorkItem,
 } from '@/entities/contract'
 import { useAccessStore } from '@/entities/role'
 import { AssignmentDialog, type AssignmentObjectOption } from '@/features/brigade-assignment'
-import { ContractFormDialog, ObjectFormDialog } from '@/features/contract-form'
-import { DeadlineEditDialog } from '@/features/deadline-edit'
+import { ContractFormDialog, ObjectFormDialog, type ObjectFormValue } from '@/features/contract-form'
+import { ObjectStatusDialog } from '@/features/object-status'
 import { WorkFormDialog } from '@/features/work-form'
 import { formatShortRange } from '@/shared/lib/date'
-import { IconClose, IconChevron, UiButton, UiState } from '@/shared/ui'
+import { IconChevron, IconClose, IconSearch, UiButton, UiState } from '@/shared/ui'
 import { ContractsSchedule } from '@/widgets/contracts-schedule'
+import ContractList from './ContractList.vue'
 
 const store = useContractsStore()
-const {
-  items,
-  status,
-  errorText,
-  actionError,
-  busy,
-  selectedContract,
-  selectedObject,
-  isEmpty,
-} = storeToRefs(store)
+const { items, reportDays, isExporting, status, errorText, actionError, busy, selectedContract, selectedObject, isEmpty } =
+  storeToRefs(store)
 
-const bounds = computed(() => scheduleBounds(items.value))
+const brigadesStore = useBrigadesStore()
+const access = useAccessStore()
+const canPlan = computed(() => access.can('brigades_plan'))
+const canEdit = computed(() => access.can('contracts_edit'))
 
-const LIST_HIDDEN_KEY = 'erp.contracts.listHidden'
-const isListHidden = ref(localStorage.getItem(LIST_HIDDEN_KEY) === '1')
-
-watch(isListHidden, (hidden) => localStorage.setItem(LIST_HIDDEN_KEY, hidden ? '1' : '0'))
-
-const expandedContractId = ref<string | null>(null)
-
-watch(selectedContract, (contract) => {
-  if (contract) expandedContractId.value = contract.id
+onMounted(() => {
+  void store.load()
+  void brigadesStore.load()
 })
 
-function toggleContract(id: string) {
-  expandedContractId.value = expandedContractId.value === id ? null : id
+const bounds = computed(() => scheduleBounds(items.value, reportDays.value.map((d) => d.date)))
+
+const view = ref<'active' | 'archive'>('active')
+const isArchive = computed(() => view.value === 'archive')
+const query = ref('')
+const info = ref('')
+
+function inView(contract: Contract, object: ContractObject, archive = isArchive.value): boolean {
+  return isObjectArchived(contract, object) === archive
+}
+
+function viewOf(contracts: Contract[], archive: boolean): Contract[] {
+  return contracts
+    .filter((c) => (archive ? c.archived || c.objects.some((o) => isObjectArchived(c, o)) : !c.archived))
+    .map((c) => ({ ...c, objects: c.objects.filter((o) => inView(c, o, archive)) }))
+}
+
+const viewContracts = computed(() => viewOf(items.value, isArchive.value))
+
+const counts = computed(() => {
+  const objects = items.value.flatMap((c) => c.objects.map((o) => isObjectArchived(c, o)))
+  return { active: objects.filter((a) => !a).length, archive: objects.filter(Boolean).length }
+})
+
+const listContracts = computed(() => {
+  const q = query.value.trim().toLowerCase()
+  if (!q) return viewContracts.value
+  const has = (value: string) => value.toLowerCase().includes(q)
+  return viewContracts.value.flatMap((c) => {
+    if (has(c.name) || has(c.customer)) return [c]
+    const objects = c.objects.filter((o) => has(o.name) || has(o.location))
+    return objects.length ? [{ ...c, objects }] : []
+  })
+})
+
+const viewContract = computed(() => viewContracts.value.find((c) => c.id === selectedContract.value?.id) ?? null)
+
+const hiddenCount = computed(() => {
+  const source = selectedContract.value ? [selectedContract.value] : items.value
+  return source.reduce((sum, c) => sum + c.objects.filter((o) => !inView(c, o)).length, 0)
+})
+
+watch(viewContracts, () => {
+  const contract = selectedContract.value
+  const object = selectedObject.value
+  if (object && contract && !inView(contract, object)) store.selectContract(viewContract.value ? contract.id : null)
+  else if (contract && !viewContract.value) store.selectContract(null)
+})
+
+function setView(next: 'active' | 'archive') {
+  info.value = ''
+  view.value = next
 }
 
 const pickerValue = computed(() => {
-  if (selectedObject.value && selectedContract.value) {
-    return `o:${selectedContract.value.id}:${selectedObject.value.id}`
-  }
+  if (selectedObject.value && selectedContract.value) return `o:${selectedContract.value.id}:${selectedObject.value.id}`
   return selectedContract.value ? `c:${selectedContract.value.id}` : 'all'
 })
 
@@ -69,22 +104,158 @@ function onPick(event: Event) {
   else store.selectContract(null)
 }
 
-function contractPeriod(contract: Contract) {
-  const span = contractSpan(contract)
-  return span ? formatShortRange(span.from, span.to) : 'сроки не заданы'
-}
+const LIST_HIDDEN_KEY = 'erp.contracts.listHidden'
+const isListHidden = ref(localStorage.getItem(LIST_HIDDEN_KEY) === '1')
+watch(isListHidden, (hidden) => localStorage.setItem(LIST_HIDDEN_KEY, hidden ? '1' : '0'))
 
 const contractDialogOpen = ref(false)
 const editingContract = ref<Contract | null>(null)
+
+function openCreateContract() {
+  editingContract.value = null
+  contractDialogOpen.value = true
+}
+
+function openEditContract() {
+  editingContract.value = selectedContract.value
+  contractDialogOpen.value = true
+}
+
+async function saveContract(draft: ContractDraft) {
+  const isNew = !editingContract.value
+  const ok = editingContract.value
+    ? await store.updateContract(editingContract.value.id, draft)
+    : await store.createContract(draft)
+  if (!ok) return
+  contractDialogOpen.value = false
+  if (isNew) {
+    setView('active')
+    if (canEdit.value) openAddObject()
+  }
+}
+
+async function removeContract() {
+  const contract = selectedContract.value
+  if (!contract) return
+  if (!confirm(`Удалить контракт «${contract.name}»? Договор с отчётами или назначениями можно только отправить в архив.`)) return
+  if (await store.removeContract(contract.id)) void brigadesStore.load()
+}
+
+async function toggleContractArchive() {
+  const contract = selectedContract.value
+  if (!contract) return
+  const archived = !contract.archived
+  if (archived && !confirm(`Отправить «${contract.name}» в архив? Будущие назначения бригад на его объекты будут сняты.`)) return
+  if (!(await store.setContractArchived(contract.id, archived))) return
+  void brigadesStore.load()
+  setView(archived ? 'archive' : 'active')
+}
+
+async function toggleObjectArchive(object: ContractObject) {
+  const contract = selectedContract.value
+  if (!contract) return
+  const archived = !object.archived
+  if (archived && !confirm(`Отправить объект «${object.name}» в архив без завершения? Будущие назначения бригад будут сняты.`)) return
+  if (!(await store.setObjectArchived(contract.id, object.id, archived))) return
+  void brigadesStore.load()
+  if (!archived) setView('active')
+}
+
 const objectDialogOpen = ref(false)
 const editingObject = ref<ContractObject | null>(null)
-const deadlineDialogOpen = ref(false)
-const deadlineObject = ref<ContractObject | null>(null)
 
-const brigadesStore = useBrigadesStore()
-const access = useAccessStore()
-const canPlan = computed(() => access.can('brigades_plan'))
-const canEdit = computed(() => access.can('contracts_edit'))
+function openAddObject() {
+  store.actionError = ''
+  editingObject.value = null
+  objectDialogOpen.value = true
+}
+
+function addObjectTo(contractId: string) {
+  store.selectContract(contractId)
+  openAddObject()
+}
+
+function exportExcel() {
+  const object = selectedObject.value
+  const contract = viewContract.value
+  const name = object?.name ?? contract?.name ?? (isArchive.value ? 'Сводный график — архив' : 'Сводный график')
+  void store.exportSchedule(
+    { objectId: object?.id, contractId: contract?.id, isArchive: isArchive.value },
+    `График — ${name}.xlsx`,
+  )
+}
+
+function openEditObject(object: ContractObject) {
+  store.actionError = ''
+  editingObject.value = object
+  objectDialogOpen.value = true
+}
+
+async function saveObject(value: ObjectFormValue, note: string) {
+  const contract = selectedContract.value
+  if (!contract) return
+  const ok = editingObject.value
+    ? await store.updateObject(contract.id, editingObject.value.id, value, note)
+    : await store.addObject(contract.id, value)
+  if (ok) objectDialogOpen.value = false
+}
+
+async function removeObject(objectId: string) {
+  const contract = selectedContract.value
+  if (!contract) return
+  if (!confirm('Удалить объект из контракта? Объект с отчётами или назначениями можно только отправить в архив.')) return
+  if (await store.removeObject(contract.id, objectId)) void brigadesStore.load()
+}
+
+const statusTarget = ref<{ object: ContractObject; status: ObjectStatus } | null>(null)
+
+function openStatus(object: ContractObject, next: ObjectStatus) {
+  store.actionError = ''
+  statusTarget.value = { object, status: next }
+}
+
+async function saveStatus(change: ObjectStatusChange) {
+  const contract = selectedContract.value
+  const target = statusTarget.value
+  if (!contract || !target) return
+  if (!(await store.setObjectStatus(contract.id, target.object.id, change))) return
+  statusTarget.value = null
+  if (change.status === 'done') {
+    void brigadesStore.load()
+    info.value = `Объект «${target.object.name}» завершён и перенесён в архив.`
+  } else if (isArchive.value) {
+    view.value = 'active'
+    store.selectObject(target.object.id, contract.id)
+  }
+}
+
+const workDialogOpen = ref(false)
+const workObject = ref<ContractObject | null>(null)
+const editingWork = ref<WorkItem | null>(null)
+
+function openWork(object: ContractObject, work: WorkItem | null = null) {
+  store.actionError = ''
+  workObject.value = object
+  editingWork.value = work
+  workDialogOpen.value = true
+}
+
+async function saveWork(draft: WorkDraft) {
+  const contract = selectedContract.value
+  if (!contract || !workObject.value) return
+  const ok = editingWork.value
+    ? await store.updateWork(contract.id, workObject.value.id, editingWork.value.id, draft)
+    : await store.addWork(contract.id, workObject.value.id, draft)
+  if (ok) workDialogOpen.value = false
+}
+
+async function removeWork(workId: string) {
+  const contract = selectedContract.value
+  if (!contract || !workObject.value) return
+  if (!confirm('Удалить работу из объекта?')) return
+  if (await store.removeWork(contract.id, workObject.value.id, workId)) workDialogOpen.value = false
+}
+
 const assignmentDialogOpen = ref(false)
 const editingAssignment = ref<BrigadeAssignment | null>(null)
 const assignmentPreset = ref<Partial<AssignmentDraft> | null>(null)
@@ -92,15 +263,10 @@ const assignmentPreset = ref<Partial<AssignmentDraft> | null>(null)
 const objectOptions = computed<AssignmentObjectOption[]>(() =>
   items.value.flatMap((c) =>
     c.objects
-      .filter((o) => (!o.archived && !c.archived) || o.id === editingAssignment.value?.objectId)
+      .filter((o) => !isObjectArchived(c, o) || o.id === editingAssignment.value?.objectId)
       .map((o) => ({ id: o.id, contractId: c.id, label: `${o.name} · ${o.location}` })),
   ),
 )
-
-onMounted(() => {
-  void store.load()
-  void brigadesStore.load()
-})
 
 const assignableBrigades = computed(() =>
   brigadesStore.brigades.filter((b) => !b.archived || b.id === editingAssignment.value?.brigadeId),
@@ -138,140 +304,37 @@ async function removeAssignment(id: string) {
   if (await brigadesStore.removeAssignment(id)) assignmentDialogOpen.value = false
 }
 
-function openCreateContract() {
-  editingContract.value = null
-  contractDialogOpen.value = true
-}
-
-function openEditContract() {
-  editingContract.value = selectedContract.value
-  contractDialogOpen.value = true
-}
-
-async function saveContract(draft: ContractDraft) {
-  const ok = editingContract.value
-    ? await store.updateContract(editingContract.value.id, draft)
-    : await store.createContract(draft)
-  if (ok) contractDialogOpen.value = false
-}
-
-async function deleteSelectedContract() {
-  if (!selectedContract.value) return
-  if (!confirm(`Удалить контракт «${selectedContract.value.name}»? Договор с отчётами или назначениями можно только отправить в архив.`)) return
-  if (await store.removeContract(selectedContract.value.id)) void brigadesStore.load()
-}
-
-async function toggleContractArchive() {
-  const contract = selectedContract.value
-  if (!contract) return
-  const archived = !contract.archived
-  if (archived && !confirm(`Отправить «${contract.name}» в архив? Будущие назначения бригад на его объекты будут сняты.`)) {
-    return
-  }
-  if (await store.setContractArchived(contract.id, archived)) void brigadesStore.load()
-}
-
-async function toggleObjectArchive(object: ContractObject) {
-  if (!selectedContract.value) return
-  const archived = !object.archived
-  if (archived && !confirm(`Отправить объект «${object.name}» в архив? Будущие назначения бригад будут сняты.`)) return
-  if (await store.setObjectArchived(selectedContract.value.id, object.id, archived)) void brigadesStore.load()
-}
-
-function openAddObject() {
-  editingObject.value = null
-  objectDialogOpen.value = true
-}
-
-function openEditObject(object: ContractObject) {
-  editingObject.value = object
-  objectDialogOpen.value = true
-}
-
-async function saveObject(draft: ObjectDraft) {
-  if (!selectedContract.value) return
-  const ok = editingObject.value
-    ? await store.updateObject(selectedContract.value.id, editingObject.value.id, draft)
-    : await store.addObject(selectedContract.value.id, draft)
-  if (ok) objectDialogOpen.value = false
-}
-
-function openDeadlines(object: ContractObject) {
-  deadlineObject.value = object
-  deadlineDialogOpen.value = true
-}
-
-async function saveDeadlines(
-  patch: Partial<
-    Pick<ContractObject, 'plannedStart' | 'plannedEnd' | 'actualStart' | 'actualEnd'>
-  > & { note: string },
-) {
-  if (!selectedContract.value || !deadlineObject.value) return
-  const { note, ...rest } = patch
-  const ok = await store.updateObject(selectedContract.value.id, deadlineObject.value.id, rest, note)
-  if (ok) deadlineDialogOpen.value = false
-}
-
-const workDialogOpen = ref(false)
-const workObject = ref<ContractObject | null>(null)
-const editingWork = ref<WorkItem | null>(null)
-
-function openWork(object: ContractObject, work: WorkItem | null = null) {
-  store.actionError = ''
-  workObject.value = object
-  editingWork.value = work
-  workDialogOpen.value = true
-}
-
-async function saveWork(draft: WorkDraft) {
-  if (!selectedContract.value || !workObject.value) return
-  const contractId = selectedContract.value.id
-  const objectId = workObject.value.id
-  const ok = editingWork.value
-    ? await store.updateWork(contractId, objectId, editingWork.value.id, draft)
-    : await store.addWork(contractId, objectId, draft)
-  if (ok) workDialogOpen.value = false
-}
-
-async function removeWork(workId: string) {
-  if (!selectedContract.value || !workObject.value) return
-  if (!confirm('Удалить работу из объекта?')) return
-  if (await store.removeWork(selectedContract.value.id, workObject.value.id, workId)) {
-    workDialogOpen.value = false
-  }
-}
-
-async function removeObject(objectId: string) {
-  if (!selectedContract.value) return
-  if (!confirm('Удалить объект из контракта? Объект с отчётами или назначениями можно только отправить в архив.')) return
-  if (await store.removeObject(selectedContract.value.id, objectId)) void brigadesStore.load()
-}
+const isDialogOpen = computed(
+  () => objectDialogOpen.value || workDialogOpen.value || contractDialogOpen.value || Boolean(statusTarget.value),
+)
 </script>
 
 <template>
   <section class="page">
     <header class="page__header">
-      <div>
-        <h1>Контракты</h1>
-        <p>Линейный график объектов и сроков по договорам</p>
+      <h1>Контракты</h1>
+      <div class="ui-segmented views" role="tablist" aria-label="Активные и архивные объекты">
+        <button type="button" role="tab" :aria-selected="!isArchive" @click="setView('active')">
+          Активные <span class="views__count">{{ counts.active }}</span>
+        </button>
+        <button type="button" role="tab" :aria-selected="isArchive" @click="setView('archive')">
+          Архив <span class="views__count">{{ counts.archive }}</span>
+        </button>
       </div>
-      <div v-if="canEdit" class="page__actions">
-        <UiButton variant="secondary" :disabled="!selectedContract" @click="openEditContract">
-          Изменить
-        </UiButton>
-        <UiButton variant="secondary" :disabled="!selectedContract || busy" @click="toggleContractArchive">
-          {{ selectedContract?.archived ? 'Из архива' : 'В архив' }}
-        </UiButton>
-        <UiButton variant="danger" :disabled="!selectedContract" @click="deleteSelectedContract">
-          Удалить
-        </UiButton>
-        <UiButton variant="primary" @click="openCreateContract">Новый контракт</UiButton>
-      </div>
+      <UiButton v-if="canEdit" variant="primary" size="sm" class="page__create" @click="openCreateContract">
+        Новый контракт
+      </UiButton>
     </header>
 
-    <p v-if="actionError" class="alert" role="alert">
+    <p v-if="actionError && !isDialogOpen" class="alert" role="alert">
       {{ actionError }}
       <button type="button" aria-label="Скрыть" @click="store.actionError = ''"><IconClose :size="16" /></button>
+    </p>
+
+    <p v-if="info" class="info" role="status">
+      {{ info }}
+      <button type="button" class="info__link" @click="setView('archive')">Открыть архив</button>
+      <button type="button" aria-label="Скрыть" @click="info = ''"><IconClose :size="16" /></button>
     </p>
 
     <div v-if="brigadesStore.notices.length && !assignmentDialogOpen" class="notice" role="status">
@@ -288,40 +351,31 @@ async function removeObject(objectId: string) {
 
     <UiState v-if="status === 'loading'" kind="loading" title="Загрузка контрактов…" text="Получаем данные с сервера ERP." />
 
-    <UiState
-      v-else-if="status === 'error'"
-      kind="error"
-      title="Не удалось загрузить"
-      :text="errorText"
-    >
+    <UiState v-else-if="status === 'error'" kind="error" title="Не удалось загрузить" :text="errorText">
       <UiButton variant="primary" @click="store.load()">Повторить</UiButton>
     </UiState>
 
     <UiState
       v-else-if="isEmpty"
       title="Контрактов пока нет"
-      :text="canEdit ? 'Создайте первый договор с заказчиком и объектами на НПС.' : 'Договоры заводит администратор.'"
+      :text="canEdit ? 'Создайте договор: название и заказчик, затем добавьте объекты со сроками и объёмами.' : 'Договоры заводит администратор.'"
     >
       <UiButton v-if="canEdit" variant="primary" @click="openCreateContract">Создать контракт</UiButton>
     </UiState>
 
     <div v-else class="layout" :class="{ 'layout--collapsed': isListHidden }">
       <label class="picker">
-        <span class="ui-overline">Договор и объект</span>
-        <select class="ui-control" :value="pickerValue" @change="onPick">
-          <option value="all">Сводный график — все договоры</option>
-          <optgroup v-for="contract in items" :key="contract.id" :label="contract.name">
-            <option :value="`c:${contract.id}`">Сводный график договора</option>
-            <option
-              v-for="object in contract.objects"
-              :key="object.id"
-              :value="`o:${contract.id}:${object.id}`"
-            >
+        <select class="ui-control" aria-label="Договор и объект" :value="pickerValue" @change="onPick">
+          <option value="all">{{ isArchive ? 'Весь архив' : 'Сводный график — все договоры' }}</option>
+          <optgroup v-for="contract in viewContracts" :key="contract.id" :label="contract.name">
+            <option :value="`c:${contract.id}`">Договор целиком</option>
+            <option v-for="object in contract.objects" :key="object.id" :value="`o:${contract.id}:${object.id}`">
               {{ object.name }} · {{ formatShortRange(object.plannedStart, object.plannedEnd) }}
             </option>
           </optgroup>
         </select>
       </label>
+
       <button
         v-if="isListHidden"
         type="button"
@@ -333,102 +387,65 @@ async function removeObject(objectId: string) {
         <IconChevron class="rail__icon" />
         <span class="rail__text">Договоры</span>
       </button>
-      <nav v-else class="list" aria-label="Договоры">
-        <div class="list__head">
-          <span class="ui-overline">Договоры</span>
+      <aside v-else class="side">
+        <div class="side__head">
+          <label class="search">
+            <IconSearch :size="16" />
+            <input v-model="query" type="search" placeholder="Договор, заказчик, объект" aria-label="Поиск по договорам" />
+          </label>
           <button
             type="button"
-            class="ui-icon-button list__hide"
+            class="ui-icon-button side__hide"
             aria-label="Скрыть список"
             title="Скрыть список"
             @click="isListHidden = true"
           >
-            <IconChevron class="list__hide-icon" />
+            <IconChevron class="side__hide-icon" />
           </button>
         </div>
-        <button
-          type="button"
-          class="list__summary"
-          :class="{ 'list__summary--current': !selectedContract }"
-          @click="store.selectContract(null)"
-        >
-          <strong>Сводный график</strong>
-          <span>Все договоры и объекты</span>
-        </button>
-
-        <div
-          v-for="contract in items"
-          :key="contract.id"
-          class="list__group"
-          :class="{ 'list__group--active': contract.id === expandedContractId }"
-        >
-          <button
-            type="button"
-            class="list__item"
-            :aria-expanded="contract.id === expandedContractId"
-            @click="toggleContract(contract.id)"
-          >
-            <span class="list__text">
-              <strong>{{ contract.name }}</strong>
-              <span>{{ contract.customer }}<template v-if="contract.archived"> · в архиве</template></span>
-              <span class="list__meta">
-                {{ contractPeriod(contract) }} · объектов: {{ contract.objects.length }}
-              </span>
-            </span>
-            <IconChevron class="list__chevron" :size="18" />
-          </button>
-          <ul v-if="contract.id === expandedContractId" class="menu">
-            <li>
-              <button
-                type="button"
-                class="menu__item"
-                :class="{ 'menu__item--current': contract.id === selectedContract?.id && !selectedObject }"
-                @click="store.selectContract(contract.id)"
-              >
-                Сводный график
-              </button>
-            </li>
-            <li class="menu__heading">График по объектам</li>
-            <li v-for="object in contract.objects" :key="object.id">
-              <button
-                type="button"
-                class="menu__item menu__item--object"
-                :class="{ 'menu__item--current': object.id === selectedObject?.id }"
-                @click="store.selectObject(object.id, contract.id)"
-              >
-                <strong>{{ object.name }}</strong>
-                <span>
-                  {{ formatShortRange(object.plannedStart, object.plannedEnd) }}
-                  <template v-if="object.archived"> · в архиве</template>
-                </span>
-              </button>
-            </li>
-            <li v-if="!contract.objects.length" class="menu__empty">Объектов пока нет</li>
-          </ul>
-        </div>
-      </nav>
+        <ContractList
+          :contracts="listContracts"
+          :selected-contract-id="selectedContract?.id ?? null"
+          :selected-object-id="selectedObject?.id ?? null"
+          :is-archive="isArchive"
+          :is-filtered="Boolean(query.trim())"
+          :can-edit="canEdit"
+          @select-contract="store.selectContract"
+          @select-object="store.selectObject"
+          @add-object="addObjectTo"
+        />
+      </aside>
 
       <div class="detail">
         <ContractsSchedule
-          :contracts="items"
-          :contract="selectedContract"
+          :contracts="viewContracts"
+          :contract="viewContract"
           :object="selectedObject"
           :bounds="bounds"
+          :is-archive="isArchive"
+          :hidden-count="hiddenCount"
           :assignments="brigadesStore.assignments"
           :brigade-name="brigadesStore.brigadeName"
           :can-plan="canPlan"
           :can-edit="canEdit"
+          :report-days="reportDays"
+          :is-exporting="isExporting"
+          @export-excel="exportExcel"
           @select-contract="store.selectContract"
           @select-object="store.selectObject"
+          @toggle-archive="setView(isArchive ? 'active' : 'archive')"
+          @change-status="openStatus"
           @assign-brigade="openAssign"
           @edit-assignment="openEditAssignment"
-          @edit-deadlines="openDeadlines"
           @edit-object="openEditObject"
           @add-object="openAddObject"
           @remove-object="removeObject"
           @archive-object="toggleObjectArchive"
           @add-work="openWork"
           @edit-work="openWork"
+          @edit-contract="openEditContract"
+          @archive-contract="toggleContractArchive"
+          @remove-contract="removeContract"
         />
       </div>
     </div>
@@ -442,14 +459,19 @@ async function removeObject(objectId: string) {
     <ObjectFormDialog
       :open="objectDialogOpen"
       :object="editingObject"
+      :busy="busy"
+      :error="objectDialogOpen ? actionError : ''"
       @close="objectDialogOpen = false"
       @save="saveObject"
     />
-    <DeadlineEditDialog
-      :open="deadlineDialogOpen"
-      :object="deadlineObject"
-      @close="deadlineDialogOpen = false"
-      @save="saveDeadlines"
+    <ObjectStatusDialog
+      :open="Boolean(statusTarget)"
+      :object="statusTarget?.object ?? null"
+      :status="statusTarget?.status ?? null"
+      :busy="busy"
+      :error="statusTarget ? actionError : ''"
+      @close="statusTarget = null"
+      @save="saveStatus"
     />
     <WorkFormDialog
       :open="workDialogOpen"
@@ -483,15 +505,14 @@ async function removeObject(objectId: string) {
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
   min-height: 100%;
 }
 
 .page__header {
   display: flex;
-  justify-content: space-between;
-  gap: var(--space-4);
-  align-items: flex-start;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
   flex-wrap: wrap;
 }
 
@@ -504,30 +525,46 @@ async function removeObject(objectId: string) {
   color: var(--text-primary);
 }
 
-.page__header p {
-  margin: var(--space-2) 0 0;
-  color: var(--text-secondary);
-  font-size: var(--font-size-base);
+.page__create {
+  margin-left: auto;
 }
 
-.page__actions {
+.views > button {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+}
+
+.views__count {
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.info,
+.notice {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.info {
+  border: 1px solid var(--status-ok-border);
+  background: var(--status-ok-bg);
+  color: var(--status-ok-fg);
 }
 
 .notice {
-  display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--status-warn-border);
-  border-radius: var(--radius);
   background: var(--status-warn-bg);
   color: var(--status-warn-fg);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
 }
 
 .notice ul {
@@ -535,68 +572,89 @@ async function removeObject(objectId: string) {
   padding-left: var(--space-4);
 }
 
+.info button,
 .notice button {
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  width: 28px;
+  min-width: 28px;
   height: 28px;
+  padding: 0;
   border: 0;
   background: transparent;
   color: inherit;
   cursor: pointer;
 }
 
+.info .info__link {
+  margin-left: auto;
+  padding: 0 var(--space-2);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .layout {
   display: grid;
-  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
-  gap: var(--space-4);
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  gap: var(--space-3);
   min-height: 0;
   flex: 1;
+}
+
+.layout--collapsed {
+  grid-template-columns: var(--tap-size) minmax(0, 1fr);
 }
 
 .picker {
   display: none;
 }
 
-.list {
+.side {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   align-self: start;
   position: sticky;
   top: 0;
-  max-height: calc(100vh - 2 * var(--space-8));
   max-height: calc(100dvh - 2 * var(--space-8));
   overflow: auto;
 }
 
-.list__head {
+.side__head {
   display: flex;
+  gap: var(--space-1);
+}
+
+.search {
+  display: flex;
+  flex: 1;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-2);
-  margin: calc(-1 * var(--space-2)) 0 calc(-1 * var(--space-1));
-}
-
-.list__hide-icon {
-  transform: rotate(90deg);
-}
-
-.list__group {
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-2);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--surface-card);
-  box-shadow: var(--shadow-card);
+  color: var(--text-secondary);
 }
 
-.list__group--active {
+.search:focus-within {
   border-color: var(--accent);
-  box-shadow: inset 3px 0 0 var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
-.layout--collapsed {
-  grid-template-columns: var(--tap-size) minmax(0, 1fr);
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.side__hide-icon {
+  transform: rotate(90deg);
 }
 
 .rail {
@@ -607,12 +665,11 @@ async function removeObject(objectId: string) {
   flex-direction: column;
   align-items: center;
   gap: var(--space-3);
-  min-height: 180px;
+  min-height: 160px;
   padding: var(--space-3) 0;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--surface-card);
-  box-shadow: var(--shadow-card);
   color: var(--text-link);
   cursor: pointer;
 }
@@ -631,179 +688,52 @@ async function removeObject(objectId: string) {
   color: var(--text-secondary);
 }
 
-.list__summary {
-  display: grid;
-  gap: var(--space-1);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border-subtle);
-  border-left: 3px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--surface-card);
-  box-shadow: var(--shadow-card);
-  text-align: left;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.list__summary strong {
-  font-size: var(--font-size-base);
-  font-weight: 700;
-}
-
-.list__summary span {
-  font-size: var(--font-size-xs);
-  color: var(--text-secondary);
-}
-
-.list__summary--current {
-  border-left-color: var(--accent);
-  background: var(--accent-subtle);
-}
-
-.list__item {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  width: 100%;
-  padding: var(--space-3) var(--space-4);
-  border: 0;
-  background: transparent;
-  text-align: left;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.list__group--active > .list__item {
-  background: var(--accent-subtle);
-}
-
-.list__text {
-  display: grid;
-  flex: 1;
-  gap: var(--space-1);
-  min-width: 0;
-}
-
-.list__text strong {
-  font-size: var(--font-size-base);
-  font-weight: 700;
-  line-height: var(--line-height-tight);
-}
-
-.list__text span {
-  font-size: var(--font-size-xs);
-  color: var(--text-secondary);
-}
-
-.list__meta {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.list__chevron {
-  color: var(--text-secondary);
-  transition: transform 0.15s ease;
-}
-
-.list__item[aria-expanded='true'] .list__chevron {
-  transform: rotate(180deg);
-}
-
-.menu {
-  margin: 0;
-  padding: var(--space-1) 0 var(--space-2);
-  list-style: none;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.menu__item {
-  display: grid;
-  gap: 2px;
-  width: 100%;
-  min-height: 40px;
-  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-5);
-  border: 0;
-  border-left: 3px solid transparent;
-  background: transparent;
-  text-align: left;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.menu__item--object {
-  padding-left: var(--space-8);
-}
-
-.menu__item--object strong {
-  font-size: var(--font-size-sm);
-}
-
-.menu__item--object span {
-  font-size: var(--font-size-xs);
-  font-weight: 500;
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.menu__item--current {
-  border-left-color: var(--accent);
-  background: var(--row-selected-bg);
-  color: var(--text-link);
-}
-
-.menu__heading {
-  padding: var(--space-3) var(--space-4) var(--space-1) var(--space-5);
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.menu__empty {
-  padding: var(--space-1) var(--space-4) var(--space-1) var(--space-8);
-  font-size: var(--font-size-xs);
-  color: var(--text-secondary);
-}
-
 .detail {
   min-width: 0;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .rail:hover,
-  .list__summary:hover,
-  .list__item:hover,
-  .menu__item:hover {
+  .rail:hover {
     background: var(--row-hover-bg);
-  }
-
-  .list__summary--current:hover,
-  .menu__item--current:hover {
-    background: var(--row-selected-bg);
   }
 }
 
 @media (max-width: 860px) {
+  .page__header {
+    gap: var(--space-2);
+  }
+
+  .views {
+    order: 3;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .views > button {
+    min-height: 40px;
+  }
+
+  .page__create {
+    min-height: var(--tap-size);
+  }
+
   .layout,
   .layout--collapsed {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .picker {
-    display: grid;
-    gap: 6px;
+    display: block;
     position: sticky;
     top: 0;
     z-index: var(--z-sticky);
-    margin: 0 calc(-1 * var(--space-4));
-    padding: var(--space-2) var(--space-4);
+    margin: 0 calc(-1 * var(--space-3));
+    padding: var(--space-2) var(--space-3);
     background: var(--surface-app);
   }
 
-  .list,
+  .side,
   .rail {
     display: none;
   }

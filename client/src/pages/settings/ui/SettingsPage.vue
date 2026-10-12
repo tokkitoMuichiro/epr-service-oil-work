@@ -19,7 +19,7 @@ const isEditable = computed(() => access.can('settings_manage'))
     <header class="page__header">
       <div>
         <h1>Настройки</h1>
-        <p>Пользователи, роли и права по всей системе.</p>
+        <p class="ui-hide-mobile">Пользователи, роли и права по всей системе.</p>
       </div>
     </header>
 
@@ -171,23 +171,20 @@ const isEditable = computed(() => access.can('settings_manage'))
 }
 
 @media (max-width: 860px) {
-  .roles {
-    display: flex;
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
-    scrollbar-width: none;
-    margin: 0 calc(-1 * var(--space-4));
-    padding: 2px var(--space-4);
-    scroll-padding-inline: var(--space-4);
+  .page {
+    gap: var(--space-3);
   }
 
-  .role {
-    flex: 0 0 240px;
-    scroll-snap-align: start;
+  .roles {
+    display: none;
   }
 
   .panel {
-    padding: var(--space-4);
+    padding: var(--space-3);
+  }
+
+  .panel__text {
+    margin-bottom: var(--space-3);
   }
 }
 </style>

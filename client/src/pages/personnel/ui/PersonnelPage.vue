@@ -15,12 +15,14 @@ import {
 import { useAccessStore, useRoleStore } from '@/entities/role'
 import { TestingMarkIcon, testingMark, useTrainingStore, type TestingMark } from '@/entities/training'
 import { WorkerFormDialog } from '@/features/worker-form'
-import { IconClose, IconSearch, UiButton, UiState } from '@/shared/ui'
+import { useMobilePagination } from '@/shared/lib/pagination'
+import { IconClose, IconSearch, UiButton, UiPagination, UiState } from '@/shared/ui'
 import { BrigadeProfileDialog, NEW_BRIGADE } from '@/widgets/brigade-profile'
 import { WorkerCertifications } from '@/widgets/worker-certifications'
 import { WorkerProfileDialog } from '@/widgets/worker-profile'
 import { useBrigadeList, type BrigadeSortKey } from '../model/use-brigade-list'
 import { useWorkerList } from '../model/use-worker-list'
+import MobileSort from './MobileSort.vue'
 import WorkerFilters from './WorkerFilters.vue'
 
 type TabId = 'workers' | 'brigades'
@@ -74,8 +76,13 @@ function ariaSort(key: WorkerSortKey) {
   return sortDirection.value === 'asc' ? 'ascending' : 'descending'
 }
 
+const workerPager = useMobilePagination(rows, {
+  resetOn: [query, employmentFilter, statusFilter, brigadeFilter, testingFilter, sortKey, sortDirection],
+})
+
 const brigadeList = useBrigadeList(brigades, assignments, today, (id) => personnel.workerName(id))
 const { sortKey: brigadeSortKey, sortDirection: brigadeSortDirection, rows: brigadeRows } = brigadeList
+const brigadePager = useMobilePagination(brigadeRows, { resetOn: [brigadeSortKey, brigadeSortDirection] })
 
 const BRIGADE_COLUMNS: { key: BrigadeSortKey; label: string }[] = [
   { key: 'name', label: 'Наименование' },
@@ -140,7 +147,7 @@ function openCreateBrigade() {
     <header class="page__header">
       <div>
         <h1>Персонал</h1>
-        <p>Карточки сотрудников, документы и бригады.</p>
+        <p class="ui-hide-mobile">Карточки сотрудников, документы и бригады.</p>
       </div>
       <div class="page__actions">
         <UiButton v-if="tab === 'workers' && canEdit" variant="primary" @click="openCreateWorker">
@@ -238,11 +245,14 @@ function openCreateBrigade() {
           />
         </div>
 
-        <p class="legend">
-          <span><i class="legend__swatch legend__swatch--expiring" />Документ истекает в течение {{ TRAINING_EXPIRING_DAYS }} дней</span>
+        <div class="legend">
+          <span>
+            <i class="legend__swatch legend__swatch--expiring" />Документ истекает<span class="ui-hide-mobile">&nbsp;в течение {{ TRAINING_EXPIRING_DAYS }} дней</span>
+          </span>
           <span><i class="legend__swatch legend__swatch--expired" />Документ просрочен</span>
           <span class="legend__count">Показано: {{ rows.length }} из {{ workers.length }}</span>
-        </p>
+          <MobileSort v-model:sort-key="sortKey" v-model:direction="sortDirection" class="legend__sort" :options="COLUMNS" />
+        </div>
 
         <UiState v-if="!rows.length" title="Ничего не найдено" text="Измените поиск или фильтры." />
 
@@ -273,7 +283,7 @@ function openCreateBrigade() {
             </thead>
             <tbody>
               <tr
-                v-for="w in rows"
+                v-for="w in workerPager.pageItems"
                 :key="w.id"
                 :class="workerAttention(w, today) ? `row--${workerAttention(w, today)}` : ''"
                 tabindex="0"
@@ -285,7 +295,9 @@ function openCreateBrigade() {
                 <td data-label="Бригада">{{ brigadeName(w.brigadeId) }}</td>
                 <td class="nowrap col--phone" data-label="Телефон">{{ w.phone || '—' }}</td>
                 <td data-label="Занятость"><WorkerStatusBadge :status="w.status" /></td>
-                <td class="nowrap" data-label="В компании">{{ EMPLOYMENT_STATUS_LABEL[w.employment] }}</td>
+                <td class="nowrap" :class="{ 'ui-hide-mobile': w.employment === 'active' }" data-label="В компании">
+                  {{ EMPLOYMENT_STATUS_LABEL[w.employment] }}
+                </td>
                 <td v-if="showTraining" class="col--testing" data-label="Тестирование">
                   <TestingMarkIcon :mark="testingOf(w.id)" />
                 </td>
@@ -293,6 +305,14 @@ function openCreateBrigade() {
             </tbody>
           </table>
         </div>
+        <UiPagination
+          v-if="workerPager.isPaged"
+          v-model:page="workerPager.page"
+          class="pager"
+          :total="workerPager.total"
+          :page-size="workerPager.pageSize"
+          label="Страницы списка сотрудников"
+        />
       </div>
     </template>
 
@@ -306,6 +326,15 @@ function openCreateBrigade() {
       </UiState>
 
       <div v-else class="panel">
+        <div class="legend legend--brigades">
+          <span class="legend__count">Бригад: {{ brigadeRows.length }}</span>
+          <MobileSort
+            v-model:sort-key="brigadeSortKey"
+            v-model:direction="brigadeSortDirection"
+            class="legend__sort"
+            :options="BRIGADE_COLUMNS"
+          />
+        </div>
         <div class="table-wrap ui-table-wrap">
           <table class="table--brigades">
             <thead>
@@ -327,7 +356,7 @@ function openCreateBrigade() {
             </thead>
             <tbody>
               <tr
-                v-for="row in brigadeRows"
+                v-for="row in brigadePager.pageItems"
                 :key="row.brigade.id"
                 :class="{ 'row--archived': row.brigade.archived }"
                 tabindex="0"
@@ -350,6 +379,14 @@ function openCreateBrigade() {
             </tbody>
           </table>
         </div>
+        <UiPagination
+          v-if="brigadePager.isPaged"
+          v-model:page="brigadePager.page"
+          class="pager"
+          :total="brigadePager.total"
+          :page-size="brigadePager.pageSize"
+          label="Страницы списка бригад"
+        />
       </div>
     </template>
 
@@ -546,6 +583,10 @@ function openCreateBrigade() {
   margin-left: auto;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+.legend--brigades {
+  display: none;
 }
 
 .table-wrap {
@@ -748,8 +789,34 @@ tbody tr.row--expired td:first-child {
     box-shadow: 1px 0 0 var(--border-subtle);
   }
 
+  .page {
+    gap: var(--space-3);
+  }
+
   .panel {
-    padding: var(--space-2);
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .legend {
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+    margin: var(--space-2) 0 var(--space-1);
+  }
+
+  .legend--brigades {
+    display: flex;
+    margin-top: 0;
+  }
+
+  .legend__sort {
+    margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) auto;
+  }
+
+  .pager {
+    margin-top: var(--space-2);
   }
 
   .table--workers .col--phone,
@@ -760,7 +827,15 @@ tbody tr.row--expired td:first-child {
   .table--workers td.col--testing {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: var(--space-1);
+    grid-column: 2;
+    grid-row: 2;
+    font-size: var(--font-size-xs);
+  }
+
+  .table--workers td:nth-child(2) {
+    grid-column: 1;
   }
 
   .legend__count {
@@ -781,38 +856,7 @@ tbody tr.row--expired td:first-child {
   }
 
   thead {
-    display: block;
-    margin-bottom: var(--space-2);
-  }
-
-  thead tr {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-  }
-
-  th,
-  th:first-child {
-    position: static;
-    flex: 0 0 auto;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius);
-    background: var(--surface-card);
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    letter-spacing: 0;
-    text-transform: none;
-  }
-
-  .sort {
-    min-height: 36px;
-    letter-spacing: 0.02em;
-  }
-
-  th[aria-sort='ascending'],
-  th[aria-sort='descending'] {
-    border-color: var(--accent);
-    background: var(--accent-subtle);
+    display: none;
   }
 
   tbody {
@@ -823,8 +867,8 @@ tbody tr.row--expired td:first-child {
   tbody tr {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-1) var(--space-3);
-    padding: var(--space-3);
+    gap: 2px var(--space-3);
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius);
     background: var(--surface-card);
@@ -862,8 +906,14 @@ tbody tr.row--expired td:first-child {
   }
 
   td:first-child {
-    grid-column: 1;
     font-size: var(--font-size-base);
+  }
+
+  .table--workers tbody tr td:first-child,
+  .table--brigades tbody tr td:first-child {
+    grid-column: 1;
+    grid-row: 1;
+    box-shadow: none;
   }
 
   .table--workers td:nth-child(5),

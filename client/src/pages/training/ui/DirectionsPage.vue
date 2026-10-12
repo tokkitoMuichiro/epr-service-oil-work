@@ -371,12 +371,22 @@ function archiveProgram(program: TrainingProgram) {
 }
 
 @media (max-width: 860px) {
+  .directions {
+    gap: var(--space-3);
+  }
+
+  .direction {
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
   .hide-md {
     display: none;
   }
 
   .direction__actions {
     width: 100%;
+    gap: var(--space-1);
   }
 
   .direction__actions :deep(.btn) {
@@ -402,9 +412,14 @@ function archiveProgram(program: TrainingProgram) {
 
   .direction .ui-table tr {
     display: grid;
-    gap: var(--space-1);
-    padding: var(--space-3) 0;
+    gap: 2px;
+    padding: var(--space-2) 0;
     border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .direction .ui-table tr:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
   }
 
   .direction .ui-table td {
@@ -423,6 +438,7 @@ function archiveProgram(program: TrainingProgram) {
 
   .direction__row-actions {
     justify-content: flex-start;
+    gap: var(--space-1);
     padding-top: var(--space-1);
   }
 
