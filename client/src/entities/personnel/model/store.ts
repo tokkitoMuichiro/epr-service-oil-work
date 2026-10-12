@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { todayIso } from '@shared/dates'
 import { errorMessage } from '@/shared/api'
+import { reloadStatus } from '@/shared/lib/load-status'
 import { personnelApi, type DocumentUpload } from '../api/personnel'
 import { workerAttention, type EmploymentStatus, type Worker, type WorkerDraft } from './types'
 
@@ -28,7 +29,7 @@ export const usePersonnelStore = defineStore('personnel', () => {
   )
 
   async function load() {
-    status.value = 'loading'
+    status.value = reloadStatus(status.value)
     errorText.value = ''
     try {
       workers.value = await personnelApi.list()

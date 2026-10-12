@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { errorMessage as toMessage } from '@/shared/api'
+import { reloadStatus } from '@/shared/lib/load-status'
 import { equipmentApi } from '../api/equipment'
 import {
   REPAIR_WAREHOUSE_SLUG,
@@ -75,7 +76,7 @@ export const useEquipmentStore = defineStore('equipment', () => {
   }
 
   async function load() {
-    status.value = 'loading'
+    status.value = reloadStatus(status.value)
     errorMessage.value = ''
     actionError.value = ''
     try {

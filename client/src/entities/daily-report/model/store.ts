@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { errorMessage as toMessage } from '@/shared/api'
+import { reloadStatus } from '@/shared/lib/load-status'
 import { dailyReportsApi } from '../api/reports'
 import type { DailyReport, DailyReportDraft, ReportObjectRef, ReportsMode } from './types'
 
@@ -36,7 +37,7 @@ export const useDailyReportsStore = defineStore('daily-reports', () => {
   })
 
   async function load() {
-    status.value = 'loading'
+    status.value = reloadStatus(status.value)
     errorMessage.value = ''
     try {
       const [objs, allReports] = await Promise.all([

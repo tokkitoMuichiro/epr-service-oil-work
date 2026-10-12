@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { ApiError, errorMessage } from '@/shared/api'
+import { reloadStatus } from '@/shared/lib/load-status'
 import { assignmentsApi, brigadesApi } from '../api/brigades'
 import type { AssignmentDraft, AssignmentIssue, Brigade, BrigadeAssignment, BrigadeDraft } from './types'
 
@@ -20,7 +21,7 @@ export const useBrigadesStore = defineStore('brigades', () => {
   const activeBrigades = computed(() => brigades.value.filter((b) => !b.archived))
 
   async function load() {
-    status.value = 'loading'
+    status.value = reloadStatus(status.value)
     errorText.value = ''
     try {
       const [b, a] = await Promise.all([brigadesApi.list(), assignmentsApi.list()])

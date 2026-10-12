@@ -16,6 +16,7 @@ import { AssignTestDialog } from '@/features/training-assign'
 import { errorMessage } from '@/shared/api'
 import { copyText } from '@/shared/lib/clipboard'
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/date'
+import { reloadStatus } from '@/shared/lib/load-status'
 import { useMobilePagination } from '@/shared/lib/pagination'
 import { todayIso } from '@shared/dates'
 import { UiButton, UiDialog, UiPagination, UiState } from '@/shared/ui'
@@ -41,7 +42,7 @@ const canAssign = computed(() => access.can('training_assign'))
 const today = todayIso()
 
 async function load() {
-  status.value = 'loading'
+  status.value = reloadStatus(status.value)
   errorText.value = ''
   try {
     items.value = await trainingApi.assignments()
