@@ -10,12 +10,10 @@ import {
   isInsideTrainingRoot,
   materialMimeType,
   nextDueDate,
-  phoneLast4,
   programLabel,
   programState,
   programTitle,
   scoreAttempt,
-  shortName,
   toPublicQuestion,
   trainingCounters,
   validateElectricalScope,
@@ -340,17 +338,13 @@ describe('helpers', () => {
     assert.equal(programTitle({ code: 'Б' }, ot), 'Охрана труда — Б')
   })
 
-  it('hides personal data on the public page', () => {
-    assert.equal(shortName('Иванов Иван Петрович'), 'Иванов И. П.')
-    assert.equal(phoneLast4('+7 (912) 345-67-89'), '6789')
-  })
-
-  it('builds the message for forwarding', () => {
+  it('builds the message for forwarding without asking for a phone', () => {
     const text = assignmentMessage({ fullName: 'Иванов Иван Петрович', programName: 'Охрана труда — Б', dueDate: '2026-10-08', link: 'https://erp/t/x' })
     assert.equal(
       text,
-      'Иванов Иван, пройдите проверку знаний «Охрана труда — Б» до 08.10.2026: https://erp/t/x. Для входа понадобятся последние 4 цифры вашего телефона.',
+      'Иванов Иван, пройдите проверку знаний «Охрана труда — Б» до 08.10.2026: https://erp/t/x. Ссылка личная — не пересылайте её другим.',
     )
+    assert.doesNotMatch(text, /телефон/)
   })
 
   it('draws a sample of questions and strips correct answers for the worker', () => {

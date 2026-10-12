@@ -13,8 +13,6 @@ export const REASON_NOTE_MIN = 5
 export const ANNUL_REASON_MIN = 5
 /** Answers arriving later than the deadline plus this grace period are rejected. */
 export const ANSWER_GRACE_MS = 30_000
-export const PHONE_ATTEMPTS = 5
-export const PHONE_LOCK_MS = 30 * 60 * 1000
 export const TEST_SESSION_MS = 4 * 60 * 60 * 1000
 
 // ─── Directions and programmes ────────────────────────────────────────────
@@ -517,18 +515,7 @@ export function validateTestAssignmentDraft(draft: Partial<TestAssignmentDraft>,
 export function assignmentMessage(input: { fullName: string; programName: string; dueDate: string; link: string }): string {
   const [last, first] = input.fullName.split(/\s+/)
   const name = [last, first].filter(Boolean).join(' ')
-  return `${name}, пройдите проверку знаний «${input.programName}» до ${formatIsoDate(input.dueDate)}: ${input.link}. Для входа понадобятся последние 4 цифры вашего телефона.`
-}
-
-/** «Иванов И. И.» — the only personal data shown on the public test page. */
-export function shortName(fullName: string): string {
-  const [last, ...rest] = fullName.trim().split(/\s+/)
-  const initials = rest.map((p) => `${p.charAt(0).toUpperCase()}.`).join(' ')
-  return [last, initials].filter(Boolean).join(' ')
-}
-
-export function phoneLast4(phone: string): string {
-  return phone.replace(/\D/g, '').slice(-4)
+  return `${name}, пройдите проверку знаний «${input.programName}» до ${formatIsoDate(input.dueDate)}: ${input.link}. Ссылка личная — не пересылайте её другим.`
 }
 
 // ─── Attempts and scoring ─────────────────────────────────────────────────
@@ -945,8 +932,8 @@ export interface PublicTestView {
   }
   attemptsAllowed: number
   attemptsUsed: number
-  isVerified: boolean
-  lockedUntil: string | null
+  /** The worker pressed «Это я» in this browser; until then only this view is available. */
+  isConfirmed: boolean
   hasActiveAttempt: boolean
   lastResult: PublicResult | null
 }

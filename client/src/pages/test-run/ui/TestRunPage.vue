@@ -16,7 +16,7 @@ import { AppLogo, UiButton } from '@/shared/ui'
 import { useAutosave } from '../model/use-autosave'
 import RunResult from './RunResult.vue'
 
-type Screen = 'loading' | 'gone' | 'error' | 'verify' | 'intro' | 'test' | 'result'
+type Screen = 'loading' | 'gone' | 'error' | 'confirm' | 'intro' | 'test' | 'result'
 
 const route = useRoute()
 const token = computed(() => String(route.params.token ?? ''))
@@ -28,7 +28,6 @@ const attempt = ref<PublicAttempt | null>(null)
 const result = ref<PublicResult | null>(null)
 const answers = ref<Record<string, string[]>>({})
 const current = ref(0)
-const digits = ref('')
 const message = ref('')
 const busy = ref(false)
 const isConfirmOpen = ref(false)
@@ -74,8 +73,8 @@ async function resolveScreen() {
     message.value = v.status === 'expired' ? 'Срок прохождения истёк — ссылка больше недействительна' : 'Ссылка больше недействительна'
     return
   }
-  if (!v.isVerified) {
-    screen.value = 'verify'
+  if (!v.isConfirmed) {
+    screen.value = 'confirm'
     return
   }
   if (v.hasActiveAttempt) {
@@ -91,16 +90,11 @@ async function resolveScreen() {
   screen.value = 'intro'
 }
 
-async function verify() {
-  if (!/^\d{4}$/.test(digits.value)) {
-    message.value = 'Введите 4 цифры'
-    return
-  }
+async function confirm() {
   busy.value = true
   message.value = ''
   try {
-    view.value = await publicTestApi.verify(token.value, digits.value)
-    digits.value = ''
+    view.value = await publicTestApi.confirm(token.value)
     await resolveScreen()
   } catch (e) {
     fail(e)
@@ -263,30 +257,19 @@ onBeforeUnmount(() => {
     </section>
 
     <template v-else-if="view">
-      <section v-if="screen === 'verify'" class="run__card">
-        <p class="run__hello">Здравствуйте, {{ view.workerName }}!</p>
+      <section v-if="screen === 'confirm'" class="run__card">
         <h1 class="run__title">{{ view.programTitle }}</h1>
         <p class="run__text">
           {{ view.kind === 'extraordinary' ? 'Внеочередная проверка знаний' : 'Проверка знаний' }}
           <template v-if="view.reasonLabel"> ({{ view.reasonLabel }})</template> — пройти до {{ formatDateRu(view.dueDate) }}.
         </p>
-        <form class="run__verify" @submit.prevent="verify">
-          <label for="phone-digits" class="run__label">Для входа введите последние 4 цифры вашего телефона</label>
-          <input
-            id="phone-digits"
-            v-model="digits"
-            class="run__digits"
-            type="text"
-            inputmode="numeric"
-            autocomplete="off"
-            pattern="\d{4}"
-            maxlength="4"
-            placeholder="••••"
-            :aria-invalid="Boolean(message)"
-          />
-          <p v-if="message" class="run__error" role="alert">{{ message }}</p>
-          <UiButton type="submit" variant="primary" class="run__wide" :disabled="busy">{{ busy ? 'Проверяем…' : 'Войти' }}</UiButton>
-        </form>
+        <div class="run__person">
+          <span class="run__label">Ссылка выдана сотруднику</span>
+          <strong class="run__person-name">{{ view.workerName }}</strong>
+        </div>
+        <p v-if="message" class="run__error" role="alert">{{ message }}</p>
+        <UiButton variant="primary" class="run__wide" :disabled="busy" @click="confirm">{{ busy ? 'Открываем…' : 'Это я' }}</UiButton>
+        <p class="run__hint">Если это не вы — закройте страницу и сообщите тому, кто прислал ссылку.</p>
       </section>
 
       <section v-else-if="screen === 'intro'" class="run__card">
@@ -468,33 +451,25 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 
-.run__verify {
+.run__person {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-1);
   margin-top: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--surface-app);
 }
 
 .run__label {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
   font-weight: 600;
-  line-height: var(--line-height-base);
 }
 
-.run__digits {
-  width: 100%;
-  min-height: 56px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--surface-card);
-  color: var(--text-primary);
-  font-size: var(--font-size-2xl);
-  letter-spacing: 0.4em;
-  text-align: center;
-}
-
-.run__digits:focus {
-  border-color: var(--accent);
-  outline: none;
-  box-shadow: 0 0 0 3px var(--focus-ring);
+.run__person-name {
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-tight);
 }
 
 .run__error {
