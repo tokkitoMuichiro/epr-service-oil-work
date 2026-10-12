@@ -14,8 +14,12 @@ export interface AssignmentRecord extends TestAssignment {
   tokenHash: string
   /** AES-GCM encrypted token, to show the same link again. */
   tokenSecret: string
-  phoneFailures: number
-  lockedUntil: number
+}
+
+/** Counters of the dropped phone check, still stored in databases created before it was removed. */
+export interface LegacyAssignmentFields {
+  phoneFailures?: number
+  lockedUntil?: number
 }
 
 export interface TrainingState {

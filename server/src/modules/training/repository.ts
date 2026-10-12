@@ -7,8 +7,6 @@ import {
   EXTRAORDINARY_REASON_SHORT,
   IMAGE_MAX_BYTES,
   MATERIAL_MAX_BYTES,
-  PHONE_ATTEMPTS,
-  PHONE_LOCK_MS,
   SKIP_REASON_LABEL,
   TEST_IMAGES_FOLDER,
   TEST_SESSION_MS,
@@ -23,12 +21,10 @@ import {
   isImageFile,
   materialMimeType,
   nextDueDate,
-  phoneLast4,
   programLabel,
   programTitle,
   questionsPerAttempt,
   scoreAttempt,
-  shortName,
   testSummary,
   toPublicQuestion,
   todayIso,
@@ -77,7 +73,7 @@ import {
   type TrainingTest,
 } from '../../shared.js'
 import { isFileUnavailable, type StorageFolder, type TrainingStorage } from './bitrix.js'
-import { emptyTraining, type AssignmentRecord, type TrainingState } from './model.js'
+import { emptyTraining, type AssignmentRecord, type LegacyAssignmentFields, type TrainingState } from './model.js'
 
 export interface TrainingWorker {
   id: string
@@ -207,7 +203,8 @@ function contentOf(test: TrainingTest): TestContent {
 }
 
 function toAssignment(record: AssignmentRecord, today: string): TestAssignment {
-  const { tokenHash: _hash, tokenSecret: _secret, phoneFailures: _failures, lockedUntil: _locked, ...rest } = record
+  const { tokenHash: _hash, tokenSecret: _secret, phoneFailures: _failures, lockedUntil: _locked, ...rest } = record as AssignmentRecord &
+    LegacyAssignmentFields
   return { ...structuredClone(rest), status: assignmentStatus(record, today) }
 }
 
@@ -321,8 +318,6 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
     const token = randomBytes(24).toString('base64url')
     record.tokenHash = hashToken(token)
     record.tokenSecret = encrypt(token)
-    record.phoneFailures = 0
-    record.lockedUntil = 0
     for (const [id, session] of sessions) if (session.assignmentId === record.id) sessions.delete(id)
     return token
   }
@@ -469,8 +464,8 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
     return true
   }
 
-  function requireVerified(record: AssignmentRecord, sessionToken: string | null) {
-    if (!sessionOf(record, sessionToken)) forbidden('Подтвердите личность: введите последние 4 цифры телефона')
+  function requireConfirmed(record: AssignmentRecord, sessionToken: string | null) {
+    if (!sessionOf(record, sessionToken)) forbidden('Подтвердите, что это вы: откройте ссылку заново и нажмите «Это я»')
   }
 
   function requireOpen(record: AssignmentRecord) {
@@ -881,8 +876,6 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
           cancelReason: '',
           tokenHash: '',
           tokenSecret: '',
-          phoneFailures: 0,
-          lockedUntil: 0,
         }
         const token = issueToken(record)
         state.assignments.push(record)
@@ -995,7 +988,7 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
       const worker = workerMap().get(record.workerId)
       return {
         status: assignmentStatus(record, today()),
-        workerName: shortName(worker?.fullName ?? ''),
+        workerName: worker?.fullName ?? '',
         programTitle: titleOf(record.programId),
         kind: record.kind,
         reasonLabel: record.reason ? EXTRAORDINARY_REASON_SHORT[record.reason as ExtraordinaryReason] : null,
@@ -1011,31 +1004,15 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
         },
         attemptsAllowed: record.attemptsAllowed,
         attemptsUsed: record.attemptsUsed,
-        isVerified: sessionOf(record, sessionToken),
-        lockedUntil: record.lockedUntil > now() ? new Date(record.lockedUntil).toISOString() : null,
+        isConfirmed: sessionOf(record, sessionToken),
         hasActiveAttempt: Boolean(activeAttempt(record.id)),
         lastResult: publicResult(record),
       }
     },
 
-    verify(token: string, value: unknown): { sessionToken: string; expiresAt: number } {
+    confirm(token: string): { sessionToken: string; expiresAt: number } {
       const record = byToken(token)
       requireOpen(record)
-      if (record.lockedUntil > now()) throw new HttpError(423, 'Слишком много попыток ввода, повторите через 30 минут')
-      const worker = workerMap().get(record.workerId)
-      const expected = phoneLast4(worker?.phone ?? '')
-      if (expected.length < 4) conflict('В карточке сотрудника нет телефона — обратитесь к тому, кто прислал ссылку')
-      const entered = typeof value === 'string' ? value.replace(/\D/g, '') : ''
-      if (entered.length !== 4 || !sameHash(entered, expected)) {
-        record.phoneFailures += 1
-        if (record.phoneFailures >= PHONE_ATTEMPTS) {
-          record.phoneFailures = 0
-          record.lockedUntil = now() + PHONE_LOCK_MS
-          throw new HttpError(423, 'Слишком много попыток ввода, повторите через 30 минут')
-        }
-        badRequest(`Цифры не совпадают. Осталось попыток: ${PHONE_ATTEMPTS - record.phoneFailures}`)
-      }
-      record.phoneFailures = 0
       if (record.status === 'assigned') record.status = 'opened'
       const sessionToken = randomBytes(24).toString('base64url')
       const expiresAt = now() + TEST_SESSION_MS
@@ -1046,7 +1023,7 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
 
     publicMaterials(token: string, sessionToken: string | null): PublicMaterial[] {
       const record = byToken(token)
-      requireVerified(record, sessionToken)
+      requireConfirmed(record, sessionToken)
       const content = versionOf(record)
       return content.materialIds.flatMap((id) => {
         const material = state.materials.find((m) => m.id === id)
@@ -1067,7 +1044,7 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
 
     async publicMaterialFile(token: string, sessionToken: string | null, materialId: string): Promise<{ material: TrainingMaterial; file: StoredFile }> {
       const record = byToken(token)
-      requireVerified(record, sessionToken)
+      requireConfirmed(record, sessionToken)
       if (activeAttempt(record.id)) conflict('Во время теста материалы недоступны')
       if (!versionOf(record).materialIds.includes(materialId)) notFound('Материал не найден')
       const material = findMaterial(materialId)
@@ -1078,7 +1055,7 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
 
     async publicImage(token: string, sessionToken: string | null, fileId: string): Promise<StoredFile> {
       const record = byToken(token)
-      requireVerified(record, sessionToken)
+      requireConfirmed(record, sessionToken)
       const attempts = state.attempts.filter((a) => a.assignmentId === record.id)
       if (!attempts.some((a) => a.questionSnapshot.some((q) => q.image?.fileId === fileId))) notFound('Картинка не найдена')
       return disk.getFile(fileId)
@@ -1086,7 +1063,7 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
 
     start(token: string, sessionToken: string | null, userAgent: string): PublicAttempt {
       const record = byToken(token)
-      requireVerified(record, sessionToken)
+      requireConfirmed(record, sessionToken)
       const current = activeAttempt(record.id)
       if (current) return publicAttempt(current)
       requireOpen(record)
@@ -1119,7 +1096,7 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
 
     answer(token: string, sessionToken: string | null, questionId: string, value: unknown): { questionId: string; optionIds: string[] } {
       const record = byToken(token)
-      requireVerified(record, sessionToken)
+      requireConfirmed(record, sessionToken)
       const attempt = activeAttempt(record.id)
       if (!attempt) {
         if (lastFinishedAttempt(record.id)?.finishReason === 'timeout') conflict('Время на тест истекло — ответы больше не принимаются')
@@ -1136,7 +1113,7 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
 
     finish(token: string, sessionToken: string | null): PublicResult {
       const record = byToken(token)
-      requireVerified(record, sessionToken)
+      requireConfirmed(record, sessionToken)
       const attempt = activeAttempt(record.id)
       if (attempt) finalize(record, attempt, 'submitted')
       return publicResult(record) ?? conflict('Тест не начат')
@@ -1165,7 +1142,7 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
       'cancelForWorker',
       'annulRecord',
       'publicView',
-      'verify',
+      'confirm',
       'publicMaterialFile',
       'start',
       'answer',

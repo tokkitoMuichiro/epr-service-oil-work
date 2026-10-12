@@ -190,8 +190,6 @@ function demoHistory(): Pick<TrainingState, 'assignments' | 'records'> {
     cancelReason: '',
     tokenHash: '',
     tokenSecret: '',
-    phoneFailures: 0,
-    lockedUntil: 0,
   }))
   const records: CertificationRecord[] = DEMO_RESULTS.map((r) => ({
     id: `rec-${r.id}`,

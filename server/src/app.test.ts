@@ -717,9 +717,8 @@ describe('training', () => {
     await training.close()
   })
 
-  async function phoneLast4Of(workerId: string): Promise<string> {
-    const worker = (await training.call('GET', `/api/personnel/${workerId}`)).json.item as Worker
-    return worker.phone.replace(/\D/g, '').slice(-4)
+  async function workerOf(workerId: string): Promise<Worker> {
+    return (await training.call('GET', `/api/personnel/${workerId}`)).json.item as Worker
   }
 
   async function assign(workerIds: string[], extra: Record<string, unknown> = {}) {
@@ -738,16 +737,13 @@ describe('training', () => {
     return token
   }
 
-  async function verified(token: string, digits: string): Promise<{ cookie: string }> {
-    const response = await fetch(`${training.base}/api/public/test/${token}/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneLast4: digits }),
-    })
+  async function confirmed(token: string): Promise<{ cookie: string; item: Record<string, unknown> }> {
+    const response = await fetch(`${training.base}/api/public/test/${token}/confirm`, { method: 'POST' })
     assert.equal(response.status, 200)
     const match = /erp_test=[^;]+/.exec(response.headers.get('set-cookie') ?? '')
     assert.ok(match, 'test session cookie is set')
-    return { cookie: match[0] }
+    assert.match(response.headers.get('set-cookie') ?? '', /HttpOnly/i)
+    return { cookie: match[0], item: ((await response.json()) as { item: Record<string, unknown> }).item }
   }
 
   it('requires training permissions for management and assignment', async () => {
@@ -768,20 +764,27 @@ describe('training', () => {
     assert.equal(result.status, 201)
     const [created] = result.json.created
     assert.match(created.link, /^https:\/\/erp\.example\/t\//)
-    assert.match(created.message, /последние 4 цифры вашего телефона/)
+    assert.doesNotMatch(created.message, /телефон/)
     const token = tokenOf(created.link)
-    const digits = await phoneLast4Of('p-4')
+    const worker = await workerOf('p-4')
 
     const view = await training.call('GET', `/api/public/test/${token}`, null)
     assert.equal(view.status, 200)
-    assert.equal(view.json.item.isVerified, false)
-    assert.ok(!view.text.includes(digits), 'the phone is never returned')
-    assert.equal((await training.call('POST', `/api/public/test/${token}/start`, null)).status, 403)
+    assert.equal(view.json.item.isConfirmed, false)
+    assert.equal(view.json.item.workerName, worker.fullName, 'the worker sees the full name to confirm it is them')
+    assert.ok(worker.phone && !view.text.includes(worker.phone), 'the phone is never returned')
+    assert.ok(!/phone|snils/i.test(view.text), 'no personal data besides the name')
+    for (const path of ['materials', 'start', 'finish']) {
+      const method = path === 'materials' ? 'GET' : 'POST'
+      assert.equal((await training.call(method, `/api/public/test/${token}/${path}`, null)).status, 403, `${path} needs «Это я»`)
+    }
 
-    const wrong = String((Number(digits) + 1) % 10000).padStart(4, '0')
-    assert.equal((await training.call('POST', `/api/public/test/${token}/verify`, null, { phoneLast4: wrong })).status, 400)
+    const session = await confirmed(token)
+    assert.equal(session.item.isConfirmed, true)
+    assert.equal(session.item.status, 'opened')
+    assert.equal((await training.call('GET', `/api/public/test/${token}`, session)).json.item.isConfirmed, true)
+    assert.equal((await training.call('POST', `/api/public/test/${token}/start`, { cookie: 'erp_test=forged' })).status, 403)
 
-    const session = await verified(token, digits)
     const started = await training.call('POST', `/api/public/test/${token}/start`, session)
     assert.equal(started.status, 200)
     assert.ok(!/correctOptionIds|explanation/.test(started.text), 'no correct answers before finishing')
@@ -803,22 +806,51 @@ describe('training', () => {
 
     const restart = await training.call('POST', `/api/public/test/${token}/start`, session)
     assert.equal(restart.status, 409)
+    assert.equal((await training.call('POST', `/api/public/test/${token}/confirm`, null)).status, 409, 'a finished check cannot be reopened')
 
     const certs = (await training.call('GET', '/api/training/workers/p-4/certifications')).json.item
     const fire = certs.statuses.find((s: { programId: string }) => s.programId === 'pr-fire')
     assert.equal(fire.state, 'valid')
   })
 
-  it('locks the link after five wrong phone digits', async () => {
+  it('confirms «Это я» only for a live link and drops the session when the link is reissued', async () => {
+    assert.equal((await training.call('POST', '/api/public/test/unknown-token/confirm', null)).status, 410)
+
     const [created] = (await assign(['p-9'])).json.created
     const token = tokenOf(created.link)
-    const digits = await phoneLast4Of('p-9')
-    const wrong = String((Number(digits) + 1) % 10000).padStart(4, '0')
-    for (let i = 0; i < 4; i += 1) {
-      assert.equal((await training.call('POST', `/api/public/test/${token}/verify`, null, { phoneLast4: wrong })).status, 400)
+    const session = await confirmed(token)
+    assert.equal((await training.call('GET', `/api/public/test/${token}/materials`, session)).status, 200)
+
+    const reissued = await training.call('POST', `/api/training/assignments/${created.assignment.id}/reissue`, 'admin')
+    assert.equal(reissued.status, 200)
+    assert.equal((await training.call('GET', `/api/public/test/${token}`, null)).status, 410, 'the old link stops working')
+    const fresh = tokenOf(reissued.json.item.link)
+    assert.equal((await training.call('GET', `/api/public/test/${fresh}`, session)).json.item.isConfirmed, false, 'old session is not carried over')
+
+    const cancelled = await training.call('POST', `/api/training/assignments/${created.assignment.id}/cancel`, 'admin', { reason: 'Тест' })
+    assert.equal(cancelled.status, 200)
+    assert.equal((await training.call('POST', `/api/public/test/${fresh}/confirm`, null)).status, 410)
+  })
+
+  it('refuses «Это я» after the due date', async () => {
+    let today = TODAY
+    const clocked = await startApp({ publicUrl: 'https://erp.example', today: () => today })
+    try {
+      const assigned = await clocked.call('POST', '/api/training/assignments', 'admin', {
+        testId: 'test-fire',
+        workerIds: ['p-10'],
+        dueDate: '2026-09-30',
+        kind: 'regular',
+      })
+      const token = tokenOf(assigned.json.created[0].link)
+      assert.equal((await clocked.call('GET', `/api/public/test/${token}`, null)).json.item.status, 'opened')
+      today = '2026-10-01'
+      const view = await clocked.call('GET', `/api/public/test/${token}`, null)
+      assert.equal(view.json.item.status, 'expired')
+      assert.equal((await clocked.call('POST', `/api/public/test/${token}/confirm`, null)).status, 410)
+    } finally {
+      await clocked.close()
     }
-    assert.equal((await training.call('POST', `/api/public/test/${token}/verify`, null, { phoneLast4: wrong })).status, 423)
-    assert.equal((await training.call('POST', `/api/public/test/${token}/verify`, null, { phoneLast4: digits })).status, 423)
   })
 
   it('replaces a regular check with an extraordinary one and skips duplicates', async () => {

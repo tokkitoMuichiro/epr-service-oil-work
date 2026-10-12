@@ -61,8 +61,8 @@ export function publicTestRouter(repo: TrainingRepository, options: { secureCook
     res.json({ item: repo.publicView(token(req), session(req)) })
   })
 
-  router.post('/verify', (req, res) => {
-    const { sessionToken } = repo.verify(token(req), req.body?.phoneLast4)
+  router.post('/confirm', (req, res) => {
+    const { sessionToken } = repo.confirm(token(req))
     res.cookie(TEST_COOKIE, sessionToken, { ...cookieOptions(req), maxAge: TEST_SESSION_MS })
     res.json({ item: repo.publicView(token(req), sessionToken) })
   })

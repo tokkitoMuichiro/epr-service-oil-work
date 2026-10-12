@@ -13,8 +13,8 @@ export const publicTestApi = {
     return (await http.get<Item<PublicTestView>>(base(token))).item
   },
 
-  async verify(token: string, phoneLast4: string): Promise<PublicTestView> {
-    return (await http.post<Item<PublicTestView>>(`${base(token)}/verify`, { phoneLast4 })).item
+  async confirm(token: string): Promise<PublicTestView> {
+    return (await http.post<Item<PublicTestView>>(`${base(token)}/confirm`)).item
   },
 
   async materials(token: string): Promise<PublicMaterial[]> {
