@@ -12,15 +12,21 @@ import {
   trimmed,
 } from '../../http.js'
 import { isRoleId, normalizeLogin, safeRedirectPath, type BitrixLoginError, type SessionView } from '../../shared.js'
+import { log } from '../../log.js'
+import { rateLimit } from '../../security.js'
 import type { AccessStore } from '../access/store.js'
 import { BitrixLoginFailure, type BitrixDirectory, type BitrixSso } from './bitrix.js'
 import { SESSION_TTL_MS, type UserRepository } from './repository.js'
+import type { BitrixUserSync } from './sync.js'
 
 export const SESSION_COOKIE = 'erp_session'
 export const BITRIX_STATE_COOKIE = 'erp_bitrix_state'
 
 const MAX_FAILURES = 5
 const LOCK_MS = 5 * 60 * 1000
+const MAX_IP_FAILURES = 20
+const IP_LOCK_MS = 15 * 60 * 1000
+const MAX_TRACKED = 10_000
 const BITRIX_STATE_TTL_MS = 10 * 60 * 1000
 const BITRIX_COOKIE_PATH = '/api/auth/bitrix'
 
@@ -87,6 +93,10 @@ export const requireSession: RequestHandler = (req, _res, next) => {
 export function authRouter(users: UserRepository, options: AuthOptions) {
   const router = Router()
   const failures = new Map<string, { count: number; lockedUntil: number }>()
+  /** Password guessing across many logins from one address. */
+  const ipFailures = new Map<string, { count: number; lockedUntil: number }>()
+  const loginLimit = rateLimit({ windowMs: 60_000, max: 30 })
+  const bitrixLimit = rateLimit({ windowMs: 60_000, max: 60 })
 
   function cookieOptions(req: Request): CookieOptions {
     return {
@@ -122,6 +132,8 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
     const query = new URLSearchParams({ bitrixError: code, ...(to === '/' ? {} : { redirect: to }) })
     res.redirect(`/login?${query}`)
   }
+
+  router.use('/bitrix', bitrixLimit)
 
   router.get('/bitrix/start', (req, res) => {
     const to = safeRedirectPath(req.query.to)
@@ -161,7 +173,7 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
       if (!portalUser.isActive) return bitrixFailed(res, 'blocked', entry.to)
       portalUserId = portalUser.id
     } catch (error) {
-      console.warn('Вход через Битрикс24 не удался', error instanceof Error ? error.message : error)
+      log.warn('Вход через Битрикс24 не удался', error)
       return bitrixFailed(res, error instanceof BitrixLoginFailure ? error.code : 'failed', entry.to)
     }
     const user = users.byBitrixUserId(portalUserId)
@@ -171,18 +183,26 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
     res.redirect(entry.to)
   })
 
-  router.post('/login', (req, res) => {
+  router.post('/login', loginLimit, (req, res) => {
     const login = normalizeLogin(trimmed(req.body?.login))
     const password = typeof req.body?.password === 'string' ? req.body.password : ''
     if (!login || !password) badRequest('Введите логин и пароль')
+    const now = Date.now()
     const state = failures.get(login)
-    if (state && state.lockedUntil > Date.now()) {
+    const ip = req.ip ?? 'unknown'
+    const ipState = ipFailures.get(ip)
+    if ((state && state.lockedUntil > now) || (ipState && ipState.lockedUntil > now)) {
       throw new HttpError(429, 'Слишком много неудачных попыток. Повторите через несколько минут')
     }
     const user = users.authenticate(login, password)
     if (!user) {
+      if (failures.size > MAX_TRACKED || ipFailures.size > MAX_TRACKED) {
+        for (const map of [failures, ipFailures]) for (const [k, v] of map) if (v.lockedUntil < now) map.delete(k)
+      }
       const count = (state?.count ?? 0) + 1
-      failures.set(login, { count, lockedUntil: count >= MAX_FAILURES ? Date.now() + LOCK_MS : 0 })
+      failures.set(login, { count, lockedUntil: count >= MAX_FAILURES ? now + LOCK_MS : 0 })
+      const ipCount = (ipState?.count ?? 0) + 1
+      ipFailures.set(ip, { count: ipCount, lockedUntil: ipCount >= MAX_IP_FAILURES ? now + IP_LOCK_MS : 0 })
       throw new HttpError(401, 'Неверный логин или пароль')
     }
     failures.delete(login)
@@ -197,7 +217,7 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
     res.status(204).end()
   })
 
-  router.post('/dev-login', (req, res) => {
+  router.post('/dev-login', loginLimit, (req, res) => {
     if (!options.devLogin) notFound('Метод API не найден')
     const role = req.body?.role
     if (!isRoleId(role)) badRequest('Неизвестная роль')
@@ -209,7 +229,7 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
   return router
 }
 
-export function usersRouter(users: UserRepository, access: AccessStore, directory: BitrixDirectory) {
+export function usersRouter(users: UserRepository, access: AccessStore, directory: BitrixDirectory, userSync: BitrixUserSync) {
   const router = Router()
 
   router.use((req, _res, next) => {
@@ -223,6 +243,10 @@ export function usersRouter(users: UserRepository, access: AccessStore, director
 
   router.get('/bitrix', async (req, res) => {
     res.json({ items: await directory.search(trimmed(req.query.q)) })
+  })
+
+  router.post('/bitrix/sync', async (_req, res) => {
+    res.json({ item: await userSync.run() })
   })
 
   router.post('/', (req, res) => {

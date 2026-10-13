@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import cors from 'cors'
 import express from 'express'
@@ -7,10 +7,13 @@ import { createDisk, type BitrixConfig, type Disk } from './disk/index.js'
 import { diskRouter } from './disk/router.js'
 import { createDiskSync, scheduleDiskSync } from './disk/sync.js'
 import { errorHandler, notFound } from './http.js'
+import { log } from './log.js'
+import { securityHeaders, spaContentSecurityPolicy } from './security.js'
 import { accessRouter } from './modules/access/router.js'
 import { createAccessStore } from './modules/access/store.js'
 import { bitrixDirectoryFromConfig, bitrixSsoFromConfig } from './modules/auth/bitrix.js'
 import { createUserRepository } from './modules/auth/repository.js'
+import { createBitrixUserSync } from './modules/auth/sync.js'
 import { authRouter, authenticate, requireSession, usersRouter } from './modules/auth/router.js'
 import { createContractsRepository } from './modules/contracts/repository.js'
 import { contractsRouter } from './modules/contracts/router.js'
@@ -89,8 +92,10 @@ export function createApp(options: AppOptions = {}) {
     audit,
   })
   const diskSync = createDiskSync(disk, [personnel, equipment, training], audit)
+  const bitrixUserSync = createBitrixUserSync(bitrixDirectory, users, audit)
   if (options.diskSyncMs) {
-    scheduleDiskSync(diskSync, options.diskSyncMs, (error) => console.error('Синхронизация с Диском Битрикс не удалась', error))
+    scheduleDiskSync(diskSync, options.diskSyncMs, (error) => log.error('Синхронизация с Диском Битрикс не удалась', error))
+    scheduleDiskSync(bitrixUserSync, options.diskSyncMs, (error) => log.error('Проверка уволенных в Битрикс24 не удалась', error))
   }
 
   if (options.admin) {
@@ -101,12 +106,7 @@ export function createApp(options: AppOptions = {}) {
   const app = express()
   app.disable('x-powered-by')
   if (options.trustProxy) app.set('trust proxy', 1)
-  app.use((_req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff')
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN')
-    res.setHeader('Referrer-Policy', 'same-origin')
-    next()
-  })
+  app.use(securityHeaders)
   if (options.corsOrigins?.length) app.use(cors({ origin: options.corsOrigins, credentials: true }))
   app.use(express.json({ limit: '1mb' }))
 
@@ -143,7 +143,7 @@ export function createApp(options: AppOptions = {}) {
   )
   api.use('/public/test/:token', publicTestRouter(training, { secureCookies: options.secureCookies }))
   api.use(requireSession)
-  api.use('/users', usersRouter(users, access, bitrixDirectory))
+  api.use('/users', usersRouter(users, access, bitrixDirectory, bitrixUserSync))
   api.use('/disk', diskRouter(disk, diskSync, access))
   api.use('/access', accessRouter(access))
   api.use(
@@ -169,6 +169,8 @@ export function createApp(options: AppOptions = {}) {
 
   const clientDist = options.clientDist ? path.resolve(options.clientDist) : null
   if (clientDist && existsSync(clientDist)) {
+    const indexFile = path.join(clientDist, 'index.html')
+    const csp = spaContentSecurityPolicy(existsSync(indexFile) ? readFileSync(indexFile, 'utf8') : '')
     app.use(
       express.static(clientDist, {
         index: false,
@@ -181,7 +183,8 @@ export function createApp(options: AppOptions = {}) {
     )
     app.get(/^(?!\/api\/|\/health$).*/, (_req, res) => {
       res.setHeader('Cache-Control', 'no-cache')
-      res.sendFile(path.join(clientDist, 'index.html'))
+      res.setHeader('Content-Security-Policy', csp)
+      res.sendFile(indexFile)
     })
   }
 

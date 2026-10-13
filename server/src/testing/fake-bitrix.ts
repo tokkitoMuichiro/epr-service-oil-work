@@ -118,7 +118,9 @@ export function createFakeBitrix() {
         return { result, result_error: errors }
       }
       case 'user.get':
-        return [...users.values()].filter((u) => !params.ID || u.ID === String(params.ID))
+        return [...users.values()].filter(
+          (u) => (!params.ID || u.ID === String(params.ID)) && (params.FILTER?.ACTIVE === undefined || u.ACTIVE === params.FILTER.ACTIVE),
+        )
       case 'user.search': {
         const find = String(params.FIND ?? '').toLowerCase()
         return [...users.values()].filter((u) => `${u.LAST_NAME} ${u.NAME} ${u.EMAIL}`.toLowerCase().includes(find))

@@ -1,4 +1,5 @@
 import express, { type ErrorRequestHandler, type Request, type Response } from 'express'
+import { log } from './log.js'
 import type { RoleId, User } from './shared.js'
 
 export interface StoredFile {
@@ -103,7 +104,7 @@ export function sendFile(res: Response, file: StoredFile, fileName?: string) {
   res.end(file.data)
 }
 
-export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   if (err instanceof HttpError) {
     res.status(err.status).json({ ...err.details, error: err.message })
     return
@@ -116,6 +117,6 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     res.status(400).json({ error: 'Некорректный JSON в запросе' })
     return
   }
-  console.error(err)
+  log.error(`${req.method} ${req.path}: внутренняя ошибка`, err)
   res.status(500).json({ error: 'Внутренняя ошибка сервера' })
 }

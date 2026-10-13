@@ -2,6 +2,7 @@ import { backupDatabase, copyBackupToDisk, pruneBackups } from './backup.js'
 import { openDatabase } from './db.js'
 import { bitrixConfigFromEnv } from './disk/env.js'
 import { createLiveDisk } from './disk/live.js'
+import { log } from './log.js'
 
 const dbPath = process.env.DB_PATH || 'data/erp.sqlite'
 const dir = process.env.BACKUP_DIR || 'data/backups'
@@ -14,7 +15,7 @@ let file: string
 try {
   file = backupDatabase(db, dir, label)
   const removed = pruneBackups(dir, keepDays)
-  console.log(`Backup: ${file}${removed.length ? `; removed old: ${removed.length}` : ''}`)
+  log.info('Бэкап создан', { file, removedOld: removed.length })
 } finally {
   db.close()
 }
@@ -24,9 +25,9 @@ if (bitrix.mode === 'live' && bitrix.webhookUrl && !label.startsWith('pre-')) {
   try {
     const disk = createLiveDisk({ webhookUrl: bitrix.webhookUrl, rootFolderId: bitrix.rootFolderId || undefined })
     const copy = await copyBackupToDisk(disk, file, keepDays)
-    console.log(`Bitrix Disk: ${copy.path}${copy.removed.length ? `; moved to trash: ${copy.removed.length}` : ''}`)
+    log.info('Копия бэкапа на Диске Битрикс', { path: copy.path, movedToTrash: copy.removed.length })
   } catch (error) {
-    console.error('Копия на Диск Битрикс не создана — локальная копия есть', error)
+    log.error('Копия на Диск Битрикс не создана — локальная копия есть', error)
     process.exitCode = 1
   }
 }

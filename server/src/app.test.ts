@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import type { Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -643,7 +644,44 @@ describe('authentication', () => {
     const response = await call('GET', '/health', null)
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff')
     assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN')
+    assert.equal(response.headers.get('cross-origin-opener-policy'), 'same-origin')
+    assert.match(response.headers.get('permissions-policy') ?? '', /camera=\(\)/)
     assert.equal(response.headers.get('x-powered-by'), null)
+  })
+
+  it('serves the SPA with a CSP that allows only its own inline theme script', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'erp-dist-'))
+    const theme = "document.documentElement.dataset.theme = 'light'"
+    writeFileSync(path.join(dir, 'index.html'), `<html><head><script>${theme}</script><script type="module" src="/assets/app.js"></script></head></html>`)
+    const spa = await startApp({ clientDist: dir })
+    try {
+      const page = await fetch(`${spa.base}/equipment/mine`)
+      assert.equal(page.status, 200)
+      const csp = page.headers.get('content-security-policy') ?? ''
+      const hash = createHash('sha256').update(theme).digest('base64')
+      assert.match(csp, new RegExp(`script-src 'self' 'sha256-${hash.replace(/[+/=]/g, '\\$&')}'(;|$)`))
+      assert.match(csp, /object-src 'none'/)
+      assert.match(csp, /frame-ancestors 'self'/)
+      assert.doesNotMatch(csp, /unsafe-eval/)
+      assert.equal((await fetch(`${spa.base}/api/auth/session`)).headers.get('content-security-policy'), null, 'API files are not affected')
+    } finally {
+      await spa.close()
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('locks out an address that guesses passwords across many logins', async () => {
+    const isolated = await startApp({ devLogin: false, admin: { login: 'root', password: 'корневой-пароль' } })
+    try {
+      for (let i = 0; i < 20; i += 1) {
+        const wrong = await isolated.call('POST', '/api/auth/login', null, { login: `guess${i}`, password: 'не-угадал' })
+        assert.equal(wrong.status, 401)
+      }
+      const locked = await isolated.call('POST', '/api/auth/login', null, { login: 'root', password: 'корневой-пароль' })
+      assert.equal(locked.status, 429, 'even the right password waits after 20 failures from one IP')
+    } finally {
+      await isolated.close()
+    }
   })
 
   it('ignores the role header: no session means 401, the header never grants PII', async () => {
@@ -855,6 +893,23 @@ describe('bitrix sign-in', () => {
     const byId = (await sso.call('GET', '/api/users/bitrix?q=57')).json.items
     assert.equal(byId[0].isActive, false, 'lookup by ID shows fired users too')
     assert.deepEqual((await sso.call('GET', '/api/users/bitrix?q=Орлов')).json.items, [], 'search hides fired users')
+  })
+
+  it('disables accounts of users fired in Bitrix24 and ends their sessions', async () => {
+    bitrix.addUser('77', 'Временный', 'Пётр')
+    const created = await createUser({ login: 'temp.worker', fullName: 'Временный Пётр', bitrixUserId: '77' })
+    const { session } = await signIn('77')
+    assert.ok(session)
+    assert.equal((await sso.call('POST', '/api/users/bitrix/sync', 'master')).status, 403)
+    const before = (await sso.call('POST', '/api/users/bitrix/sync')).json.item.disabled as string[]
+    assert.ok(!before.includes('temp.worker'), 'still active in Bitrix24')
+
+    bitrix.addUser('77', 'Временный', 'Пётр', false)
+    const result = (await sso.call('POST', '/api/users/bitrix/sync')).json.item
+    assert.ok(result.disabled.includes('temp.worker'))
+    assert.equal((await sso.call('GET', '/api/auth/session', { cookie: session })).json.item.user, null, 'the open session ends')
+    const users = (await sso.call('GET', '/api/users')).json.items as User[]
+    assert.equal(users.find((u) => u.id === created.json.item.id)?.active, false)
   })
 
   it('keeps an account reachable: unlinking needs a password', async () => {
