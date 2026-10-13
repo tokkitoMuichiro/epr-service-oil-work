@@ -42,6 +42,8 @@ export class BitrixLoginFailure extends Error {
 
 /** «Войти через Битрикс24»: OAuth 2.0 authorization code of a local server application. */
 export interface BitrixSso {
+  /** Origin of the portal, e.g. https://company.bitrix24.ru */
+  readonly portal: string
   authorizeUrl(state: string): string
   /** Exchanges the code for the Bitrix24 user who granted it; throws {@link BitrixLoginFailure}. */
   userByCode(code: string): Promise<BitrixPortalUser>
@@ -99,6 +101,8 @@ export function createBitrixSso(options: BitrixSsoOptions): BitrixSso {
   }
 
   return {
+    portal,
+
     authorizeUrl(state) {
       const url = new URL('/oauth/authorize/', portal)
       url.searchParams.set('client_id', options.clientId)

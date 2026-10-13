@@ -769,6 +769,24 @@ describe('bitrix sign-in', () => {
     assert.ok(state.length >= 32)
   })
 
+  it('opened from Bitrix24 «Приложения», offers a new tab inside the portal frame only', async () => {
+    const response = await fetch(`${sso.base}/api/auth/bitrix/callback?DOMAIN=portal.example`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'AUTH_ID=token&REFRESH_ID=refresh&member_id=member',
+    })
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('x-frame-options'), null)
+    assert.match(response.headers.get('content-security-policy') ?? '', new RegExp(`frame-ancestors ${FAKE_PORTAL}$`))
+    const html = await response.text()
+    assert.match(html, /href="\/auth\/bitrix\?to=%2F" target="_blank"/)
+    assert.doesNotMatch(html, /token|refresh/)
+    assert.equal(response.headers.get('set-cookie'), null, 'no session from the frame')
+
+    const elsewhere = await fetch(`${api.base}/api/auth/bitrix/callback`, { method: 'POST' })
+    assert.match(elsewhere.headers.get('content-security-policy') ?? '', /frame-ancestors 'none'/)
+  })
+
   it('links a Bitrix24 user without a password and signs in straight into the module', async () => {
     const created = await createUser({ login: 'sidorova', fullName: 'Сидорова Мария', bitrixUserId: '36' })
     assert.equal(created.status, 201)
