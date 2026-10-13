@@ -113,6 +113,11 @@ export const usePersonnelStore = defineStore('personnel', () => {
     return mutate(async () => replace(await personnelApi.removeDocument(id, docId)))
   }
 
+  /** A file deleted on Bitrix Disk is dropped by the server, so the card is refreshed after a failure. */
+  async function downloadDocument(id: string, docId: string, fileName: string) {
+    if (!(await mutate(() => personnelApi.downloadDocument(id, docId, fileName)))) await refresh()
+  }
+
   function setPhoto(id: string, file: File) {
     return mutate(async () => replace(await personnelApi.setPhoto(id, file)))
   }
@@ -146,6 +151,7 @@ export const usePersonnelStore = defineStore('personnel', () => {
     setEmployment,
     uploadDocuments,
     removeDocument,
+    downloadDocument,
     setPhoto,
     removePhoto,
     workerName,

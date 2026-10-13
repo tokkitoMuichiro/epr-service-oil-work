@@ -704,12 +704,30 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
       return structuredClone(material)
     },
 
-    /** Deletes the material record only; the file in Bitrix is never deleted by the ERP. */
-    removeMaterial(id: string): void {
-      findMaterial(id)
+    /** An uploaded file goes to the Bitrix trash; a linked file belongs to its author and stays on Disk. */
+    async removeMaterial(id: string): Promise<void> {
+      const material = findMaterial(id)
       const used = state.tests.find((t) => t.materialIds.includes(id))
       if (used) conflict(`Материал используется в тесте «${used.title}» — отправьте его в архив`)
+      if (material.source === 'upload' && !material.isUnavailable) await disk.trashFile(material.bitrixFileId)
       state.materials = state.materials.filter((m) => m.id !== id)
+    },
+
+    diskFileIds(): string[] {
+      return state.materials.map((m) => m.bitrixFileId).filter(Boolean)
+    },
+
+    /** Materials stay (tests refer to them) but are marked unavailable; a file restored from the trash becomes available again. */
+    forgetDiskFiles(gone: ReadonlySet<string>): string[] {
+      const lines: string[] = []
+      for (const material of state.materials) {
+        const isGone = gone.has(material.bitrixFileId)
+        if (isGone === material.isUnavailable) continue
+        material.isUnavailable = isGone
+        if (isGone) lines.push(`Учебный материал «${material.title}»: ${material.storagePath}`)
+      }
+      save()
+      return lines
     },
 
     async materialFile(id: string): Promise<{ material: TrainingMaterial; file: StoredFile }> {

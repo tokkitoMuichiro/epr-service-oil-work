@@ -7,7 +7,14 @@ import type {
 } from '../../shared.js'
 
 export const PERSONNEL_KEY = 'personnel'
+/** Files uploaded before Bitrix Disk; read from SQLite while they last. */
 export const WORKER_DOCUMENTS_BUCKET = 'worker-documents'
+/** Local copy of each photo on Disk: avatars are shown in every list. */
+export const WORKER_PHOTOS_BUCKET = 'worker-photos'
+
+export interface WorkerDocumentRecord extends WorkerDocument {
+  diskFileId?: string
+}
 
 export interface WorkerRecord {
   id: string
@@ -18,7 +25,8 @@ export interface WorkerRecord {
   note: string
   employment: EmploymentStatus
   photoUpdatedAt: string | null
-  documents: WorkerDocument[]
+  photoFileId?: string | null
+  documents: WorkerDocumentRecord[]
   pii: WorkerPii
 }
 

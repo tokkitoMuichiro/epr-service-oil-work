@@ -1,6 +1,7 @@
 import { createApp } from './app.js'
 import { openDatabase } from './db.js'
 import { loadDemoSeed } from './demo-seed.js'
+import { bitrixConfigFromEnv } from './disk/env.js'
 import { closeGracefully } from './lifecycle.js'
 
 const port = Number(process.env.PORT) || 4568
@@ -27,11 +28,8 @@ const app = createApp({
   trustProxy: process.env.TRUST_PROXY === '1',
   corsOrigins: process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()).filter(Boolean),
   publicUrl: process.env.PUBLIC_URL?.trim().replace(/\/+$/, '') || undefined,
-  bitrix: {
-    mode: process.env.BITRIX_MODE?.trim() || 'mock',
-    webhookUrl: process.env.BITRIX_WEBHOOK_URL?.trim(),
-    rootFolderId: process.env.BITRIX_TRAINING_FOLDER_ID?.trim(),
-  },
+  bitrix: bitrixConfigFromEnv(),
+  diskSyncMs: (Number(process.env.BITRIX_SYNC_MINUTES) || 10) * 60_000,
 })
 
 if (isProduction && !adminLogin) {
@@ -41,7 +39,7 @@ if (isProduction && !process.env.PUBLIC_URL) {
   console.warn('PUBLIC_URL не задан: ссылки на проверку знаний будут строиться по адресу запроса')
 }
 if (isProduction && (process.env.BITRIX_MODE?.trim() || 'mock') === 'mock') {
-  console.warn('BITRIX_MODE=mock: материалы обучения хранятся в базе, а не на Диске Битрикс24')
+  console.warn('BITRIX_MODE=mock: файлы хранятся в базе, а не на Диске Битрикс24')
 }
 
 const server = app.listen(port, host, () => {
