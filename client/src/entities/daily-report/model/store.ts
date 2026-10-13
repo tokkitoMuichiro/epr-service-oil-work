@@ -131,6 +131,14 @@ export const useDailyReportsStore = defineStore('daily-reports', () => {
     }
   }
 
+  async function openSavedInArchive() {
+    const saved = lastSaved.value
+    if (!saved) return
+    selectedObjectId.value = saved.objectId
+    setMode('archive')
+    await openArchiveDate(saved.date)
+  }
+
   async function saveReport(draft: DailyReportDraft): Promise<DailyReport | null> {
     saving.value = true
     saveError.value = ''
@@ -187,6 +195,7 @@ export const useDailyReportsStore = defineStore('daily-reports', () => {
     clearObject,
     loadArchiveDates,
     openArchiveDate,
+    openSavedInArchive,
     saveReport,
     getPreviousForObject,
   }

@@ -15,7 +15,7 @@ const router = useRouter()
 watch(
   () => session.status,
   (status) => {
-    if (status === 'anonymous' && !route.meta.isPublic) {
+    if (status === 'anonymous' && route.matched.length && !route.meta.isPublic) {
       void router.replace({ name: 'login', query: route.fullPath === '/' ? {} : { redirect: route.fullPath } })
     }
   },

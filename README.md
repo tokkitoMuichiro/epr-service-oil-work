@@ -21,12 +21,15 @@ deploy/   # docker-compose, deploy.sh / backup.sh для VDS, пример nginx
 npm install
 npm run dev:all      # API http://127.0.0.1:4568 + клиент http://127.0.0.1:4567
 npm run check        # проверка типов + тесты
+npm run test:e2e     # сборка клиента + сквозные тесты Playwright
 npm run build        # client/dist + server/dist
 ```
 
+Сквозные тесты (`e2e/`) поднимают сервер на `127.0.0.1:4610` с чистой базой из демо-набора и заглушкой Диска Битрикс24. Перед первым запуском: `npx playwright install chromium`.
+
 ## Выпуск
 
-Пуш в `main` → GitHub Actions: проверки и сборка → Docker-образ `ghcr.io/<owner>/erp-ammir:vN` (smoke-тест контейнера) → `deploy/deploy.sh vN` на VDS по SSH. Сервер ничего не собирает. `deploy.sh` делает бэкап базы, перезапускает контейнер и при неудачном healthcheck возвращает прежний тег.
+Пуш в `main` → GitHub Actions: проверки, сборка и сквозные тесты → Docker-образ `ghcr.io/<owner>/erp-ammir:vN` (smoke-тест контейнера) → `deploy/deploy.sh vN` на VDS по SSH. Сервер ничего не собирает. `deploy.sh` делает бэкап базы, перезапускает контейнер и при неудачном healthcheck возвращает прежний тег.
 
 Откат: Actions → **Deploy** → тег (`v12`) или пусто — предыдущий релиз; на сервере — `deploy.sh v12` / `deploy.sh previous`.
 
