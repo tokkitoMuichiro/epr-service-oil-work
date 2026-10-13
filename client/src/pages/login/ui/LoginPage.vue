@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ROLES, useRoleStore, type RoleId } from '@/entities/role'
+import {
+  ROLES,
+  bitrixLoginErrorText,
+  bitrixLoginUrl,
+  safeRedirectPath,
+  useRoleStore,
+  type RoleId,
+} from '@/entities/role'
 import { errorMessage } from '@/shared/api'
 import { APP_NAME } from '@/shared/config'
 import { AppLogo, UiButton, UiInput } from '@/shared/ui'
@@ -13,11 +20,15 @@ const router = useRouter()
 const login = ref('')
 const password = ref('')
 const isBusy = ref(false)
-const error = ref('')
+const error = ref(bitrixLoginErrorText(route.query.bitrixError) ?? '')
 
 function redirectTarget() {
-  const target = route.query.redirect
-  return typeof target === 'string' && target.startsWith('/') && !target.startsWith('//') ? target : '/'
+  return safeRedirectPath(route.query.redirect)
+}
+
+function enterWithBitrix() {
+  isBusy.value = true
+  window.location.assign(bitrixLoginUrl(redirectTarget()))
 }
 
 async function run(action: () => Promise<void>) {
@@ -56,6 +67,11 @@ function enterAs(role: RoleId) {
 
       <h1 id="login-title">Вход в систему</h1>
 
+      <template v-if="session.bitrixLogin">
+        <UiButton variant="primary" :disabled="isBusy" @click="enterWithBitrix">Войти через Битрикс24</UiButton>
+        <p class="divider"><span>или по логину и паролю</span></p>
+      </template>
+
       <form class="form" novalidate @submit.prevent="submit">
         <UiInput v-model="login" label="Логин" autocomplete="username" required :disabled="isBusy" />
         <UiInput
@@ -67,7 +83,7 @@ function enterAs(role: RoleId) {
           :disabled="isBusy"
         />
         <p v-if="error" class="error" role="alert">{{ error }}</p>
-        <UiButton variant="primary" type="submit" :disabled="isBusy">
+        <UiButton :variant="session.bitrixLogin ? 'secondary' : 'primary'" type="submit" :disabled="isBusy">
           {{ isBusy ? 'Входим…' : 'Войти' }}
         </UiButton>
       </form>
@@ -146,6 +162,22 @@ h1 {
   color: var(--status-bad-fg);
   font-size: var(--font-size-sm);
   font-weight: 600;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .hint {

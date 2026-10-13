@@ -22,7 +22,9 @@ interface UserRow {
   full_name: string
   role: string
   worker_id: string | null
+  bitrix_user_id: string | null
   active: number
+  /** Empty for accounts that sign in only through Bitrix24. */
   password_hash: string
   created_at: string
 }
@@ -34,6 +36,8 @@ function toUser(row: UserRow): User {
     fullName: row.full_name,
     role: isRoleId(row.role) ? row.role : 'office',
     workerId: row.worker_id,
+    bitrixUserId: row.bitrix_user_id,
+    hasPassword: row.password_hash !== '',
     active: row.active === 1,
     createdAt: row.created_at,
   }
@@ -69,6 +73,7 @@ function parseDraft(body: Partial<UserDraft>, isNew: boolean): UserDraft {
     fullName: trimmed(body.fullName).replace(/\s+/g, ' '),
     role: body.role as RoleId,
     workerId: trimmed(body.workerId) || null,
+    bitrixUserId: trimmed(body.bitrixUserId) || null,
     active: body.active !== false,
     ...(typeof body.password === 'string' && body.password ? { password: body.password } : {}),
   }
@@ -82,11 +87,14 @@ export function createUserRepository(db: Database, now: () => number = Date.now)
     all: db.prepare('SELECT * FROM users ORDER BY full_name'),
     byId: db.prepare('SELECT * FROM users WHERE id = ?'),
     byLogin: db.prepare('SELECT * FROM users WHERE login = ?'),
+    byBitrixUserId: db.prepare('SELECT * FROM users WHERE bitrix_user_id = ?'),
     insert: db.prepare(
-      `INSERT INTO users (id, login, full_name, role, worker_id, active, password_hash, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, login, full_name, role, worker_id, bitrix_user_id, active, password_hash, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ),
-    update: db.prepare('UPDATE users SET login = ?, full_name = ?, role = ?, worker_id = ?, active = ? WHERE id = ?'),
+    update: db.prepare(
+      'UPDATE users SET login = ?, full_name = ?, role = ?, worker_id = ?, bitrix_user_id = ?, active = ? WHERE id = ?',
+    ),
     setPassword: db.prepare('UPDATE users SET password_hash = ? WHERE id = ?'),
     insertSession: db.prepare('INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)'),
     session: db.prepare('SELECT user_id, expires_at FROM sessions WHERE id = ?'),
@@ -109,16 +117,24 @@ export function createUserRepository(db: Database, now: () => number = Date.now)
     if (taken && taken.id !== exceptId) conflict('Пользователь с таким логином уже есть')
   }
 
-  function insert(draft: UserDraft & { password: string }, id = uid('u')): User {
+  function assertBitrixUserFree(bitrixUserId: string | null | undefined, exceptId: string | null) {
+    if (!bitrixUserId) return
+    const taken = statements.byBitrixUserId.get(bitrixUserId) as UserRow | undefined
+    if (taken && taken.id !== exceptId) conflict(`Этот пользователь Битрикс24 уже привязан к учётной записи «${taken.full_name}»`)
+  }
+
+  function insert(draft: UserDraft, id = uid('u')): User {
     assertLoginFree(draft.login, null)
+    assertBitrixUserFree(draft.bitrixUserId, null)
     statements.insert.run(
       id,
       draft.login,
       draft.fullName,
       draft.role,
       draft.workerId,
+      draft.bitrixUserId ?? null,
       draft.active ? 1 : 0,
-      hashPassword(draft.password),
+      draft.password ? hashPassword(draft.password) : '',
       new Date(now()).toISOString(),
     )
     return toUser(row(id))
@@ -143,20 +159,33 @@ export function createUserRepository(db: Database, now: () => number = Date.now)
     },
 
     create(body: Partial<UserDraft>): User {
-      const draft = parseDraft(body, true)
-      return insert({ ...draft, password: draft.password ?? '' })
+      return insert(parseDraft(body, true))
     },
 
+    /** A new password in the body is set too and signs the user out everywhere. */
     update(id: string, body: Partial<UserDraft>): User {
       const current = toUser(row(id))
-      const draft = parseDraft({ ...current, ...body, password: undefined }, false)
+      const draft = parseDraft({ ...current, ...body }, false)
       assertLoginFree(draft.login, id)
+      assertBitrixUserFree(draft.bitrixUserId, id)
+      if (!draft.bitrixUserId && !current.hasPassword && !draft.password) {
+        badRequest('Задайте пароль: без привязки к Битрикс24 пользователь не сможет войти')
+      }
       if (wouldLoseLastAdmin(rows().map(toUser), id, draft) && current.role === 'admin' && current.active) {
         conflict('Нельзя отключить или понизить последнего администратора')
       }
-      statements.update.run(draft.login, draft.fullName, draft.role, draft.workerId, draft.active ? 1 : 0, id)
-      if (!draft.active) statements.deleteUserSessions.run(id)
+      statements.update.run(draft.login, draft.fullName, draft.role, draft.workerId, draft.bitrixUserId ?? null, draft.active ? 1 : 0, id)
+      if (draft.password) statements.setPassword.run(hashPassword(draft.password), id)
+      if (!draft.active || draft.password || (current.bitrixUserId && current.bitrixUserId !== draft.bitrixUserId)) {
+        statements.deleteUserSessions.run(id)
+      }
       return toUser(row(id))
+    },
+
+    /** The ERP account linked to a Bitrix24 user, active or not. */
+    byBitrixUserId(bitrixUserId: string): User | null {
+      const found = statements.byBitrixUserId.get(bitrixUserId) as UserRow | undefined
+      return found ? toUser(found) : null
     },
 
     setPassword(id: string, password: unknown): void {

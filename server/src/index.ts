@@ -3,6 +3,7 @@ import { openDatabase } from './db.js'
 import { loadDemoSeed } from './demo-seed.js'
 import { bitrixConfigFromEnv } from './disk/env.js'
 import { closeGracefully } from './lifecycle.js'
+import { bitrixSsoFromConfig } from './modules/auth/bitrix.js'
 
 const port = Number(process.env.PORT) || 4568
 const host = process.env.HOST || '0.0.0.0'
@@ -16,6 +17,7 @@ const adminPassword = process.env.ADMIN_PASSWORD
 const seed = wantsDemo ? await loadDemoSeed() : null
 if (wantsDemo && !seed) console.warn('Демо-данные не найдены (server/src/testing/fixtures): новая база будет пустой')
 
+const bitrix = bitrixConfigFromEnv()
 const db = openDatabase(dbPath)
 const app = createApp({
   clientDist: process.env.CLIENT_DIST,
@@ -28,7 +30,7 @@ const app = createApp({
   trustProxy: process.env.TRUST_PROXY === '1',
   corsOrigins: process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()).filter(Boolean),
   publicUrl: process.env.PUBLIC_URL?.trim().replace(/\/+$/, '') || undefined,
-  bitrix: bitrixConfigFromEnv(),
+  bitrix,
   diskSyncMs: (Number(process.env.BITRIX_SYNC_MINUTES) || 10) * 60_000,
 })
 
@@ -38,8 +40,11 @@ if (isProduction && !adminLogin) {
 if (isProduction && !process.env.PUBLIC_URL) {
   console.warn('PUBLIC_URL не задан: ссылки на проверку знаний будут строиться по адресу запроса')
 }
-if (isProduction && (process.env.BITRIX_MODE?.trim() || 'mock') === 'mock') {
+if (isProduction && bitrix.mode === 'mock') {
   console.warn('BITRIX_MODE=mock: файлы хранятся в базе, а не на Диске Битрикс24')
+}
+if (isProduction && !bitrixSsoFromConfig(bitrix)) {
+  console.warn('BITRIX_CLIENT_ID/BITRIX_CLIENT_SECRET не заданы: кнопка «Войти через Битрикс24» скрыта')
 }
 
 const server = app.listen(port, host, () => {

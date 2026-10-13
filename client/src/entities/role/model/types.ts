@@ -1,8 +1,11 @@
 export { ROLES, canViewPii, isRoleId, type Role, type RoleId } from '@shared/roles'
 export {
   PASSWORD_MIN_LENGTH,
+  bitrixLoginErrorText,
+  safeRedirectPath,
   validatePassword,
   validateUserDraft,
+  type BitrixPortalUser,
   type SessionView,
   type User,
   type UserDraft,

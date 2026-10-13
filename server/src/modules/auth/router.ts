@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { Router, type CookieOptions, type Request, type RequestHandler, type Response } from 'express'
 import {
   HttpError,
@@ -10,20 +11,26 @@ import {
   setRequestAuth,
   trimmed,
 } from '../../http.js'
-import { isRoleId, normalizeLogin, type SessionView } from '../../shared.js'
+import { isRoleId, normalizeLogin, safeRedirectPath, type BitrixLoginError, type SessionView } from '../../shared.js'
 import type { AccessStore } from '../access/store.js'
+import { BitrixLoginFailure, type BitrixDirectory, type BitrixSso } from './bitrix.js'
 import { SESSION_TTL_MS, type UserRepository } from './repository.js'
 
 export const SESSION_COOKIE = 'erp_session'
+export const BITRIX_STATE_COOKIE = 'erp_bitrix_state'
 
 const MAX_FAILURES = 5
 const LOCK_MS = 5 * 60 * 1000
+const BITRIX_STATE_TTL_MS = 10 * 60 * 1000
+const BITRIX_COOKIE_PATH = '/api/auth/bitrix'
 
 export interface AuthOptions {
   /** Dev only: allows logging in as a demo user of any role without a password. */
   devLogin: boolean
   /** Force the Secure cookie flag; by default it follows the request protocol (`trust proxy` aware). */
   secureCookies?: boolean
+  /** «Войти через Битрикс24»; off when null. */
+  bitrix?: BitrixSso | null
 }
 
 function readCookie(req: Request, name: string): string | null {
@@ -75,11 +82,61 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
   }
 
   function view(req: Request): SessionView {
-    return { user: optionalAuth(req)?.user ?? null, devLogin: options.devLogin }
+    return { user: optionalAuth(req)?.user ?? null, devLogin: options.devLogin, bitrixLogin: Boolean(options.bitrix) }
   }
 
   router.get('/session', (req, res) => {
     res.json({ item: view(req) })
+  })
+
+  const bitrixStates = new Map<string, { to: string; expiresAt: number }>()
+
+  function bitrixCookie(req: Request): CookieOptions {
+    return { ...cookieOptions(req), path: BITRIX_COOKIE_PATH }
+  }
+
+  function bitrixFailed(res: Response, code: BitrixLoginError, to: string) {
+    const query = new URLSearchParams({ bitrixError: code, ...(to === '/' ? {} : { redirect: to }) })
+    res.redirect(`/login?${query}`)
+  }
+
+  router.get('/bitrix/start', (req, res) => {
+    const to = safeRedirectPath(req.query.to)
+    if (optionalAuth(req)) return res.redirect(to)
+    if (!options.bitrix) return bitrixFailed(res, 'disabled', to)
+    const now = Date.now()
+    for (const [key, entry] of bitrixStates) if (entry.expiresAt < now) bitrixStates.delete(key)
+    const state = randomBytes(24).toString('base64url')
+    bitrixStates.set(state, { to, expiresAt: now + BITRIX_STATE_TTL_MS })
+    res.cookie(BITRIX_STATE_COOKIE, state, { ...bitrixCookie(req), maxAge: BITRIX_STATE_TTL_MS })
+    res.redirect(options.bitrix.authorizeUrl(state))
+  })
+
+  router.get('/bitrix/callback', async (req, res) => {
+    const state = typeof req.query.state === 'string' ? req.query.state : ''
+    const entry = state ? bitrixStates.get(state) : undefined
+    const isOwnState = Boolean(entry) && readCookie(req, BITRIX_STATE_COOKIE) === state
+    res.clearCookie(BITRIX_STATE_COOKIE, bitrixCookie(req))
+    if (!options.bitrix) return bitrixFailed(res, 'disabled', '/')
+    if (!entry || !isOwnState || entry.expiresAt < Date.now()) return bitrixFailed(res, 'expired', '/')
+    bitrixStates.delete(state)
+    const code = typeof req.query.code === 'string' ? req.query.code : ''
+    if (!code || req.query.error) return bitrixFailed(res, 'denied', entry.to)
+
+    let portalUserId: string
+    try {
+      const portalUser = await options.bitrix.userByCode(code)
+      if (!portalUser.isActive) return bitrixFailed(res, 'blocked', entry.to)
+      portalUserId = portalUser.id
+    } catch (error) {
+      console.warn('Вход через Битрикс24 не удался', error instanceof Error ? error.message : error)
+      return bitrixFailed(res, error instanceof BitrixLoginFailure ? error.code : 'failed', entry.to)
+    }
+    const user = users.byBitrixUserId(portalUserId)
+    if (!user) return bitrixFailed(res, 'not-linked', entry.to)
+    if (!user.active) return bitrixFailed(res, 'blocked', entry.to)
+    startSession(req, res, user.id)
+    res.redirect(entry.to)
   })
 
   router.post('/login', (req, res) => {
@@ -98,7 +155,7 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
     }
     failures.delete(login)
     startSession(req, res, user.id)
-    res.json({ item: { user, devLogin: options.devLogin } satisfies SessionView })
+    res.json({ item: { ...view(req), user } satisfies SessionView })
   })
 
   router.post('/logout', (req, res) => {
@@ -114,13 +171,13 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
     if (!isRoleId(role)) badRequest('Неизвестная роль')
     const user = users.demoUser(role) ?? notFound('Демо-пользователь роли не найден')
     startSession(req, res, user.id)
-    res.json({ item: { user, devLogin: true } satisfies SessionView })
+    res.json({ item: { ...view(req), user } satisfies SessionView })
   })
 
   return router
 }
 
-export function usersRouter(users: UserRepository, access: AccessStore) {
+export function usersRouter(users: UserRepository, access: AccessStore, directory: BitrixDirectory) {
   const router = Router()
 
   router.use((req, _res, next) => {
@@ -130,6 +187,10 @@ export function usersRouter(users: UserRepository, access: AccessStore) {
 
   router.get('/', (_req, res) => {
     res.json({ items: users.list() })
+  })
+
+  router.get('/bitrix', async (req, res) => {
+    res.json({ items: await directory.search(trimmed(req.query.q)) })
   })
 
   router.post('/', (req, res) => {

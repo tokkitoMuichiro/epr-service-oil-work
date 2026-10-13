@@ -1,5 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAccessStore, useRoleStore, type AccessBlock, type Permission } from '@/entities/role'
+import {
+  bitrixLoginUrl,
+  safeRedirectPath,
+  useAccessStore,
+  useRoleStore,
+  type AccessBlock,
+  type Permission,
+} from '@/entities/role'
 import { ContractsPage } from '@/pages/contracts'
 import { DailyReportsPage } from '@/pages/daily-reports'
 import {
@@ -46,6 +53,17 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', name: 'login', component: LoginPage, meta: { isPublic: true } },
+    {
+      // Link for Bitrix24 menu items: /auth/bitrix?to=/equipment. Served by the SPA because the PWA service worker owns navigations.
+      path: '/auth/bitrix',
+      name: 'bitrix-login',
+      component: LoginPage,
+      meta: { isPublic: true, isSessionless: true },
+      beforeEnter: (to) => {
+        window.location.replace(bitrixLoginUrl(safeRedirectPath(to.query.to)))
+        return false
+      },
+    },
     { path: '/', name: 'home', component: HomePage },
     { path: '/contracts', name: 'contracts', component: ContractsPage, meta: { block: 'contracts' } },
     { path: '/personnel', name: 'personnel', component: PersonnelPage, meta: { block: 'personnel' } },
