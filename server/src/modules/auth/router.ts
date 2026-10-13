@@ -24,6 +24,29 @@ const LOCK_MS = 5 * 60 * 1000
 const BITRIX_STATE_TTL_MS = 10 * 60 * 1000
 const BITRIX_COOKIE_PATH = '/api/auth/bitrix'
 
+const BITRIX_FRAME_PAGE = `<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ERP АММИР</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: Montserrat, Arial, sans-serif; color: #242d3d; background: #eef0f3; }
+  main { display: grid; gap: 16px; max-width: 420px; padding: 24px; text-align: center; }
+  h1 { margin: 0; font-size: 20px; }
+  p { margin: 0; color: #5b6576; font-size: 14px; line-height: 1.5; }
+  a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 20px; border-radius: 2px; background: #1e90ff; color: #fff; font-weight: 600; text-decoration: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>ERP АММИР</h1>
+  <p>ERP открывается в отдельной вкладке — вход выполнится автоматически под вашим пользователем Битрикс24.</p>
+  <a href="/auth/bitrix?to=%2F" target="_blank" rel="noopener">Открыть ERP в новой вкладке</a>
+</main>
+</body>
+</html>`
+
 export interface AuthOptions {
   /** Dev only: allows logging in as a demo user of any role without a password. */
   devLogin: boolean
@@ -110,6 +133,15 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
     bitrixStates.set(state, { to, expiresAt: now + BITRIX_STATE_TTL_MS })
     res.cookie(BITRIX_STATE_COOKIE, state, { ...bitrixCookie(req), maxAge: BITRIX_STATE_TTL_MS })
     res.redirect(options.bitrix.authorizeUrl(state))
+  })
+
+  // Bitrix24 opens the application from «Приложения» by POSTing the handler URL into its iframe.
+  // The ERP itself cannot live there (third-party cookies), so the frame only offers a new tab.
+  router.post('/bitrix/callback', (_req, res) => {
+    res.removeHeader('X-Frame-Options')
+    const ancestors = options.bitrix ? options.bitrix.portal : "'none'"
+    res.setHeader('Content-Security-Policy', `default-src 'none'; style-src 'unsafe-inline'; frame-ancestors ${ancestors}`)
+    res.type('html').send(BITRIX_FRAME_PAGE)
   })
 
   router.get('/bitrix/callback', async (req, res) => {
