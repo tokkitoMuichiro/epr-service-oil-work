@@ -1,10 +1,12 @@
 export { useAccessStore } from './model/access-store'
 export { useRoleStore } from './model/store'
-export { usersApi } from './api/users'
+export { bitrixLoginUrl, usersApi } from './api/users'
 export {
   ACCESS_SECTIONS,
   PASSWORD_MIN_LENGTH,
   ROLES,
+  bitrixLoginErrorText,
+  safeRedirectPath,
   canViewBlock,
   canViewPii,
   equipmentPermissionsOf,
@@ -16,6 +18,7 @@ export {
   type AccessBlock,
   type AccessMatrix,
   type AccessSection,
+  type BitrixPortalUser,
   type Permission,
   type PermissionDef,
   type Role,

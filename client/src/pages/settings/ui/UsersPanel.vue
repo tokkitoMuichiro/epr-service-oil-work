@@ -81,7 +81,8 @@ onMounted(load)
             >
               <td class="ui-cell--main"><strong>{{ u.fullName }}</strong></td>
               <td class="users__login">
-                {{ u.login }}<span class="users__role"> · {{ roleLabel(u.role) }}</span>
+                {{ u.login }}<span v-if="u.bitrixUserId" class="users__bitrix"> · Битрикс24</span
+                ><span class="users__role"> · {{ roleLabel(u.role) }}</span>
               </td>
               <td class="hide-mobile">{{ roleLabel(u.role) }}</td>
               <td class="hide-mobile">{{ formatDateRu(u.createdAt.slice(0, 10)) }}</td>
@@ -135,6 +136,10 @@ onMounted(load)
 
 .users__role {
   display: none;
+}
+
+.users__bitrix {
+  color: var(--text-secondary);
 }
 
 .actions {

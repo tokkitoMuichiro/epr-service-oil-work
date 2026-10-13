@@ -10,6 +10,7 @@ type SessionStatus = 'unknown' | 'anonymous' | 'authenticated' | 'error'
 export const useRoleStore = defineStore('role', () => {
   const user = ref<User | null>(null)
   const devLogin = ref(false)
+  const bitrixLogin = ref(false)
   const status = ref<SessionStatus>('unknown')
   const errorText = ref('')
   const switching = ref(false)
@@ -23,6 +24,7 @@ export const useRoleStore = defineStore('role', () => {
   function apply(view: SessionView) {
     user.value = view.user
     devLogin.value = view.devLogin
+    bitrixLogin.value = view.bitrixLogin
     status.value = view.user ? 'authenticated' : 'anonymous'
     errorText.value = ''
   }
@@ -75,6 +77,7 @@ export const useRoleStore = defineStore('role', () => {
   return {
     user,
     devLogin,
+    bitrixLogin,
     status,
     errorText,
     switching,

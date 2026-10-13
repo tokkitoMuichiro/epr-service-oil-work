@@ -49,7 +49,15 @@ export function openDatabase(file = ':memory:'): Database {
   const db = new DatabaseSync(file)
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;')
   db.exec(SCHEMA)
+  migrate(db)
   return db
+}
+
+/** Columns are only added, so an older release still runs on a migrated database. */
+function migrate(db: Database) {
+  const userColumns = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map((c) => c.name)
+  if (!userColumns.includes('bitrix_user_id')) db.exec('ALTER TABLE users ADD COLUMN bitrix_user_id TEXT')
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_bitrix_user ON users(bitrix_user_id) WHERE bitrix_user_id IS NOT NULL')
 }
 
 export interface FileStore {

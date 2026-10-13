@@ -9,6 +9,7 @@ import { createDiskSync, scheduleDiskSync } from './disk/sync.js'
 import { errorHandler, notFound } from './http.js'
 import { accessRouter } from './modules/access/router.js'
 import { createAccessStore } from './modules/access/store.js'
+import { bitrixDirectoryFromConfig, bitrixSsoFromConfig } from './modules/auth/bitrix.js'
 import { createUserRepository } from './modules/auth/repository.js'
 import { authRouter, authenticate, requireSession, usersRouter } from './modules/auth/router.js'
 import { createContractsRepository } from './modules/contracts/repository.js'
@@ -47,6 +48,8 @@ export interface AppOptions {
   /** Base address for knowledge-check links; defaults to the request origin. */
   publicUrl?: string
   bitrix?: BitrixConfig
+  /** Replaces `fetch` for every Bitrix24 call (tests). */
+  bitrixFetch?: typeof fetch
   /** Overrides the Disk built from `bitrix` (tests). */
   disk?: (storage: Storage) => Disk
   /** Background check for files deleted on Disk; off when not set. */
@@ -63,7 +66,10 @@ export function createApp(options: AppOptions = {}) {
   const access = createAccessStore(storage)
   const contracts = createContractsRepository(storage, { today: options.today })
   const reports = createReportsRepository(contracts, storage)
-  const disk = options.disk?.(storage) ?? createDisk(storage, options.bitrix)
+  const bitrix = options.bitrix ?? {}
+  const disk = options.disk?.(storage) ?? createDisk(storage, bitrix, options.bitrixFetch)
+  const bitrixSso = bitrixSsoFromConfig(bitrix, options.bitrixFetch)
+  const bitrixDirectory = bitrixDirectoryFromConfig(bitrix, options.bitrixFetch)
   const equipment = createEquipmentService(storage, {
     disk,
     users: () => users.list(),
@@ -131,10 +137,13 @@ export function createApp(options: AppOptions = {}) {
       bitrix: disk.mode,
     })
   })
-  api.use('/auth', authRouter(users, { devLogin: Boolean(options.devLogin), secureCookies: options.secureCookies }))
+  api.use(
+    '/auth',
+    authRouter(users, { devLogin: Boolean(options.devLogin), secureCookies: options.secureCookies, bitrix: bitrixSso }),
+  )
   api.use('/public/test/:token', publicTestRouter(training, { secureCookies: options.secureCookies }))
   api.use(requireSession)
-  api.use('/users', usersRouter(users, access))
+  api.use('/users', usersRouter(users, access, bitrixDirectory))
   api.use('/disk', diskRouter(disk, diskSync, access))
   api.use('/access', accessRouter(access))
   api.use(

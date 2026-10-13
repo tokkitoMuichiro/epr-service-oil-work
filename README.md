@@ -48,6 +48,7 @@ NODE_ENV=production CLIENT_DIST=client/dist npm start
 | `COOKIE_SECURE=1`, `TRUST_PROXY=1` | Работа за HTTPS-прокси (nginx) |
 | `CORS_ORIGIN` | Только если клиент раздаётся с другого домена |
 | `BITRIX_MODE`, `BITRIX_WEBHOOK_URL`, `BITRIX_ROOT_FOLDER_ID`, `BITRIX_SYNC_MINUTES` | Файлы на Диске Битрикс24 в папке «ERP» (`mock` по умолчанию — файлы в базе) |
+| `BITRIX_PORTAL`, `BITRIX_CLIENT_ID`, `BITRIX_CLIENT_SECRET` | Вход через Битрикс24 (локальное приложение); без ключей кнопка скрыта |
 
 ## Роли
 

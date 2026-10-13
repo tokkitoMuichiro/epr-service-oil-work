@@ -1,3 +1,5 @@
+import { BITRIX_TOKEN_URL } from '../modules/auth/bitrix.js'
+
 interface FakeObject {
   ID: string
   NAME: string
@@ -7,17 +9,32 @@ interface FakeObject {
   content?: Buffer
 }
 
-export const FAKE_WEBHOOK = 'https://portal.example/rest/1/secret/'
-const DOWNLOAD = 'https://portal.example/download/'
+interface FakeUser {
+  ID: string
+  NAME: string
+  LAST_NAME: string
+  EMAIL: string
+  ACTIVE: boolean
+}
+
+export const FAKE_PORTAL = 'https://portal.example'
+export const FAKE_WEBHOOK = `${FAKE_PORTAL}/rest/1/secret/`
+export const FAKE_CLIENT_ID = 'local.erp'
+export const FAKE_CLIENT_SECRET = 'app-secret'
+const DOWNLOAD = `${FAKE_PORTAL}/download/`
+const USER_CURRENT = `${FAKE_PORTAL}/rest/user.current.json`
 const COMMON_ROOT = '100'
 const PAGE_SIZE = 2
 
-/** In-memory Bitrix24 REST (Disk methods used by the ERP) with a call log. */
+/** In-memory Bitrix24: REST (Disk and user methods used by the ERP) and OAuth, with a call log. */
 export function createFakeBitrix() {
   let seq = 1000
   const objects = new Map<string, FakeObject>()
   const denied = new Set<string>()
   const calls: string[] = []
+  const users = new Map<string, FakeUser>()
+  const codes = new Map<string, { userId: string; endpoint: string }>()
+  const tokens = new Map<string, string>()
   objects.set(COMMON_ROOT, { ID: COMMON_ROOT, NAME: 'Общий диск', TYPE: 'folder', PARENT_ID: '', DELETED_TYPE: '0' })
 
   function add(parentId: string, name: string, type: FakeObject['TYPE'], content?: Buffer): FakeObject {
@@ -100,6 +117,12 @@ export function createFakeBitrix() {
         }
         return { result, result_error: errors }
       }
+      case 'user.get':
+        return [...users.values()].filter((u) => !params.ID || u.ID === String(params.ID))
+      case 'user.search': {
+        const find = String(params.FIND ?? '').toLowerCase()
+        return [...users.values()].filter((u) => `${u.LAST_NAME} ${u.NAME} ${u.EMAIL}`.toLowerCase().includes(find))
+      }
       default:
         throw new Error(`Fake Bitrix: unknown method ${method}`)
     }
@@ -107,6 +130,19 @@ export function createFakeBitrix() {
 
   const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input)
+    if (url.startsWith(BITRIX_TOKEN_URL)) {
+      const query = new URL(url).searchParams
+      const grant = codes.get(query.get('code') ?? '')
+      codes.delete(query.get('code') ?? '')
+      if (!grant || query.get('client_secret') !== FAKE_CLIENT_SECRET) return Response.json({ error: 'invalid_grant' }, { status: 400 })
+      const token = `token-${(seq += 1)}`
+      tokens.set(token, grant.userId)
+      return Response.json({ access_token: token, client_endpoint: grant.endpoint, member_id: 'member', user_id: Number(grant.userId) })
+    }
+    if (url.startsWith(USER_CURRENT)) {
+      const user = users.get(tokens.get(new URL(url).searchParams.get('auth') ?? '') ?? '')
+      return user ? Response.json({ result: user }) : Response.json({ error: 'expired_token' }, { status: 401 })
+    }
     if (url.startsWith(DOWNLOAD)) {
       const object = objects.get(url.slice(DOWNLOAD.length))
       return object?.content && object.DELETED_TYPE === '0' ? new Response(new Uint8Array(object.content)) : new Response('', { status: 404 })
@@ -137,5 +173,14 @@ export function createFakeBitrix() {
     addFile: (parentId: string, name: string, content: string) => add(parentId, name, 'file', Buffer.from(content)),
     /** A user deletes the file in Bitrix: gone for good. */
     deleteForever: (id: string) => objects.delete(id),
+    users,
+    addUser: (id: string, lastName: string, name: string, active = true) =>
+      users.set(id, { ID: id, NAME: name, LAST_NAME: lastName, EMAIL: `${id}@portal.example`, ACTIVE: active }),
+    /** The code Bitrix24 hands to the callback after the user signs in; another portal gives another endpoint. */
+    issueCode: (userId: string, endpoint = `${FAKE_PORTAL}/rest/`) => {
+      const code = `code-${(seq += 1)}`
+      codes.set(code, { userId, endpoint })
+      return code
+    },
   }
 }

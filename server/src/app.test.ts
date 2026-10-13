@@ -10,7 +10,13 @@ import { openDatabase } from './db.js'
 import { ensurePath } from './disk/disk.js'
 import { createLiveDisk } from './disk/live.js'
 import { createMockDisk, type MockDisk } from './disk/mock.js'
-import { FAKE_WEBHOOK, createFakeBitrix } from './testing/fake-bitrix.js'
+import {
+  FAKE_CLIENT_ID,
+  FAKE_CLIENT_SECRET,
+  FAKE_PORTAL,
+  FAKE_WEBHOOK,
+  createFakeBitrix,
+} from './testing/fake-bitrix.js'
 import { demoUserOf } from './modules/auth/repository.js'
 import { demoSeed } from './testing/fixtures/index.js'
 import { unzip } from './testing/unzip.js'
@@ -647,7 +653,7 @@ describe('authentication', () => {
     assert.equal(spoofed.status, 200)
     assert.ok((spoofed.json.items as Worker[]).every((w) => w.pii === null))
     const session = await call('GET', '/api/auth/session', null)
-    assert.deepEqual(session.json.item, { user: null, devLogin: true })
+    assert.deepEqual(session.json.item, { user: null, devLogin: true, bitrixLogin: false })
   })
 
   it('manages users and signs in with a password', async () => {
@@ -707,6 +713,147 @@ describe('authentication', () => {
     } finally {
       await isolated.close()
     }
+  })
+})
+
+describe('bitrix sign-in', () => {
+  const bitrix = createFakeBitrix()
+  let sso: Api
+
+  before(async () => {
+    bitrix.addUser('36', 'Сидорова', 'Мария')
+    bitrix.addUser('42', 'Кузнецов', 'Игорь')
+    bitrix.addUser('57', 'Орлов', 'Олег', false)
+    sso = await startApp({
+      bitrix: { mode: 'live', webhookUrl: FAKE_WEBHOOK, clientId: FAKE_CLIENT_ID, clientSecret: FAKE_CLIENT_SECRET },
+      bitrixFetch: bitrix.fetchImpl,
+    })
+  })
+
+  after(async () => {
+    await sso.close()
+  })
+
+  function get(url: string, cookie?: string) {
+    return fetch(`${sso.base}${url}`, { redirect: 'manual', headers: cookie ? { Cookie: cookie } : {} })
+  }
+
+  async function begin(to: string) {
+    const response = await get(`/api/auth/bitrix/start?to=${encodeURIComponent(to)}`)
+    assert.equal(response.status, 302)
+    const location = new URL(response.headers.get('location') ?? '')
+    const cookie = /erp_bitrix_state=[^;]+/.exec(response.headers.get('set-cookie') ?? '')?.[0]
+    assert.ok(cookie, 'state cookie is set')
+    return { location, state: location.searchParams.get('state') ?? '', cookie }
+  }
+
+  async function signIn(bitrixUserId: string, to = '/', endpoint?: string) {
+    const { state, cookie } = await begin(to)
+    const code = bitrix.issueCode(bitrixUserId, endpoint)
+    const response = await get(`/api/auth/bitrix/callback?code=${code}&state=${state}&domain=portal.example`, cookie)
+    assert.equal(response.status, 302)
+    const session = /erp_session=[^;]+/.exec(response.headers.get('set-cookie') ?? '')?.[0] ?? null
+    return { location: response.headers.get('location') ?? '', session }
+  }
+
+  async function createUser(body: Record<string, unknown>) {
+    return sso.call('POST', '/api/users', 'admin', { role: 'master', workerId: null, active: true, ...body })
+  }
+
+  it('shows the button and sends the user to the portal OAuth page', async () => {
+    assert.equal((await sso.call('GET', '/api/auth/session', null)).json.item.bitrixLogin, true)
+    const { location, state } = await begin('/equipment')
+    assert.equal(location.origin, FAKE_PORTAL)
+    assert.equal(location.pathname, '/oauth/authorize/')
+    assert.equal(location.searchParams.get('client_id'), FAKE_CLIENT_ID)
+    assert.ok(state.length >= 32)
+  })
+
+  it('links a Bitrix24 user without a password and signs in straight into the module', async () => {
+    const created = await createUser({ login: 'sidorova', fullName: 'Сидорова Мария', bitrixUserId: '36' })
+    assert.equal(created.status, 201)
+    assert.equal(created.json.item.hasPassword, false)
+    assert.equal(created.json.item.bitrixUserId, '36')
+    assert.equal((await sso.call('POST', '/api/auth/login', null, { login: 'sidorova', password: 'какой-нибудь' })).status, 401)
+    const taken = await createUser({ login: 'other', fullName: 'Другой', bitrixUserId: '36' })
+    assert.equal(taken.status, 409)
+    assert.match(taken.json.error, /Сидорова Мария/)
+
+    const { location, session } = await signIn('36', '/equipment/mine?category=vehicles')
+    assert.equal(location, '/equipment/mine?category=vehicles')
+    assert.ok(session)
+    const view = (await sso.call('GET', '/api/auth/session', { cookie: session })).json.item
+    assert.equal(view.user.id, created.json.item.id)
+
+    const again = await get('/api/auth/bitrix/start?to=%2Freports', session)
+    assert.equal(again.headers.get('location'), '/reports', 'an existing session skips Bitrix24')
+  })
+
+  it('refuses unknown, fired and blocked users with a code, never a session', async () => {
+    const notLinked = await signIn('42', '/equipment')
+    assert.equal(notLinked.session, null)
+    assert.equal(notLinked.location, '/login?bitrixError=not-linked&redirect=%2Fequipment')
+
+    await createUser({ login: 'orlov', fullName: 'Орлов Олег', bitrixUserId: '57' })
+    assert.match((await signIn('57')).location, /bitrixError=blocked/, 'deactivated in Bitrix24')
+
+    const kuznetsov = await createUser({ login: 'kuznetsov', fullName: 'Кузнецов Игорь', bitrixUserId: '42', active: false })
+    assert.equal(kuznetsov.status, 201)
+    const blocked = await signIn('42')
+    assert.match(blocked.location, /bitrixError=blocked/, 'blocked in the ERP')
+    assert.equal(blocked.session, null)
+  })
+
+  it('rejects a forged or reused state, another portal and an external redirect', async () => {
+    const { state, cookie } = await begin('/')
+    const code = bitrix.issueCode('36')
+    const noCookie = await get(`/api/auth/bitrix/callback?code=${code}&state=${state}`)
+    assert.match(noCookie.headers.get('location') ?? '', /bitrixError=expired/, 'state must come from this browser')
+    const forged = await get(`/api/auth/bitrix/callback?code=${code}&state=forged`, cookie)
+    assert.match(forged.headers.get('location') ?? '', /bitrixError=expired/)
+
+    const first = await get(`/api/auth/bitrix/callback?code=${code}&state=${state}`, cookie)
+    assert.ok(/erp_session=/.test(first.headers.get('set-cookie') ?? ''))
+    const reused = await get(`/api/auth/bitrix/callback?code=${bitrix.issueCode('36')}&state=${state}`, cookie)
+    assert.match(reused.headers.get('location') ?? '', /bitrixError=expired/, 'a state works once')
+
+    const foreign = await signIn('36', '/', 'https://evil.bitrix24.ru/rest/')
+    assert.equal(foreign.session, null)
+    assert.match(foreign.location, /bitrixError=wrong-portal/)
+
+    const external = await signIn('36', '//evil.example/steal')
+    assert.equal(external.location, '/')
+    assert.ok(external.session)
+
+    const declined = await begin('/')
+    const denied = await get(`/api/auth/bitrix/callback?error=access_denied&state=${declined.state}`, declined.cookie)
+    assert.match(denied.headers.get('location') ?? '', /bitrixError=denied/)
+  })
+
+  it('finds portal users for linking through the webhook (admins only)', async () => {
+    assert.equal((await sso.call('GET', '/api/users/bitrix?q=Сидор', 'master')).status, 403)
+    const found = await sso.call('GET', `/api/users/bitrix?q=${encodeURIComponent('Сидор')}`)
+    assert.deepEqual(found.json.items.map((u: { id: string; fullName: string }) => [u.id, u.fullName]), [['36', 'Сидорова Мария']])
+    const byId = (await sso.call('GET', '/api/users/bitrix?q=57')).json.items
+    assert.equal(byId[0].isActive, false, 'lookup by ID shows fired users too')
+    assert.deepEqual((await sso.call('GET', '/api/users/bitrix?q=Орлов')).json.items, [], 'search hides fired users')
+  })
+
+  it('keeps an account reachable: unlinking needs a password', async () => {
+    const created = await createUser({ login: 'unlink.me', fullName: 'Отвязка', bitrixUserId: '99' })
+    const id = created.json.item.id as string
+    assert.equal((await sso.call('PATCH', `/api/users/${id}`, 'admin', { bitrixUserId: null })).status, 400)
+    const unlinked = await sso.call('PATCH', `/api/users/${id}`, 'admin', { bitrixUserId: null, password: 'новый-пароль-1' })
+    assert.equal(unlinked.status, 200)
+    assert.equal(unlinked.json.item.hasPassword, true)
+    assert.equal((await sso.call('POST', '/api/auth/login', null, { login: 'unlink.me', password: 'новый-пароль-1' })).status, 200)
+  })
+
+  it('stays off without the local application keys', async () => {
+    const response = await fetch(`${api.base}/api/auth/bitrix/start?to=%2Fpersonnel`, { redirect: 'manual' })
+    assert.equal(response.headers.get('location'), '/login?bitrixError=disabled&redirect=%2Fpersonnel')
+    const mock = await call('GET', '/api/users/bitrix?q=36')
+    assert.equal(mock.json.items[0].fullName, 'Сидорова Мария Ивановна', 'mock directory in dev')
   })
 })
 
