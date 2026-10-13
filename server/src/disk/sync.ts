@@ -40,8 +40,8 @@ export function createDiskSync(disk: Disk, sources: readonly DiskFileSource[], a
 
 export type DiskSync = ReturnType<typeof createDiskSync>
 
-/** Runs the sync in the background; the timer does not keep the process alive. */
-export function scheduleDiskSync(sync: DiskSync, intervalMs: number, onError: (error: unknown) => void): () => void {
+/** Runs a sync in the background; the timer does not keep the process alive. */
+export function scheduleDiskSync(sync: { run(): Promise<unknown> }, intervalMs: number, onError: (error: unknown) => void): () => void {
   const timer = setInterval(() => {
     sync.run().catch(onError)
   }, intervalMs)

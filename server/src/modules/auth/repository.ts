@@ -182,6 +182,23 @@ export function createUserRepository(db: Database, now: () => number = Date.now)
       return toUser(row(id))
     },
 
+    /** Disables active accounts linked to fired Bitrix24 users and ends their sessions; the last administrator is kept. */
+    deactivateBitrixUsers(bitrixUserIds: ReadonlySet<string>): { disabled: User[]; kept: User[] } {
+      const disabled: User[] = []
+      const kept: User[] = []
+      for (const user of rows().map(toUser)) {
+        if (!user.active || !user.bitrixUserId || !bitrixUserIds.has(user.bitrixUserId)) continue
+        if (user.role === 'admin' && wouldLoseLastAdmin(rows().map(toUser), user.id, { role: user.role, active: false })) {
+          kept.push(user)
+          continue
+        }
+        statements.update.run(user.login, user.fullName, user.role, user.workerId, user.bitrixUserId, 0, user.id)
+        statements.deleteUserSessions.run(user.id)
+        disabled.push(toUser(row(user.id)))
+      }
+      return { disabled, kept }
+    },
+
     /** The ERP account linked to a Bitrix24 user, active or not. */
     byBitrixUserId(bitrixUserId: string): User | null {
       const found = statements.byBitrixUserId.get(bitrixUserId) as UserRow | undefined

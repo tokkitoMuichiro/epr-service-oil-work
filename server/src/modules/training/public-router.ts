@@ -1,12 +1,10 @@
-import { Router, type CookieOptions, type Request, type RequestHandler } from 'express'
-import { HttpError, param, sendFile } from '../../http.js'
+import { Router, type CookieOptions, type Request } from 'express'
+import { param, sendFile } from '../../http.js'
+import { rateLimit } from '../../security.js'
 import { TEST_SESSION_MS } from '../../shared.js'
 import type { TrainingRepository } from './repository.js'
 
 export const TEST_COOKIE = 'erp_test'
-
-const WINDOW_MS = 60_000
-const MAX_REQUESTS = 120
 
 function readCookie(req: Request, name: string): string | null {
   for (const part of (req.headers.cookie ?? '').split(';')) {
@@ -20,20 +18,6 @@ function readCookie(req: Request, name: string): string | null {
     }
   }
   return null
-}
-
-/** Per IP and token: the public test API is reachable without a session. */
-function rateLimit(): RequestHandler {
-  const hits = new Map<string, { count: number; start: number }>()
-  return (req, _res, next) => {
-    const now = Date.now()
-    if (hits.size > 10_000) for (const [k, v] of hits) if (now - v.start > WINDOW_MS) hits.delete(k)
-    const key = `${req.ip}|${param(req, 'token')}`
-    const entry = hits.get(key)
-    if (!entry || now - entry.start > WINDOW_MS) hits.set(key, { count: 1, start: now })
-    else if (++entry.count > MAX_REQUESTS) throw new HttpError(429, 'Слишком много запросов. Подождите минуту и повторите')
-    next()
-  }
 }
 
 export function publicTestRouter(repo: TrainingRepository, options: { secureCookies?: boolean } = {}) {
@@ -51,7 +35,8 @@ export function publicTestRouter(repo: TrainingRepository, options: { secureCook
   const token = (req: Request) => param(req, 'token')
   const session = (req: Request) => readCookie(req, TEST_COOKIE)
 
-  router.use(rateLimit())
+  // Per IP and token: the public test API is reachable without a session.
+  router.use(rateLimit({ windowMs: 60_000, max: 120, key: (req) => `${req.ip}|${token(req)}` }))
   router.use((_req, res, next) => {
     res.setHeader('Cache-Control', 'no-store')
     next()

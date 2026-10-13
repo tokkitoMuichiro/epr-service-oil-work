@@ -6,6 +6,7 @@ import type { BitrixLoginError, BitrixPortalUser } from '../../shared.js'
 export const BITRIX_TOKEN_URL = 'https://oauth.bitrix.info/oauth/token/'
 
 const SEARCH_LIMIT = 20
+const MAX_USER_PAGES = 100
 
 interface BitrixRestUser {
   ID: string | number
@@ -53,6 +54,8 @@ export interface BitrixSso {
 export interface BitrixDirectory {
   /** By name or e-mail; a number looks the user up by Bitrix24 ID (inactive ones included). */
   search(query: string): Promise<BitrixPortalUser[]>
+  /** IDs of users deactivated (fired) on the portal; any failure throws so nobody is disabled by mistake. */
+  firedUserIds(): Promise<Set<string>>
 }
 
 export interface BitrixSsoOptions {
@@ -141,6 +144,10 @@ export function createLiveBitrixDirectory(options: { webhookUrl: string; fetchIm
   const doFetch = options.fetchImpl ?? fetch
 
   async function call(method: string, params: Record<string, unknown>): Promise<BitrixRestUser[]> {
+    return (await request(method, params)).result ?? []
+  }
+
+  async function request(method: string, params: Record<string, unknown>): Promise<RestBody<BitrixRestUser[]> & { next?: number }> {
     let response: Response
     try {
       response = await doFetch(`${base}${method}.json`, {
@@ -151,9 +158,9 @@ export function createLiveBitrixDirectory(options: { webhookUrl: string; fetchIm
     } catch {
       bitrixError('Битрикс недоступен. Проверьте сеть сервера и адрес портала')
     }
-    const body = (await response.json().catch(() => null)) as RestBody<BitrixRestUser[]> | null
+    const body = (await response.json().catch(() => null)) as (RestBody<BitrixRestUser[]> & { next?: number }) | null
     const code = body?.error ?? ''
-    if (response.ok && body && !code) return body.result ?? []
+    if (response.ok && body && !code) return body
     if (code === 'insufficient_scope' || code === 'ACCESS_DENIED' || response.status === 403) {
       bitrixError('У вебхука Битрикс нет права «Пользователи» (user)')
     }
@@ -168,6 +175,17 @@ export function createLiveBitrixDirectory(options: { webhookUrl: string; fetchIm
       if (value.length < 2) return []
       const found = await call('user.search', { FIND: value })
       return found.map(toPortalUser).filter((u) => u.isActive).slice(0, SEARCH_LIMIT)
+    },
+
+    async firedUserIds() {
+      const fired = new Set<string>()
+      let start: number | undefined = 0
+      for (let page = 0; start !== undefined && page < MAX_USER_PAGES; page += 1) {
+        const body: RestBody<BitrixRestUser[]> & { next?: number } = await request('user.get', { FILTER: { ACTIVE: false }, start })
+        for (const user of body.result ?? []) if (!isActiveFlag(user.ACTIVE ?? true)) fired.add(String(user.ID))
+        start = body.next
+      }
+      return fired
     },
   }
 }
@@ -208,6 +226,10 @@ export function createMockBitrixDirectory(users: readonly BitrixPortalUser[] = M
       return users
         .filter((u) => u.isActive && `${u.fullName} ${u.email}`.toLowerCase().includes(value))
         .slice(0, SEARCH_LIMIT)
+    },
+
+    async firedUserIds() {
+      return new Set(users.filter((u) => !u.isActive).map((u) => u.id))
     },
   }
 }

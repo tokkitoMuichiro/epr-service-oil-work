@@ -3,6 +3,7 @@ import { openDatabase } from './db.js'
 import { loadDemoSeed } from './demo-seed.js'
 import { bitrixConfigFromEnv } from './disk/env.js'
 import { closeGracefully } from './lifecycle.js'
+import { log } from './log.js'
 import { bitrixSsoFromConfig } from './modules/auth/bitrix.js'
 
 const port = Number(process.env.PORT) || 4568
@@ -15,7 +16,7 @@ const adminLogin = process.env.ADMIN_LOGIN?.trim()
 const adminPassword = process.env.ADMIN_PASSWORD
 
 const seed = wantsDemo ? await loadDemoSeed() : null
-if (wantsDemo && !seed) console.warn('Демо-данные не найдены (server/src/testing/fixtures): новая база будет пустой')
+if (wantsDemo && !seed) log.warn('Демо-данные не найдены (server/src/testing/fixtures): новая база будет пустой')
 
 const bitrix = bitrixConfigFromEnv()
 const db = openDatabase(dbPath)
@@ -35,31 +36,34 @@ const app = createApp({
 })
 
 if (isProduction && !adminLogin) {
-  console.warn('ADMIN_LOGIN/ADMIN_PASSWORD не заданы: если пользователей ещё нет, войти в систему будет некому')
+  log.warn('ADMIN_LOGIN/ADMIN_PASSWORD не заданы: если пользователей ещё нет, войти в систему будет некому')
+}
+if (isProduction && adminPassword) {
+  log.warn('ADMIN_PASSWORD задан: после первого входа удалите его из erp.env (пароль администратора меняется в «Настройках»)')
 }
 if (isProduction && !process.env.PUBLIC_URL) {
-  console.warn('PUBLIC_URL не задан: ссылки на проверку знаний будут строиться по адресу запроса')
+  log.warn('PUBLIC_URL не задан: ссылки на проверку знаний будут строиться по адресу запроса')
 }
 if (isProduction && bitrix.mode === 'mock') {
-  console.warn('BITRIX_MODE=mock: файлы хранятся в базе, а не на Диске Битрикс24')
+  log.warn('BITRIX_MODE=mock: файлы хранятся в базе, а не на Диске Битрикс24')
 }
 if (isProduction && !bitrixSsoFromConfig(bitrix)) {
-  console.warn('BITRIX_CLIENT_ID/BITRIX_CLIENT_SECRET не заданы: кнопка «Войти через Битрикс24» скрыта')
+  log.warn('BITRIX_CLIENT_ID/BITRIX_CLIENT_SECRET не заданы: кнопка «Войти через Битрикс24» скрыта')
 }
 
 const server = app.listen(port, host, () => {
-  console.log(`API listening on http://${host}:${port}, database: ${dbPath}`)
+  log.info('API запущен', { host, port, database: dbPath, version: process.env.APP_VERSION ?? 'dev' })
 })
 
 let isStopping = false
 function stop(signal: NodeJS.Signals) {
   if (isStopping) return
   isStopping = true
-  console.log(`${signal}: stopping`)
+  log.info('Остановка', { signal })
   closeGracefully({ server, db })
     .then(() => process.exit(0))
     .catch((error: unknown) => {
-      console.error('Shutdown failed', error)
+      log.error('Остановка не удалась', error)
       process.exit(1)
     })
 }
