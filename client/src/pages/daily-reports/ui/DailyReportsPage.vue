@@ -232,16 +232,7 @@ function changeObject() {
             </p>
             <div class="success__actions">
               <UiButton variant="primary" @click="store.lastSaved = null">Ещё отчёт</UiButton>
-              <UiButton
-                variant="ghost"
-                @click="
-                  store.setMode('archive');
-                  store.selectObject(lastSaved.objectId);
-                  void store.openArchiveDate(lastSaved.date)
-                "
-              >
-                Открыть в архиве
-              </UiButton>
+              <UiButton variant="ghost" @click="store.openSavedInArchive()">Открыть в архиве</UiButton>
             </div>
           </div>
           <ReportForm

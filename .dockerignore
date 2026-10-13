@@ -19,3 +19,6 @@ data
 *.sqlite-*
 client/package-lock.json
 e2e
+playwright.config.ts
+test-results
+playwright-report
