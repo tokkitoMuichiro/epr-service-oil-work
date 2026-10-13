@@ -7,8 +7,9 @@ withDefaults(
     text?: string
     kind?: 'empty' | 'loading' | 'error'
     rows?: number
+    compact?: boolean
   }>(),
-  { kind: 'empty', rows: 5 },
+  { kind: 'empty', rows: 5, compact: false },
 )
 </script>
 
@@ -26,7 +27,7 @@ withDefaults(
       </span>
     </div>
   </div>
-  <div v-else class="state" :class="`state--${kind}`" :role="kind === 'error' ? 'alert' : undefined">
+  <div v-else class="state" :class="[`state--${kind}`, { 'state--compact': compact }]" :role="kind === 'error' ? 'alert' : undefined">
     <span class="state__icon" aria-hidden="true">
       <IconAlert v-if="kind === 'error'" :size="24" />
       <IconInbox v-else :size="24" />
@@ -76,6 +77,15 @@ withDefaults(
   margin: 0;
   max-width: 44ch;
   line-height: var(--line-height-base);
+}
+
+.state--compact {
+  padding: var(--space-6) var(--space-4);
+}
+
+.state--compact .state__icon {
+  width: 36px;
+  height: 36px;
 }
 
 .state__actions {
@@ -129,7 +139,7 @@ withDefaults(
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) minmax(0, 1fr);
   gap: var(--space-4);
   align-items: center;
-  min-height: 48px;
+  min-height: calc(var(--control-height) + 4px);
   padding: 0 var(--space-4);
   background: var(--surface-card);
 }
@@ -159,10 +169,6 @@ withDefaults(
 
   .state--loading {
     padding: var(--space-2) 0;
-  }
-
-  .skeleton__row {
-    min-height: 40px;
   }
 }
 </style>

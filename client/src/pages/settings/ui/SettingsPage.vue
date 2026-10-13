@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ROLES, useAccessStore, useRoleStore } from '@/entities/role'
-import { IconClose, UiButton, UiState } from '@/shared/ui'
+import { IconClose, PageHeader, UiButton, UiState } from '@/shared/ui'
 import { ROLE_SUMMARY } from '../model/roles'
 import AccessMatrix from './AccessMatrix.vue'
 import BitrixCheck from './BitrixCheck.vue'
@@ -16,12 +16,7 @@ const isEditable = computed(() => access.can('settings_manage'))
 
 <template>
   <section class="page">
-    <header class="page__header">
-      <div>
-        <h1>Настройки</h1>
-        <p class="ui-hide-mobile">Пользователи, роли и права по всей системе.</p>
-      </div>
-    </header>
+    <PageHeader title="Настройки" description="Пользователи, роли и права по всей системе." />
 
     <UiState v-if="access.status === 'loading' && !access.matrix" kind="loading" title="Загрузка прав…" text="Получаем матрицу с сервера." />
     <UiState v-else-if="access.status === 'error'" kind="error" title="Не удалось загрузить права" :text="access.errorText">
@@ -89,30 +84,14 @@ const isEditable = computed(() => access.can('settings_manage'))
 <style scoped>
 .page {
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-4);
   min-width: 0;
-}
-
-.page__header h1 {
-  margin: 0;
-  font-size: var(--page-title-size);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: var(--line-height-tight);
-  color: var(--text-primary);
-}
-
-.page__header p {
-  margin: var(--space-2) 0 0;
-  color: var(--text-secondary);
-  max-width: 62ch;
-  line-height: var(--line-height-base);
 }
 
 .roles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -122,7 +101,7 @@ const isEditable = computed(() => access.can('settings_manage'))
   display: grid;
   align-content: start;
   gap: var(--space-1);
-  padding: var(--space-4);
+  padding: var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--surface-card);
@@ -137,7 +116,7 @@ const isEditable = computed(() => access.can('settings_manage'))
 
 .role span {
   color: var(--text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   line-height: var(--line-height-base);
 }
 

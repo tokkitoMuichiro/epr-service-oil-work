@@ -30,6 +30,7 @@ import {
   type DailyReport,
   type EquipmentState,
   type ObjectCrew,
+  type Overview,
   type ReportDay,
   type RoleId,
   type User,
@@ -550,6 +551,21 @@ describe('api', () => {
     }
   })
 
+  it('builds the overview from the blocks the role can see', async () => {
+    const asAdmin = (await call('GET', '/api/overview')).json.item as Overview
+    assert.equal(asAdmin.today, TODAY)
+    assert.deepEqual(asAdmin.window, { from: '2026-09-15', to: '2026-10-13' })
+    assert.ok(asAdmin.objects && asAdmin.objects.length > 0)
+    assert.ok(asAdmin.objects.every((o) => !o.actualEnd))
+    assert.ok(asAdmin.objects.some((o) => o.progress !== null && o.lastReport !== null))
+    assert.ok(asAdmin.equipment && asAdmin.documents && asAdmin.training)
+
+    const asKeeper = (await call('GET', '/api/overview', 'storekeeper')).json.item as Overview
+    assert.equal(asKeeper.training, null)
+    assert.ok(asKeeper.equipment)
+    assert.ok(asKeeper.objects)
+  })
+
   it('replaces deletion with dismissal and archive when there is history', async () => {
     assert.equal((await call('DELETE', '/api/personnel/p-1')).status, 409)
     const fresh = await call('POST', '/api/personnel', 'admin', { fullName: 'Новиков Олег', position: 'Рабочий', phone: '', hiredAt: '', note: '' })
@@ -630,11 +646,13 @@ describe('api', () => {
     assert.equal(summary.status, 200)
     assert.match(summary.headers.get('content-type') ?? '', /spreadsheetml\.sheet/)
     assert.match(summary.headers.get('content-disposition') ?? '', /attachment; .*\.xlsx/)
-    assert.match(unzip(summary.data).get('xl/workbook.xml') ?? '', /name="Сводный график"/)
+    const summaryBook = unzip(summary.data)
+    assert.match(summaryBook.get('xl/workbook.xml') ?? '', /<sheet name="Сводный график" sheetId="1"/)
+    assert.match(summaryBook.get('xl/worksheets/sheet2.xml') ?? '', /Месячно-суточный график выполнения работ/)
 
     const object = unzip((await download(`/api/contracts/export.xlsx?objectId=${reported.objectId}`)).data)
-    assert.match(object.get('xl/worksheets/sheet1.xml') ?? '', /Объект целиком/)
-    assert.match(object.get('xl/workbook.xml') ?? '', /name="Отчёты"/)
+    assert.match(object.get('xl/worksheets/sheet1.xml') ?? '', /Утверждаю:.*Генеральный директор ООО &quot;АММИР&quot;/)
+    assert.match(object.get('xl/workbook.xml') ?? '', /name="Прил.2 ГПР".*name="Отчёты".*_xlnm.Print_Titles/)
     assert.equal((await call('GET', '/api/contracts/export.xlsx?objectId=missing')).status, 404)
   })
 })

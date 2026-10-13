@@ -19,8 +19,8 @@ test('документ сотрудника загружается, скачив
   expect(downloaded.name).toBe(file.name)
   expect(downloaded.text).toBe('Удостоверение № E2E-1')
 
-  page.once('dialog', (dialog) => void dialog.accept())
   await card.getByRole('button', { name: 'Удалить Удостоверение E2E' }).click()
+  await page.getByRole('alertdialog', { name: 'Удалить документ «Удостоверение E2E»?' }).getByRole('button', { name: 'Удалить документ' }).click()
   await expect(link).toHaveCount(0)
 
   await page.reload()

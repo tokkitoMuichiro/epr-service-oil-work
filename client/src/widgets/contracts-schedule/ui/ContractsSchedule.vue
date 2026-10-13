@@ -401,18 +401,18 @@ const backLabel = computed(() => {
           <template v-if="object && status">
             <ObjectStatusBadge :status="status" />
             <span v-if="health" :class="`text--${health.tone}`">{{ health.label }}</span>
-            <span>· {{ object.location || 'без адреса' }}</span>
-            <span>· {{ reportCountLabel(objectReportDays.length) }}</span>
+            <span class="head__item">{{ object.location || 'без адреса' }}</span>
+            <span class="head__item">{{ reportCountLabel(objectReportDays.length) }}</span>
           </template>
           <template v-else-if="contract && progress">
-            <span>{{ contract.customer }}</span>
-            <span v-if="progress.total">
-              · объектов {{ progress.total }}: в работе {{ progress.inProgress }}, план {{ progress.planned }}, завершено
+            <span v-if="contract.customer" class="head__item">{{ contract.customer }}</span>
+            <span v-if="progress.total" class="head__item">
+              объектов {{ progress.total }}: в работе {{ progress.inProgress }}, план {{ progress.planned }}, завершено
               {{ progress.done }}
             </span>
           </template>
-          <span v-else>Договоров: {{ contracts.length }} · объектов: {{ objectsTotal }}</span>
-          <span>· {{ headerSpan }}</span>
+          <span v-else class="head__item">Договоров: {{ contracts.length }} · объектов: {{ objectsTotal }}</span>
+          <span v-if="headerSpan" class="head__item">{{ headerSpan }}</span>
           <span v-if="contract?.archived || object?.archived" class="ui-badge ui-badge--neutral">Архив</span>
         </p>
       </div>
@@ -647,6 +647,12 @@ const backLabel = computed(() => {
   font-weight: 700;
 }
 
+.head__item + .head__item::before {
+  content: '·';
+  margin-right: 6px;
+  color: var(--text-disabled);
+}
+
 .head__tools {
   display: flex;
   align-items: center;
@@ -808,12 +814,16 @@ const backLabel = computed(() => {
 }
 
 .cell strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
   font-size: var(--font-size-xs);
   font-weight: 600;
+  line-height: var(--line-height-tight);
   color: var(--text-primary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .cell--group strong {

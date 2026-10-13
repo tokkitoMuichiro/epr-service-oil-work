@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { authFor, canViewAllList, useEquipmentStore } from '@/entities/equipment'
 import {
   bitrixLoginUrl,
+  equipmentPermissionsOf,
   safeRedirectPath,
   useAccessStore,
   useRoleStore,
@@ -31,6 +33,14 @@ import {
   TrainingShell,
   TrainingSummaryPage,
 } from '@/pages/training'
+
+function defaultEquipmentRoute() {
+  const equipment = useEquipmentStore()
+  const auth = equipment.isReady
+    ? equipment.auth
+    : authFor(equipment.persona, equipmentPermissionsOf(useAccessStore().permissions))
+  return canViewAllList(auth) ? 'equipment-all' : 'equipment-mine'
+}
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -73,7 +83,7 @@ export const router = createRouter({
       component: EquipmentShell,
       meta: { block: 'equipment' },
       children: [
-        { path: '', name: 'equipment', redirect: { name: 'equipment-mine' } },
+        { path: '', name: 'equipment', redirect: () => ({ name: defaultEquipmentRoute() }) },
         {
           path: `mine/${CATEGORY}`,
           name: 'equipment-mine',

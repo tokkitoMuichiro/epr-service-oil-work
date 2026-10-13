@@ -16,7 +16,7 @@ import {
   type TrainingTest,
 } from '@/entities/training'
 import { errorMessage } from '@/shared/api'
-import { UiButton, UiState } from '@/shared/ui'
+import { UiButton, UiState, askConfirm } from '@/shared/ui'
 import { newId } from '../model/ids'
 import QuestionEditor from './QuestionEditor.vue'
 import TestPreview from './TestPreview.vue'
@@ -133,10 +133,12 @@ function moveQuestion(index: number, delta: number) {
   ;[list[index], list[target]] = [list[target], list[index]]
 }
 
-function removeQuestion(index: number) {
+async function removeQuestion(index: number) {
   const question = content.value.questions[index]
-  if (question.text.trim() && !window.confirm(`Удалить вопрос ${index + 1}?`)) return
-  content.value.questions.splice(index, 1)
+  if (question.text.trim() && !(await askConfirm({ title: `Удалить вопрос ${index + 1}?`, confirmText: 'Удалить вопрос' })))
+    return
+  const position = content.value.questions.indexOf(question)
+  if (position !== -1) content.value.questions.splice(position, 1)
 }
 
 function validate(forPublish: boolean): boolean {
@@ -165,9 +167,18 @@ async function run(action: () => Promise<void>) {
   }
 }
 
-function save() {
+async function save() {
   if (!validate(isPublished.value)) return
-  if (isPublished.value && !window.confirm('Тест опубликован. Сохранение создаст новую версию; уже выданные ссылки останутся на прежней. Продолжить?')) return
+  if (
+    isPublished.value &&
+    !(await askConfirm({
+      title: 'Сохранить новую версию теста?',
+      message: 'Тест опубликован. Уже выданные ссылки останутся на прежней версии.',
+      confirmText: 'Сохранить версию',
+      tone: 'default',
+    }))
+  )
+    return
   return run(async () => {
     const saved = await persist()
     notice.value = saved?.status === 'published' ? `Сохранено как версия ${saved.version}` : 'Черновик сохранён'
@@ -186,9 +197,15 @@ function publish() {
   })
 }
 
-function archive() {
-  if (!testId.value || !window.confirm('Отправить тест в архив? Назначать его станет нельзя, выданные ссылки продолжат работать.')) return
+async function archive() {
   const id = testId.value
+  if (!id) return
+  const confirmed = await askConfirm({
+    title: 'Отправить тест в архив?',
+    message: 'Назначать его станет нельзя, выданные ссылки продолжат работать.',
+    confirmText: 'В архив',
+  })
+  if (!confirmed) return
   return run(async () => {
     test.value = await trainingApi.archiveTest(id)
     await store.refresh()
@@ -196,9 +213,10 @@ function archive() {
   })
 }
 
-function remove() {
-  if (!testId.value || !window.confirm('Удалить тест безвозвратно?')) return
+async function remove() {
   const id = testId.value
+  if (!id) return
+  if (!(await askConfirm({ title: 'Удалить тест безвозвратно?', confirmText: 'Удалить тест' }))) return
   return run(async () => {
     await trainingApi.removeTest(id)
     await store.refresh()

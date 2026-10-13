@@ -52,4 +52,34 @@ describe('xlsx workbook', () => {
     assert.match(styles, /<cellXfs count="4">/)
     assert.match(styles, /<fgColor rgb="FF2E75B6"\/>/)
   })
+
+  it('writes merges, row heights, fonts and print setup with repeated title rows', () => {
+    const files = unzip(
+      workbook(
+        [
+          {
+            name: "Прил.2 ГПР o'k",
+            rows: [[{ value: 'Шапка', style: 'big' }], [], ['a']],
+            merges: ['A1:C2'],
+            heights: { 1: 30 },
+            zoom: 70,
+            print: { paper: 'A3', landscape: true, fitWidth: true, centered: true, titleRows: [1, 2] },
+          },
+        ],
+        [{ id: 'big', size: 16, valign: 'Top', shrink: true }],
+        { font: { name: 'Franklin Gothic Book', size: 12 } },
+      ),
+    )
+    const sheet = files.get('xl/worksheets/sheet1.xml') ?? ''
+    assert.match(sheet, /^.*<sheetPr><pageSetUpPr fitToPage="1"\/><\/sheetPr><sheetViews>/)
+    assert.match(sheet, /zoomScale="70"/)
+    assert.match(sheet, /<row r="1" ht="30" customHeight="1">/)
+    assert.match(sheet, /<\/sheetData><mergeCells count="1"><mergeCell ref="A1:C2"\/><\/mergeCells><printOptions horizontalCentered="1"\/>/)
+    assert.match(sheet, /<pageSetup paperSize="8" orientation="landscape" fitToWidth="1" fitToHeight="0"\/><\/worksheet>$/)
+    assert.match(files.get('xl/workbook.xml') ?? '', /<definedName name="_xlnm.Print_Titles" localSheetId="0">'Прил.2 ГПР o''k'!\$1:\$2<\/definedName>/)
+    const styles = files.get('xl/styles.xml') ?? ''
+    assert.match(styles, /<font><sz val="12"\/><name val="Franklin Gothic Book"\/><\/font>/)
+    assert.match(styles, /<font><sz val="16"\/><name val="Franklin Gothic Book"\/><\/font>/)
+    assert.match(styles, /<alignment vertical="top" shrinkToFit="1"\/>/)
+  })
 })

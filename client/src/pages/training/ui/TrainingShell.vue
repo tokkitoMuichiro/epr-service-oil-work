@@ -2,7 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { useTrainingStore } from '@/entities/training'
-import { UiButton, UiState } from '@/shared/ui'
+import { PageHeader, UiButton, UiState } from '@/shared/ui'
 
 const route = useRoute()
 const store = useTrainingStore()
@@ -16,11 +16,7 @@ onMounted(() => {
 
 <template>
   <section class="training">
-    <header class="training__header">
-      <p class="ui-overline training__eyebrow ui-hide-mobile">Обучение и проверка знаний</p>
-      <h1 class="ui-page-title">{{ title }}</h1>
-      <p v-if="route.meta.description" class="ui-page-lead ui-hide-mobile">{{ route.meta.description }}</p>
-    </header>
+    <PageHeader :title="title" :description="route.meta.description" />
 
     <UiState v-if="store.status === 'loading' || store.status === 'idle'" kind="loading" title="Загрузка…" text="Получаем программы и тесты." />
     <UiState v-else-if="store.status === 'error'" kind="error" title="Не удалось загрузить" :text="store.errorText">
@@ -34,12 +30,8 @@ onMounted(() => {
 .training {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
   min-height: 100%;
-}
-
-.training__eyebrow {
-  margin: 0 0 var(--space-1);
 }
 
 @media (max-width: 860px) {

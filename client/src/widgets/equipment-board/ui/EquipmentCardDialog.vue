@@ -26,7 +26,7 @@ import {
 import { ConditionSelect } from '@/features/equipment-condition'
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
-import { IconClose, UiButton, UiDialog, UiFileDrop } from '@/shared/ui'
+import { IconClose, UiButton, UiDialog, UiFileDrop, askConfirm } from '@/shared/ui'
 
 const props = defineProps<{ itemId: string | null }>()
 const emit = defineEmits<{
@@ -41,8 +41,6 @@ const store = useEquipmentStore()
 const history = ref<EquipmentHistoryEntry[]>([])
 const historyStatus = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
 const historyError = ref('')
-const isDeleteArmed = ref(false)
-
 const item = computed(() => store.findItem(props.itemId))
 const auth = computed(() => store.auth)
 const transfers = computed(() => store.transfers)
@@ -69,10 +67,7 @@ watch(
   () => [props.itemId, item.value?.updatedAt] as const,
   ([id], previous) => {
     if (!id) return
-    if (id !== previous?.[0]) {
-      isDeleteArmed.value = false
-      store.clearActionError()
-    }
+    if (id !== previous?.[0]) store.clearActionError()
     void loadHistory(id)
   },
   { immediate: true },
@@ -83,12 +78,14 @@ watch(item, (current) => {
 })
 
 async function remove() {
-  if (!item.value) return
-  if (!isDeleteArmed.value) {
-    isDeleteArmed.value = true
-    return
-  }
-  if (await store.removeItem(item.value.id)) emit('close')
+  const current = item.value
+  if (!current) return
+  const confirmed = await askConfirm({
+    title: `Удалить «${current.name}»?`,
+    message: 'Удаление нельзя отменить.',
+    confirmText: 'Удалить',
+  })
+  if (confirmed && (await store.removeItem(current.id))) emit('close')
 }
 </script>
 
@@ -150,10 +147,7 @@ async function remove() {
           Подтвердить заполнение
         </UiButton>
         <template v-if="canDeleteItem(auth, item, transfers)">
-          <UiButton size="sm" :variant="isDeleteArmed ? 'danger' : 'ghost'" :disabled="store.busy" @click="remove">
-            {{ isDeleteArmed ? 'Точно удалить' : 'Удалить' }}
-          </UiButton>
-          <UiButton v-if="isDeleteArmed" size="sm" variant="ghost" @click="isDeleteArmed = false">Не удалять</UiButton>
+          <UiButton size="sm" variant="ghost" :disabled="store.busy" @click="remove">Удалить</UiButton>
         </template>
       </div>
 

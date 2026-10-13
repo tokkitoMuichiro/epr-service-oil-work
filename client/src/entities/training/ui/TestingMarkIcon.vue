@@ -13,6 +13,7 @@ defineProps<{ mark: TestingMark }>()
       <path d="M10 4.5v7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
       <circle cx="10" cy="15.5" r="1.5" fill="currentColor" />
     </svg>
+    <span v-else aria-hidden="true">—</span>
   </span>
 </template>
 
@@ -22,9 +23,9 @@ defineProps<{ mark: TestingMark }>()
   place-items: center;
   width: 24px;
   height: 24px;
-  border: 1.5px solid var(--border-strong);
+  border: 1.5px solid transparent;
   border-radius: var(--radius);
-  background: var(--surface-card);
+  color: var(--text-secondary);
   vertical-align: middle;
 }
 

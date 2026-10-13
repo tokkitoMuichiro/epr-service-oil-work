@@ -164,8 +164,8 @@ function onBarClick(event: MouseEvent, row: T, bar: GridBar) {
 }
 
 .grid {
-  --label-width: 250px;
-  --row-height: 44px;
+  --label-width: 280px;
+  --row-height: var(--timeline-row);
   min-width: 820px;
 }
 
@@ -408,15 +408,6 @@ function onBarClick(event: MouseEvent, row: T, bar: GridBar) {
 
   .grid__label {
     padding: 6px 8px;
-  }
-
-  .grid__label :deep(.cell strong) {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    white-space: normal;
-    line-height: var(--line-height-tight);
   }
 }
 

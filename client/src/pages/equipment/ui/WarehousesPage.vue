@@ -12,14 +12,12 @@ import {
 } from '@/entities/equipment'
 import { WarehouseFormDialog } from '@/features/warehouse-form'
 import { useMobilePagination } from '@/shared/lib/pagination'
-import { IconClose, UiButton, UiPagination, UiState } from '@/shared/ui'
+import { IconClose, UiButton, UiPagination, UiState, askConfirm } from '@/shared/ui'
 
 const store = useEquipmentStore()
 
 const isFormOpen = ref(false)
 const editing = ref<Warehouse | null>(null)
-const armedDeleteId = ref<string | null>(null)
-
 const canManage = computed(() => canManageWarehouses(store.auth))
 const categories: AssetCategory[] = ['EQUIPMENT', 'VEHICLE', 'CARD']
 
@@ -54,12 +52,8 @@ function openForm(w: Warehouse | null) {
 }
 
 async function remove(w: Warehouse) {
-  if (armedDeleteId.value !== w.id) {
-    armedDeleteId.value = w.id
-    return
-  }
+  if (!(await askConfirm({ title: `Удалить базу «${w.name}»?`, confirmText: 'Удалить базу' }))) return
   await store.removeWarehouse(w.id)
-  armedDeleteId.value = null
 }
 </script>
 
@@ -101,15 +95,7 @@ async function remove(w: Warehouse) {
         <div v-if="canManage" class="base__actions">
           <UiButton size="sm" variant="ghost" @click="openForm(w)">Изменить</UiButton>
           <template v-if="!w.isSystem">
-            <UiButton
-              size="sm"
-              :variant="armedDeleteId === w.id ? 'danger' : 'ghost'"
-              :disabled="store.busy"
-              @click="remove(w)"
-            >
-              {{ armedDeleteId === w.id ? 'Точно удалить' : 'Удалить' }}
-            </UiButton>
-            <UiButton v-if="armedDeleteId === w.id" size="sm" variant="ghost" @click="armedDeleteId = null">Нет</UiButton>
+            <UiButton size="sm" variant="ghost" :disabled="store.busy" @click="remove(w)">Удалить</UiButton>
           </template>
         </div>
       </li>

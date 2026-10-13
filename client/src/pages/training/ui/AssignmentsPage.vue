@@ -19,7 +19,7 @@ import { formatDateRu, formatDateTimeRu } from '@/shared/lib/date'
 import { reloadStatus } from '@/shared/lib/load-status'
 import { useMobilePagination } from '@/shared/lib/pagination'
 import { todayIso } from '@shared/dates'
-import { UiButton, UiDialog, UiPagination, UiState } from '@/shared/ui'
+import { UiButton, UiDialog, UiPagination, UiState, askConfirm } from '@/shared/ui'
 
 const store = useTrainingStore()
 const access = useAccessStore()
@@ -95,8 +95,14 @@ function copyLink(item: AssignmentView, withText: boolean) {
   })
 }
 
-function reissue(item: AssignmentView) {
-  if (!window.confirm(`Перевыпустить ссылку для ${item.workerName}? Старая ссылка перестанет работать.`)) return
+async function reissue(item: AssignmentView) {
+  const confirmed = await askConfirm({
+    title: `Перевыпустить ссылку для ${item.workerName}?`,
+    message: 'Старая ссылка перестанет работать.',
+    confirmText: 'Перевыпустить',
+    tone: 'default',
+  })
+  if (!confirmed) return
   return run(item.id, async () => {
     const link = await trainingApi.reissue(item.id)
     await copyText(link.message)

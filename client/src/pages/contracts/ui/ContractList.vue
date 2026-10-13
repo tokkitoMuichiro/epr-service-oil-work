@@ -63,19 +63,21 @@ function isOpen(contract: Contract): boolean {
         @click="onContract(contract)"
       >
         <span class="row__text">
-          <strong>{{ contract.name }}</strong>
-          <span>{{ contract.customer }}</span>
-        </span>
-        <span class="counts" :title="`В работе: ${contractProgress(contract).inProgress}, запланировано: ${contractProgress(contract).planned}, завершено: ${contractProgress(contract).done}`">
-          <template v-if="!isArchive">
-            <span v-if="contractProgress(contract).inProgress" class="counts__item counts__item--in_progress">
-              {{ contractProgress(contract).inProgress }}
+          <strong class="row__title" :title="contract.name">{{ contract.name }}</strong>
+          <span :title="contract.customer">{{ contract.customer }}</span>
+          <span class="counts">
+            <template v-if="!isArchive">
+              <span v-if="contractProgress(contract).inProgress" class="counts__item">
+                <i class="dot dot--in_progress" aria-hidden="true" />в работе {{ contractProgress(contract).inProgress }}
+              </span>
+              <span v-if="contractProgress(contract).planned" class="counts__item">
+                <i class="dot dot--planned" aria-hidden="true" />план {{ contractProgress(contract).planned }}
+              </span>
+            </template>
+            <span v-else class="counts__item">
+              <i class="dot dot--done" aria-hidden="true" />объектов {{ contract.objects.length }}
             </span>
-            <span v-if="contractProgress(contract).planned" class="counts__item counts__item--planned">
-              {{ contractProgress(contract).planned }}
-            </span>
-          </template>
-          <span v-else class="counts__item counts__item--done">{{ contract.objects.length }}</span>
+          </span>
         </span>
         <IconChevron class="row__chevron" :size="16" />
       </button>
@@ -137,8 +139,8 @@ function isOpen(contract: Contract): boolean {
   align-items: center;
   gap: var(--space-2);
   width: 100%;
-  min-height: 40px;
-  padding: 6px var(--space-3);
+  min-height: calc(var(--control-height) + 4px);
+  padding: var(--space-2) var(--space-3);
   border: 0;
   border-left: 3px solid transparent;
   background: transparent;
@@ -200,36 +202,31 @@ function isOpen(contract: Contract): boolean {
   transform: rotate(180deg);
 }
 
-.counts {
-  display: inline-flex;
-  gap: 4px;
+.row__text .row__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.row__text .counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--space-3);
+  overflow: visible;
+}
+
+.counts:empty {
+  display: none;
 }
 
 .counts__item {
-  display: inline-grid;
-  place-items: center;
-  min-width: 20px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: var(--radius-pill);
-  font-size: var(--font-size-2xs);
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-variant-numeric: tabular-nums;
-}
-
-.counts__item--in_progress {
-  background: var(--status-info-bg);
-  color: var(--status-info-fg);
-}
-
-.counts__item--planned {
-  background: var(--surface-sunken);
-  color: var(--text-secondary);
-}
-
-.counts__item--done {
-  background: var(--status-ok-bg);
-  color: var(--status-ok-fg);
 }
 
 .objects {
@@ -240,7 +237,9 @@ function isOpen(contract: Contract): boolean {
 }
 
 .row--object {
-  min-height: 36px;
+  min-height: var(--control-height);
+  padding-top: 6px;
+  padding-bottom: 6px;
   padding-left: var(--space-4);
 }
 

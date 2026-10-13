@@ -11,7 +11,7 @@ import { useAccessStore } from '@/entities/role'
 import { todayIso } from '@shared/dates'
 import { ReportForm } from '@/features/report-form'
 import { useMobilePagination } from '@/shared/lib/pagination'
-import { IconChevron, UiButton, UiInput, UiPagination, UiState } from '@/shared/ui'
+import { IconChevron, PageHeader, UiButton, UiInput, UiPagination, UiState } from '@/shared/ui'
 
 const store = useDailyReportsStore()
 const {
@@ -120,36 +120,18 @@ function changeObject() {
 
 <template>
   <section class="page">
-    <header class="page__header">
-      <div>
-        <h1>Ежедневные отчёты</h1>
-        <p class="ui-hide-mobile">
-          Объекты из контрактов ERP. Отчёты хранятся на сервере.
-        </p>
-      </div>
-      <div v-if="canEdit" class="mode-tabs ui-segmented" role="tablist">
-        <button
-          type="button"
-          class="mode-tab"
-          role="tab"
-          :aria-selected="mode === 'create'"
-          :class="{ 'is-active': mode === 'create' }"
-          @click="store.setMode('create')"
-        >
-          Новый отчёт
-        </button>
-        <button
-          type="button"
-          class="mode-tab"
-          role="tab"
-          :aria-selected="mode === 'archive'"
-          :class="{ 'is-active': mode === 'archive' }"
-          @click="store.setMode('archive')"
-        >
-          Архив
-        </button>
-      </div>
-    </header>
+    <PageHeader title="Ежедневные отчёты" description="Смена по объекту: состав, техника, объёмы и планы на завтра. Отчёты хранятся на сервере.">
+      <template v-if="canEdit" #tabs>
+        <div class="ui-segmented" role="tablist" aria-label="Режим">
+          <button type="button" role="tab" :aria-selected="mode === 'create'" @click="store.setMode('create')">
+            Новый отчёт
+          </button>
+          <button type="button" role="tab" :aria-selected="mode === 'archive'" @click="store.setMode('archive')">
+            Архив
+          </button>
+        </div>
+      </template>
+    </PageHeader>
 
     <UiState
       v-if="status === 'loading'"
@@ -213,6 +195,7 @@ function changeObject() {
         </button>
         <template v-if="!selectedObject">
           <UiState
+            compact
             title="Выберите объект"
             :text="
               mode === 'create'
@@ -264,6 +247,7 @@ function changeObject() {
               <h2 class="ui-overline">Даты отчётов</h2>
               <UiState
                 v-if="archiveDates.length === 0"
+                compact
                 title="Архив пуст"
                 text="По этому объекту ещё нет сохранённых отчётов."
               />
@@ -327,33 +311,6 @@ function changeObject() {
   flex-direction: column;
   gap: var(--space-5);
   min-height: 100%;
-}
-
-.page__header {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-4);
-  align-items: flex-end;
-  flex-wrap: wrap;
-}
-
-.page__header h1 {
-  margin: 0;
-  font-size: var(--page-title-size);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: var(--line-height-tight);
-  color: var(--text-primary);
-}
-
-.page__header p {
-  margin: var(--space-2) 0 0;
-  color: var(--text-secondary);
-  max-width: 56ch;
-}
-
-.mode-tab {
-  min-height: var(--control-height-sm);
 }
 
 .layout {
@@ -614,11 +571,6 @@ function changeObject() {
     gap: var(--space-3);
   }
 
-  .page__header {
-    align-items: stretch;
-    gap: var(--space-2);
-  }
-
   .objects {
     gap: var(--space-2);
   }
@@ -631,16 +583,6 @@ function changeObject() {
 
   .date-item {
     padding: var(--space-2) var(--space-3);
-  }
-
-  .mode-tabs {
-    display: flex;
-    width: 100%;
-  }
-
-  .mode-tab {
-    flex: 1;
-    min-height: var(--tap-size);
   }
 
   .layout {

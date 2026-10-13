@@ -12,6 +12,7 @@ import {
   periodColumns,
   periodContaining,
   periodsInRange,
+  plannedVolumeOn,
   progressState,
   scheduleBounds,
   shiftPeriod,
@@ -225,5 +226,15 @@ describe('schedule bounds', () => {
         ['2026-05-01', 1, null],
       ],
     )
+  })
+
+  it('spreads the planned volume evenly over the planned days', () => {
+    const work = { plannedStart: '2026-03-01', plannedEnd: '2026-03-10', plannedVolume: 100 }
+    assert.equal(plannedVolumeOn(work, '2026-02-28'), 0)
+    assert.equal(plannedVolumeOn(work, '2026-03-01'), 10)
+    assert.equal(plannedVolumeOn(work, '2026-03-05'), 50)
+    assert.equal(plannedVolumeOn(work, '2026-03-10'), 100)
+    assert.equal(plannedVolumeOn(work, '2026-04-01'), 100)
+    assert.equal(plannedVolumeOn({ ...work, plannedEnd: '' }, '2026-03-05'), 0)
   })
 })

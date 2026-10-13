@@ -56,3 +56,49 @@ test('новый договор с объектом и ежедневный от
   await expect(page.getByRole('heading', { name: `Отчёт за ${moscowDate()}` })).toBeVisible()
   await expect(page.getByText('Откачано 12 м³')).toBeVisible()
 })
+
+test('удаление объекта и контракта спрашивает подтверждение в окне приложения', async ({ page }) => {
+  const contractName = 'Договор E2E-удаление'
+  const objectName = 'РВС-700 E2E-удаление'
+  await page.goto('/contracts')
+  await page.getByRole('button', { name: 'Новый контракт' }).click()
+  const contractDialog = page.getByRole('dialog', { name: 'Новый контракт' })
+  await contractDialog.getByLabel('Название контракта').fill(contractName)
+  await contractDialog.getByLabel('Заказчик').fill(CUSTOMER)
+  await contractDialog.getByRole('button', { name: 'Сохранить' }).click()
+
+  const objectDialog = page.getByRole('dialog', { name: 'Новый объект' })
+  await objectDialog.getByLabel('Объект').fill(objectName)
+  await objectDialog.getByLabel('Площадка / НПС').fill('НПС «Тестовая»')
+  await objectDialog.getByLabel('План: начало').fill(moscowDate())
+  await objectDialog.getByLabel('План: окончание').fill(moscowDate(10))
+  await objectDialog.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(objectDialog).toBeHidden()
+
+  const list = page.getByRole('navigation', { name: 'Договоры' })
+  const objectButton = list.getByRole('button', { name: new RegExp(objectName) })
+  await objectButton.click()
+
+  const confirm = page.getByRole('alertdialog')
+  await page.getByRole('button', { name: 'Редактировать объект' }).click()
+  await page.getByRole('menuitem', { name: 'Удалить объект' }).click()
+  await expect(confirm).toHaveAccessibleName(`Удалить объект «${objectName}»?`)
+  await confirm.getByRole('button', { name: 'Отмена' }).click()
+  await expect(confirm).toBeHidden()
+  await expect(objectButton).toBeVisible()
+
+  await page.getByRole('button', { name: 'Редактировать объект' }).click()
+  await page.getByRole('menuitem', { name: 'Удалить объект' }).click()
+  await confirm.getByRole('button', { name: 'Удалить объект' }).click()
+  await expect(objectButton).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Редактировать контракт' }).click()
+  await page.getByRole('menuitem', { name: 'Удалить контракт' }).click()
+  await page.keyboard.press('Escape')
+  await expect(confirm).toBeHidden()
+
+  await page.getByRole('button', { name: 'Редактировать контракт' }).click()
+  await page.getByRole('menuitem', { name: 'Удалить контракт' }).click()
+  await confirm.getByRole('button', { name: 'Удалить контракт' }).click()
+  await expect(list.getByRole('button', { name: new RegExp(contractName) })).toHaveCount(0)
+})
