@@ -33,6 +33,16 @@ previous_tag() {
   if [ "$previous" != "$current" ]; then echo "$previous"; fi
 }
 
+# Оставляем образы текущего и предыдущего релиза; более старые при откате скачаются заново.
+remove_old_images() {
+  local keep_previous tag
+  keep_previous=$(previous_tag)
+  docker image ls "$repo" --format '{{.Tag}}' | while read -r tag; do
+    if [ "$tag" = "$target" ] || [ "$tag" = "$keep_previous" ] || [ "$tag" = "<none>" ]; then continue; fi
+    docker image rm "$repo:$tag" >/dev/null || echo "Образ $repo:$tag не удалён" >&2
+  done
+}
+
 wait_healthy() {
   local id status
   for _ in $(seq 1 "$HEALTH_TIMEOUT"); do
@@ -71,6 +81,7 @@ docker compose up -d --remove-orphans
 
 if wait_healthy; then
   echo "$(date -Iseconds) $target" >>releases.log
+  remove_old_images
   docker image prune -f >/dev/null
   echo "Релиз $target запущен"
   exit 0
