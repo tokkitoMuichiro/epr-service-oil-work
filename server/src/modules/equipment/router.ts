@@ -52,8 +52,8 @@ export function equipmentRouter(service: EquipmentService) {
     res.json({ item: service.update(requestUser(req), param(req, 'id'), req.body ?? {}) })
   })
 
-  router.delete('/:id', (req, res) => {
-    service.remove(requestUser(req), param(req, 'id'))
+  router.delete('/:id', async (req, res) => {
+    await service.remove(requestUser(req), param(req, 'id'))
     res.status(204).end()
   })
 
@@ -83,18 +83,18 @@ export function equipmentRouter(service: EquipmentService) {
     res.json({ items: service.history(requestUser(req), param(req, 'id')) })
   })
 
-  router.post('/:id/documents', documentBody, (req, res) => {
+  router.post('/:id/documents', documentBody, async (req, res) => {
     const meta = { fileName: trimmed(req.query.fileName) }
-    res.status(201).json({ item: service.addDocument(requestUser(req), param(req, 'id'), meta, uploadedFile(req)) })
+    res.status(201).json({ item: await service.addDocument(requestUser(req), param(req, 'id'), meta, uploadedFile(req)) })
   })
 
-  router.get('/:id/documents/:docId/file', (req, res) => {
-    const { doc, file } = service.documentFile(requestUser(req), param(req, 'id'), param(req, 'docId'))
+  router.get('/:id/documents/:docId/file', async (req, res) => {
+    const { doc, file } = await service.documentFile(requestUser(req), param(req, 'id'), param(req, 'docId'))
     sendFile(res, file, doc.fileName)
   })
 
-  router.delete('/:id/documents/:docId', (req, res) => {
-    res.json({ item: service.removeDocument(requestUser(req), param(req, 'id'), param(req, 'docId')) })
+  router.delete('/:id/documents/:docId', async (req, res) => {
+    res.json({ item: await service.removeDocument(requestUser(req), param(req, 'id'), param(req, 'docId')) })
   })
 
   return router

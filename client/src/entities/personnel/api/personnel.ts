@@ -1,4 +1,4 @@
-import { apiUrl, http } from '@/shared/api'
+import { apiUrl, downloadFile, http } from '@/shared/api'
 import type { EmploymentStatus, QualificationTypeId, Worker, WorkerDraft } from '../model/types'
 
 type One = { item: Worker }
@@ -64,8 +64,8 @@ export const personnelApi = {
     return (await http.delete<One>(`/personnel/${id}/photo`)).item
   },
 
-  documentUrl(id: string, docId: string): string {
-    return apiUrl(`/personnel/${id}/documents/${docId}/file`)
+  downloadDocument(id: string, docId: string, fileName: string): Promise<void> {
+    return downloadFile(`/personnel/${id}/documents/${docId}/file`, fileName)
   },
 
   photoUrl(worker: Pick<Worker, 'id' | 'photoUpdatedAt'>): string | null {

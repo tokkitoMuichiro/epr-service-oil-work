@@ -105,8 +105,8 @@ export function trainingRouter(repo: TrainingRepository, access: AccessStore, op
     res.json({ item: repo.updateMaterial(actor(req), param(req, 'id'), req.body ?? {}) })
   })
 
-  router.delete('/materials/:id', need('training_manage'), (req, res) => {
-    repo.removeMaterial(param(req, 'id'))
+  router.delete('/materials/:id', need('training_manage'), async (req, res) => {
+    await repo.removeMaterial(param(req, 'id'))
     res.status(204).end()
   })
 

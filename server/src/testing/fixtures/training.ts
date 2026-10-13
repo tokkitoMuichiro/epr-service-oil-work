@@ -1,4 +1,4 @@
-import { MOCK_ROOT_ID, MOCK_URL, emptyMockDisk, type MockDisk } from '../../modules/training/bitrix.js'
+import { MOCK_TRAINING_FOLDER_ID, MOCK_URL, emptyMockDisk, type MockDiskState } from '../../disk/mock.js'
 import { trainingCatalog, type AssignmentRecord, type TrainingState } from '../../modules/training/model.js'
 import { nextDueDate, type CertificationRecord, type TestAssignment, type TestContent, type TestQuestion, type TrainingMaterial, type TrainingTest } from '../../shared.js'
 
@@ -73,7 +73,7 @@ function material(file: DemoFile): TrainingMaterial {
     programIds: [file.programId],
     source: file.source,
     bitrixFileId: fileId(file),
-    storagePath: `mock-disk/Учебные материалы/${file.folder.join('/')}/${file.fileName}`,
+    storagePath: `mock-disk/ERP/Учебные материалы/${file.folder.join('/')}/${file.fileName}`,
     url: `${MOCK_URL}${fileId(file)}`,
     fileName: file.fileName,
     mimeType: file.mimeType,
@@ -87,7 +87,7 @@ function material(file: DemoFile): TrainingMaterial {
 }
 
 /** Mock Disk with the folders and file entries the demo materials point to. */
-export function demoMockDisk(): MockDisk {
+export function demoMockDisk(): MockDiskState {
   const disk = emptyMockDisk()
   function folder(parentId: string, name: string): string {
     const existing = disk.folders.find((f) => f.parentId === parentId && f.name === name)
@@ -98,7 +98,7 @@ export function demoMockDisk(): MockDisk {
     return id
   }
   for (const file of FILES) {
-    const folderId = file.folder.reduce(folder, MOCK_ROOT_ID)
+    const folderId = file.folder.reduce(folder, MOCK_TRAINING_FOLDER_ID)
     disk.files.push({ id: fileId(file), name: file.fileName, folderId, size: file.size, mimeType: file.mimeType })
   }
   return disk

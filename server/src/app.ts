@@ -2,7 +2,10 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import cors from 'cors'
 import express from 'express'
-import { createAuditLog, createStorage, openDatabase, type Database, type DatabaseSeed } from './db.js'
+import { createAuditLog, createStorage, openDatabase, type Database, type DatabaseSeed, type Storage } from './db.js'
+import { createDisk, type BitrixConfig, type Disk } from './disk/index.js'
+import { diskRouter } from './disk/router.js'
+import { createDiskSync, scheduleDiskSync } from './disk/sync.js'
 import { errorHandler, notFound } from './http.js'
 import { accessRouter } from './modules/access/router.js'
 import { createAccessStore } from './modules/access/store.js'
@@ -21,7 +24,7 @@ import {
 } from './modules/personnel/router.js'
 import { createReportsRepository } from './modules/reports/repository.js'
 import { reportsRouter } from './modules/reports/router.js'
-import { createTrainingStorage, type BitrixConfig } from './modules/training/bitrix.js'
+import { createTrainingStorage } from './modules/training/bitrix.js'
 import { publicTestRouter } from './modules/training/public-router.js'
 import { createTrainingRepository, type TrainingRepository } from './modules/training/repository.js'
 import { trainingRouter } from './modules/training/router.js'
@@ -44,6 +47,10 @@ export interface AppOptions {
   /** Base address for knowledge-check links; defaults to the request origin. */
   publicUrl?: string
   bitrix?: BitrixConfig
+  /** Overrides the Disk built from `bitrix` (tests). */
+  disk?: (storage: Storage) => Disk
+  /** Background check for files deleted on Disk; off when not set. */
+  diskSyncMs?: number
   /** Release tag of the running image, shown by `/health`. */
   version?: string
 }
@@ -56,22 +63,29 @@ export function createApp(options: AppOptions = {}) {
   const access = createAccessStore(storage)
   const contracts = createContractsRepository(storage, { today: options.today })
   const reports = createReportsRepository(contracts, storage)
+  const disk = options.disk?.(storage) ?? createDisk(storage, options.bitrix)
   const equipment = createEquipmentService(storage, {
+    disk,
     users: () => users.list(),
     permissionsOf: (role) => access.equipmentPermissionsOf(role),
   })
   let training: TrainingRepository | null = null
   const personnel = createPersonnelRepository(contracts, storage, {
+    disk,
     today: options.today,
     equipmentOf: (worker) => equipment.itemsOwnedBy(worker),
     audit,
     onFired: (workerId) => training?.cancelForWorker(workerId, 'Сотрудник уволен') ?? 0,
   })
-  training = createTrainingRepository(storage, createTrainingStorage(storage, options.bitrix), {
+  training = createTrainingRepository(storage, createTrainingStorage(disk), {
     workers: () => personnel.directory(),
     today: options.today,
     audit,
   })
+  const diskSync = createDiskSync(disk, [personnel, equipment, training], audit)
+  if (options.diskSyncMs) {
+    scheduleDiskSync(diskSync, options.diskSyncMs, (error) => console.error('Синхронизация с Диском Битрикс не удалась', error))
+  }
 
   if (options.admin) {
     users.ensure({ ...options.admin, fullName: 'Администратор', role: 'admin', workerId: null, active: true })
@@ -114,13 +128,14 @@ export function createApp(options: AppOptions = {}) {
         'training',
       ],
       storage: 'sqlite',
-      bitrix: options.bitrix?.mode === 'live' ? 'live' : 'mock',
+      bitrix: disk.mode,
     })
   })
   api.use('/auth', authRouter(users, { devLogin: Boolean(options.devLogin), secureCookies: options.secureCookies }))
   api.use('/public/test/:token', publicTestRouter(training, { secureCookies: options.secureCookies }))
   api.use(requireSession)
   api.use('/users', usersRouter(users, access))
+  api.use('/disk', diskRouter(disk, diskSync, access))
   api.use('/access', accessRouter(access))
   api.use(
     '/contracts',

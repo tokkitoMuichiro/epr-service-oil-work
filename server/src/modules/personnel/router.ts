@@ -37,8 +37,8 @@ export function personnelRouter(repo: PersonnelRepository) {
     res.json({ item: repo.updateWorker(requestRole(req), param(req, 'id'), req.body ?? {}) })
   })
 
-  router.delete('/:id', (req, res) => {
-    repo.removeWorker(param(req, 'id'))
+  router.delete('/:id', async (req, res) => {
+    await repo.removeWorker(param(req, 'id'))
     res.status(204).end()
   })
 
@@ -46,31 +46,32 @@ export function personnelRouter(repo: PersonnelRepository) {
     res.json(repo.setEmployment(requestRole(req), param(req, 'id'), req.body?.employment))
   })
 
-  router.post('/:id/documents', rawBody, (req, res) => {
+  router.post('/:id/documents', rawBody, async (req, res) => {
     const meta = Object.fromEntries(DOCUMENT_FIELDS.map((key) => [key, trimmed(req.query[key])])) as unknown as DocumentMeta
-    res.status(201).json({ item: repo.addDocument(requestRole(req), param(req, 'id'), meta, uploadedFile(req)) })
+    res.status(201).json({ item: await repo.addDocument(requestRole(req), param(req, 'id'), meta, uploadedFile(req)) })
   })
 
-  router.get('/:id/documents/:docId/file', (req, res) => {
-    const { doc, file } = repo.documentFile(param(req, 'id'), param(req, 'docId'))
+  router.get('/:id/documents/:docId/file', async (req, res) => {
+    const { doc, file } = await repo.documentFile(param(req, 'id'), param(req, 'docId'))
     sendFile(res, file, doc.fileName)
   })
 
-  router.delete('/:id/documents/:docId', (req, res) => {
-    res.json({ item: repo.removeDocument(requestRole(req), param(req, 'id'), param(req, 'docId')) })
+  router.delete('/:id/documents/:docId', async (req, res) => {
+    res.json({ item: await repo.removeDocument(requestRole(req), param(req, 'id'), param(req, 'docId')) })
   })
 
-  router.put('/:id/photo', rawBody, (req, res) => {
-    res.json({ item: repo.setPhoto(requestRole(req), param(req, 'id'), uploadedFile(req)) })
+  router.put('/:id/photo', rawBody, async (req, res) => {
+    res.json({ item: await repo.setPhoto(requestRole(req), param(req, 'id'), uploadedFile(req)) })
   })
 
-  router.get('/:id/photo', (req, res) => {
+  router.get('/:id/photo', async (req, res) => {
+    const photo = await repo.photo(param(req, 'id'))
     res.setHeader('Cache-Control', 'private, max-age=31536000, immutable')
-    sendFile(res, repo.photo(param(req, 'id')))
+    sendFile(res, photo)
   })
 
-  router.delete('/:id/photo', (req, res) => {
-    res.json({ item: repo.removePhoto(requestRole(req), param(req, 'id')) })
+  router.delete('/:id/photo', async (req, res) => {
+    res.json({ item: await repo.removePhoto(requestRole(req), param(req, 'id')) })
   })
 
   return router

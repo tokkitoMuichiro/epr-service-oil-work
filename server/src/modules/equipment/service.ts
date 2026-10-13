@@ -67,7 +67,17 @@ import {
   type Warehouse,
   type WarehouseDraft,
 } from '../../shared.js'
-import { EQUIPMENT_FILES_BUCKET, EQUIPMENT_KEY, emptyEquipment, type EquipmentData } from './model.js'
+import { EQUIPMENT_FOLDER, ensurePath, isFileUnavailable, type Disk } from '../../disk/index.js'
+import {
+  EQUIPMENT_FILES_BUCKET,
+  EQUIPMENT_KEY,
+  diskFileIdOf,
+  emptyEquipment,
+  equipmentFolderName,
+  withoutDiskFileId,
+  type EquipmentData,
+  type EquipmentDocumentRecord,
+} from './model.js'
 
 interface Target {
   ownerType: OwnerType
@@ -86,6 +96,7 @@ function sameName(a: string, b: string) {
 export type EquipmentActor = Pick<User, 'id' | 'fullName' | 'role'>
 
 export interface EquipmentDeps {
+  disk: Disk
   /** All system users, including blocked ones (their names stay in labels). */
   users: () => User[]
   permissionsOf?: (role: RoleId) => EquipmentPermission[]
@@ -99,7 +110,8 @@ export function createEquipmentService(storage: Storage, deps: EquipmentDeps) {
   const permissionsOf = deps.permissionsOf ?? ((role: RoleId) => [...ROLE_PERMISSIONS[role]])
   const snapshot = storage.snapshot<EquipmentData>(EQUIPMENT_KEY, { empty: emptyEquipment })
   const state = snapshot.state
-  const files = storage.files(EQUIPMENT_FILES_BUCKET)
+  const legacyFiles = storage.files(EQUIPMENT_FILES_BUCKET)
+  const { disk } = deps
 
   /** Active users: possible owners, recipients and keepers. */
   function people(): EquipmentPerson[] {
@@ -142,6 +154,7 @@ export function createEquipmentService(storage: Storage, deps: EquipmentDeps) {
 
   function sanitized(a: EquipmentAuth, item: EquipmentItem): EquipmentItem {
     const copy = structuredClone(item)
+    copy.documents = copy.documents.map(withoutDiskFileId)
     if (copy.fillComment && !canSeeFillComment(a, item)) copy.fillComment = null
     return copy
   }
@@ -439,14 +452,18 @@ export function createEquipmentService(storage: Storage, deps: EquipmentDeps) {
       return sanitized(a, item)
     },
 
-    remove(actor: EquipmentActor, id: string) {
+    async remove(actor: EquipmentActor, id: string): Promise<void> {
       const a = auth(actor)
       const item = visibleItem(a, id)
       if (!canDeleteItem(a, item, state.transfers)) {
         if (isPendingAccept(item, state.transfers)) conflict('Позиция ожидает принятия — удаление недоступно')
         forbidden('Недостаточно прав для удаления')
       }
-      for (const doc of item.documents) files.delete(doc.id)
+      for (const doc of item.documents) {
+        const fileId = diskFileIdOf(doc)
+        if (fileId) await disk.trash(fileId)
+        legacyFiles.delete(doc.id)
+      }
       state.items = state.items.filter((i) => i.id !== item.id)
     },
 
@@ -553,23 +570,30 @@ export function createEquipmentService(storage: Storage, deps: EquipmentDeps) {
       return structuredClone(state.history.filter((h) => h.equipmentId === item.id))
     },
 
-    addDocument(actor: EquipmentActor, id: string, meta: DocumentUpload, file: StoredFile): EquipmentItem {
+    async addDocument(actor: EquipmentActor, id: string, meta: DocumentUpload, file: StoredFile): Promise<EquipmentItem> {
       const a = auth(actor)
-      const item = visibleItem(a, id)
-      if (!canEditDocuments(a, item)) forbidden('Недостаточно прав для документов')
+      const target = visibleItem(a, id)
+      if (!canEditDocuments(a, target)) forbidden('Недостаточно прав для документов')
       const fileName = trimmed(meta.fileName).replace(/[\\/:*?"<>|]+/g, '_')
       if (!fileName) badRequest('Укажите имя файла')
       if (!file.data.length) badRequest('Файл пустой')
-      const doc: EquipmentDocument = {
+      const folder = await ensurePath(disk, [EQUIPMENT_FOLDER, equipmentFolderName(target)])
+      const uploaded = await disk.upload(folder, fileName, file)
+      const item = state.items.find((i) => i.id === id)
+      if (!item) {
+        await disk.trash(uploaded.fileId)
+        notFound('Позиция не найдена')
+      }
+      const doc: EquipmentDocumentRecord = {
         id: uid('doc'),
         fileName,
         mimeType: file.mimeType,
         size: file.data.length,
-        storagePath: `mock-disk/Оборудование/${assetDisplayName(item)}/${fileName}`,
+        storagePath: uploaded.path,
         addedAt: nowIso(),
         addedBy: a.user.fullName,
+        diskFileId: uploaded.fileId,
       }
-      files.set(doc.id, file)
       item.documents.unshift(doc)
       item.hasDocuments = true
       touch(item)
@@ -577,23 +601,66 @@ export function createEquipmentService(storage: Storage, deps: EquipmentDeps) {
       return sanitized(a, item)
     },
 
-    documentFile(actor: EquipmentActor, id: string, docId: string): { doc: EquipmentDocument; file: StoredFile } {
+    /** A file deleted on Disk disappears from the card right away, without waiting for the sync. */
+    async documentFile(actor: EquipmentActor, id: string, docId: string): Promise<{ doc: EquipmentDocument; file: StoredFile }> {
       const item = visibleItem(auth(actor), id)
       const doc = item.documents.find((d) => d.id === docId) ?? notFound('Документ не найден')
-      return { doc: structuredClone(doc), file: files.get(doc.id) ?? notFound('Файл документа не найден') }
+      const fileId = diskFileIdOf(doc)
+      if (!fileId) return { doc: withoutDiskFileId(structuredClone(doc)), file: legacyFiles.get(doc.id) ?? notFound('Файл документа не найден') }
+      try {
+        return { doc: withoutDiskFileId(structuredClone(doc)), file: await disk.download(fileId) }
+      } catch (error) {
+        if (!isFileUnavailable(error)) throw error
+        service.forgetDiskFiles(new Set([fileId]))
+        notFound('Файл удалён на Диске Битрикс')
+      }
     },
 
-    removeDocument(actor: EquipmentActor, id: string, docId: string): EquipmentItem {
+    async removeDocument(actor: EquipmentActor, id: string, docId: string): Promise<EquipmentItem> {
       const a = auth(actor)
+      const target = visibleItem(a, id)
+      if (!canEditDocuments(a, target)) forbidden('Недостаточно прав для документов')
+      const found = target.documents.find((d) => d.id === docId) ?? notFound('Документ не найден')
+      const fileId = diskFileIdOf(found)
+      if (fileId) await disk.trash(fileId)
       const item = visibleItem(a, id)
-      if (!canEditDocuments(a, item)) forbidden('Недостаточно прав для документов')
       const doc = item.documents.find((d) => d.id === docId) ?? notFound('Документ не найден')
       item.documents = item.documents.filter((d) => d.id !== docId)
       item.hasDocuments = item.documents.length > 0
-      files.delete(docId)
+      legacyFiles.delete(docId)
       touch(item)
       log(item, 'DOCUMENT_REMOVED', a, doc.fileName)
       return sanitized(a, item)
+    },
+
+    diskFileIds(): string[] {
+      return state.items.flatMap((i) => i.documents.map(diskFileIdOf)).filter(Boolean)
+    },
+
+    forgetDiskFiles(gone: ReadonlySet<string>): string[] {
+      const lines: string[] = []
+      for (const item of state.items) {
+        const kept = item.documents.filter((d) => !gone.has(diskFileIdOf(d)))
+        if (kept.length === item.documents.length) continue
+        for (const doc of item.documents) {
+          if (!gone.has(diskFileIdOf(doc))) continue
+          lines.push(`${assetDisplayName(item)}: документ «${doc.fileName}»`)
+          state.history.unshift({
+            id: uid('h'),
+            equipmentId: item.id,
+            action: 'DOCUMENT_REMOVED',
+            actorUserId: '',
+            actorName: 'Синхронизация с Битрикс',
+            details: `${doc.fileName} — удалён на Диске Битрикс`,
+            createdAt: nowIso(),
+          })
+        }
+        item.documents = kept
+        item.hasDocuments = kept.length > 0
+        touch(item)
+      }
+      if (lines.length) snapshot.save(state)
+      return lines
     },
 
     createWarehouse(actor: EquipmentActor, body: Partial<WarehouseDraft>): Warehouse {

@@ -41,8 +41,17 @@ import {
   type WorkerDraft,
   type WorkerPii,
 } from '../../shared.js'
+import { PERSONNEL_FOLDER, ensurePath, isFileUnavailable, type Disk, type DiskFolder } from '../../disk/index.js'
 import type { ContractsRepository } from '../contracts/repository.js'
-import { PERSONNEL_KEY, WORKER_DOCUMENTS_BUCKET, emptyPersonnel, type PersonnelState, type WorkerRecord } from './model.js'
+import {
+  PERSONNEL_KEY,
+  WORKER_DOCUMENTS_BUCKET,
+  WORKER_PHOTOS_BUCKET,
+  emptyPersonnel,
+  type PersonnelState,
+  type WorkerDocumentRecord,
+  type WorkerRecord,
+} from './model.js'
 
 const EMPTY_PII: WorkerPii = { snils: '', birthDate: '', passport: '' }
 
@@ -50,7 +59,12 @@ export const DOCUMENT_MAX_BYTES = 20 * 1024 * 1024
 export const PHOTO_MAX_BYTES = 5 * 1024 * 1024
 const OVERRIDE_COMMENT_MIN = 10
 
+const PHOTO_EXTENSIONS: Record<string, string> = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif' }
+
+export const FILE_DELETED_ON_DISK = 'Файл удалён на Диске Битрикс'
+
 export interface PersonnelDeps {
+  disk: Disk
   today?: () => string
   /** Equipment registered to the worker's user account, for the dismissal warning. */
   equipmentOf?: (worker: Pick<WorkerRecord, 'id' | 'fullName'>) => string[]
@@ -109,7 +123,8 @@ function parseDocumentMeta(body: Partial<DocumentMeta>): DocumentMeta {
   return meta
 }
 
-export function createPersonnelRepository(contracts: ContractsRepository, storage: Storage, deps: PersonnelDeps = {}) {
+export function createPersonnelRepository(contracts: ContractsRepository, storage: Storage, deps: PersonnelDeps) {
+  const { disk } = deps
   const today = deps.today ?? (() => todayIso())
   const snapshot = storage.snapshot<PersonnelState>(PERSONNEL_KEY, { empty: emptyPersonnel })
   const state = snapshot.state
@@ -117,11 +132,37 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
     delete (state as { requirements?: unknown }).requirements
     snapshot.save(state)
   }
-  const files = storage.files(WORKER_DOCUMENTS_BUCKET)
-  const photos = storage.files('worker-photos')
+  const legacyFiles = storage.files(WORKER_DOCUMENTS_BUCKET)
+  const photos = storage.files(WORKER_PHOTOS_BUCKET)
+  const save = () => snapshot.save(state)
 
   function findWorker(id: string): WorkerRecord {
     return state.workers.find((w) => w.id === id) ?? notFound('Сотрудник не найден')
+  }
+
+  function folderOf(record: WorkerRecord): Promise<DiskFolder> {
+    return ensurePath(disk, [PERSONNEL_FOLDER, record.fullName])
+  }
+
+  /** Uploads while the worker may be deleted concurrently: an orphaned file goes straight to the trash. */
+  async function uploadFor(workerId: string, fileName: string, file: StoredFile) {
+    const uploaded = await disk.upload(await folderOf(findWorker(workerId)), fileName, file)
+    const record = state.workers.find((w) => w.id === workerId)
+    if (!record) {
+      await disk.trash(uploaded.fileId)
+      notFound('Сотрудник не найден')
+    }
+    return { record, uploaded }
+  }
+
+  function dropPhoto(record: WorkerRecord) {
+    photos.delete(record.id)
+    record.photoFileId = null
+    record.photoUpdatedAt = null
+  }
+
+  function publicDocument({ diskFileId: _id, ...doc }: WorkerDocumentRecord): WorkerDocument {
+    return doc
   }
 
   function findBrigade(id: string): Brigade {
@@ -130,8 +171,10 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
 
   function toWorker(record: WorkerRecord, role: RoleId): Worker {
     const brigade = brigadeOfWorker(record.id, state.brigades)
+    const { photoFileId: _photo, ...rest } = record
     return structuredClone({
-      ...record,
+      ...rest,
+      documents: record.documents.map(publicDocument),
       pii: canViewPii(role) ? record.pii : null,
       brigadeId: brigade?.id ?? null,
       status: workerStatus(brigade?.id ?? null, state.assignments, today()),
@@ -299,11 +342,12 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
     },
 
     /** Physical deletion is allowed only for a worker without history; otherwise dismiss them. */
-    removeWorker(id: string): void {
+    async removeWorker(id: string): Promise<void> {
       const record = findWorker(id)
       if (workerHasHistory(record, state.brigades, state.assignments)) {
         conflict('У сотрудника есть документы или назначения — переведите его в статус «Уволен»')
       }
+      if (record.photoFileId) await disk.trash(record.photoFileId)
       photos.delete(id)
       state.workers = state.workers.filter((w) => w.id !== id)
       state.brigades = state.brigades.map((b) => withoutWorker(b, id))
@@ -326,57 +370,99 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
       return { item: toWorker(record, role), warnings }
     },
 
-    addDocument(role: RoleId, workerId: string, body: Partial<DocumentMeta>, file: StoredFile): Worker {
-      const record = findWorker(workerId)
+    async addDocument(role: RoleId, workerId: string, body: Partial<DocumentMeta>, file: StoredFile): Promise<Worker> {
+      findWorker(workerId)
       const meta = parseDocumentMeta(body)
       if (!file.data.length) badRequest('Файл пустой')
       if (file.data.length > DOCUMENT_MAX_BYTES) badRequest('Файл больше 20 МБ')
-      const doc: WorkerDocument = {
+      const mimeType = file.mimeType || 'application/octet-stream'
+      const { record, uploaded } = await uploadFor(workerId, meta.fileName || meta.title, { data: file.data, mimeType })
+      record.documents.unshift({
         id: uid('doc'),
         ...meta,
-        mimeType: file.mimeType || 'application/octet-stream',
+        mimeType,
         size: file.data.length,
         uploadedAt: nowIso(),
-      }
-      files.set(doc.id, { data: file.data, mimeType: doc.mimeType })
-      record.documents.unshift(doc)
+        storagePath: uploaded.path,
+        diskFileId: uploaded.fileId,
+      })
       return toWorker(record, role)
     },
 
-    removeDocument(role: RoleId, workerId: string, docId: string): Worker {
+    async removeDocument(role: RoleId, workerId: string, docId: string): Promise<Worker> {
+      const doc = findWorker(workerId).documents.find((d) => d.id === docId) ?? notFound('Документ не найден')
+      if (doc.diskFileId) await disk.trash(doc.diskFileId)
       const record = findWorker(workerId)
-      if (!record.documents.some((d) => d.id === docId)) notFound('Документ не найден')
       record.documents = record.documents.filter((d) => d.id !== docId)
-      files.delete(docId)
+      legacyFiles.delete(docId)
       return toWorker(record, role)
     },
 
-    documentFile(workerId: string, docId: string): { doc: WorkerDocument; file: StoredFile } {
-      const record = findWorker(workerId)
-      const doc = record.documents.find((d) => d.id === docId) ?? notFound('Документ не найден')
-      return { doc: structuredClone(doc), file: files.get(docId) ?? notFound('Файл документа не найден') }
+    /** A file deleted on Disk disappears from the card right away, without waiting for the sync. */
+    async documentFile(workerId: string, docId: string): Promise<{ doc: WorkerDocument; file: StoredFile }> {
+      const doc = findWorker(workerId).documents.find((d) => d.id === docId) ?? notFound('Документ не найден')
+      if (!doc.diskFileId) return { doc: publicDocument(structuredClone(doc)), file: legacyFiles.get(docId) ?? notFound('Файл документа не найден') }
+      try {
+        return { doc: publicDocument(structuredClone(doc)), file: await disk.download(doc.diskFileId) }
+      } catch (error) {
+        if (!isFileUnavailable(error)) throw error
+        const record = state.workers.find((w) => w.id === workerId)
+        if (record) record.documents = record.documents.filter((d) => d.id !== docId)
+        save()
+        notFound(FILE_DELETED_ON_DISK)
+      }
     },
 
-    setPhoto(role: RoleId, id: string, file: StoredFile): Worker {
-      const record = findWorker(id)
+    async setPhoto(role: RoleId, id: string, file: StoredFile): Promise<Worker> {
+      findWorker(id)
       if (!file.mimeType.startsWith('image/')) badRequest('Фото должно быть изображением')
       if (!file.data.length) badRequest('Файл пустой')
       if (file.data.length > PHOTO_MAX_BYTES) badRequest('Фото больше 5 МБ')
+      const { record, uploaded } = await uploadFor(id, `Фото${PHOTO_EXTENSIONS[file.mimeType] ?? ''}`, file)
+      if (record.photoFileId) await disk.trash(record.photoFileId)
       photos.set(id, file)
+      record.photoFileId = uploaded.fileId
       record.photoUpdatedAt = nowIso()
       return toWorker(record, role)
     },
 
-    removePhoto(role: RoleId, id: string): Worker {
+    async removePhoto(role: RoleId, id: string): Promise<Worker> {
+      const fileId = findWorker(id).photoFileId
+      if (fileId) await disk.trash(fileId)
       const record = findWorker(id)
-      photos.delete(id)
-      record.photoUpdatedAt = null
+      dropPhoto(record)
       return toWorker(record, role)
     },
 
-    photo(id: string): StoredFile {
-      findWorker(id)
-      return photos.get(id) ?? notFound('Фото не загружено')
+    /** Served from the local copy; the sync removes it when the photo is deleted on Disk. */
+    async photo(id: string): Promise<StoredFile> {
+      const record = findWorker(id)
+      const cached = photos.get(id)
+      if (cached) return cached
+      if (!record.photoFileId) notFound('Фото не загружено')
+      const file = await disk.download(record.photoFileId)
+      photos.set(id, file)
+      return file
+    },
+
+    diskFileIds(): string[] {
+      return state.workers.flatMap((w) => [...w.documents.map((d) => d.diskFileId ?? ''), w.photoFileId ?? '']).filter(Boolean)
+    },
+
+    forgetDiskFiles(gone: ReadonlySet<string>): string[] {
+      const lines: string[] = []
+      for (const worker of state.workers) {
+        for (const doc of worker.documents) {
+          if (doc.diskFileId && gone.has(doc.diskFileId)) lines.push(`${worker.fullName}: документ «${doc.title}»`)
+        }
+        worker.documents = worker.documents.filter((d) => !(d.diskFileId && gone.has(d.diskFileId)))
+        if (worker.photoFileId && gone.has(worker.photoFileId)) {
+          dropPhoto(worker)
+          lines.push(`${worker.fullName}: фото`)
+        }
+      }
+      if (lines.length) save()
+      return lines
     },
 
     listBrigades(): Brigade[] {

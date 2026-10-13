@@ -54,6 +54,8 @@ export interface WorkerDocument extends QualificationFields {
   size: number
   uploadedAt: string
   expiresAt?: string
+  /** Where the file lies on Bitrix Disk; empty for files uploaded before the integration. */
+  storagePath?: string
 }
 
 export interface DocumentMeta extends QualificationFields {

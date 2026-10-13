@@ -386,14 +386,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                   />
                 </svg>
                 <div class="doc__main">
-                  <a
+                  <button
+                    type="button"
                     class="doc__link"
-                    :href="personnelApi.documentUrl(worker.id, doc.id)"
-                    :download="doc.fileName"
                     :title="`Скачать ${doc.fileName}`"
+                    :disabled="busy"
+                    @click="personnel.downloadDocument(worker.id, doc.id, doc.fileName)"
                   >
                     {{ doc.title }}
-                  </a>
+                  </button>
                   <span class="doc__meta">{{ documentMeta(doc) }}</span>
                   <span class="doc__meta">
                     {{ doc.fileName }}<template v-if="doc.size"> · {{ formatFileSize(doc.size) }}</template>
@@ -740,12 +741,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 .doc__link {
   overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--text-link);
+  font: inherit;
   font-size: var(--font-size-sm);
   font-weight: 600;
+  text-align: left;
   text-decoration: none;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .doc__meta {

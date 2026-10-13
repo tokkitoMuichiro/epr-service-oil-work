@@ -7,6 +7,10 @@ import path from 'node:path'
 import { after, before, describe, it } from 'node:test'
 import { createApp, type AppOptions } from './app.js'
 import { openDatabase } from './db.js'
+import { ensurePath } from './disk/disk.js'
+import { createLiveDisk } from './disk/live.js'
+import { createMockDisk, type MockDisk } from './disk/mock.js'
+import { FAKE_WEBHOOK, createFakeBitrix } from './testing/fake-bitrix.js'
 import { demoUserOf } from './modules/auth/repository.js'
 import { demoSeed } from './testing/fixtures/index.js'
 import { unzip } from './testing/unzip.js'
@@ -878,6 +882,143 @@ describe('training', () => {
 
   it('rejects unknown public tokens', async () => {
     assert.equal((await training.call('GET', '/api/public/test/unknown-token', null)).status, 410)
+  })
+})
+
+describe('bitrix disk', () => {
+  let disk: MockDisk
+  let app: Api
+
+  before(async () => {
+    app = await startApp({ disk: (storage) => (disk = createMockDisk(storage)) })
+  })
+
+  after(async () => {
+    await app.close()
+  })
+
+  async function workerDoc(workerId: string, title: string, content: string) {
+    const query = new URLSearchParams({ title, fileName: `${title}.pdf`, mimeType: 'application/pdf' })
+    const response = await app.upload(`/api/personnel/${workerId}/documents?${query}`, 'POST', content)
+    assert.equal(response.status, 201)
+    return ((await response.json()) as { item: Worker }).item
+  }
+
+  async function diskIdOf(storagePath: string): Promise<string> {
+    const folder = storagePath.split('/').slice(1, -1)
+    const files = await disk.list(await ensurePath(disk, folder.slice(1)))
+    const file = files.find((f) => f.path === storagePath)
+    assert.ok(file, `${storagePath} is on Disk`)
+    return file.fileId
+  }
+
+  it('stores worker documents in «ERP/Персонал/<ФИО>» and trashes them on delete', async () => {
+    const worker = await workerDoc('p-3', 'Паспорт', '%PDF-passport')
+    const doc = worker.documents[0]
+    assert.equal(doc.storagePath, `mock-disk/ERP/Персонал/${worker.fullName}/Паспорт.pdf`)
+    assert.ok(!('diskFileId' in doc), 'the Disk id stays on the server')
+    const fileId = await diskIdOf(doc.storagePath ?? '')
+    assert.equal((await app.call('GET', `/api/personnel/p-3/documents/${doc.id}/file`)).text, '%PDF-passport')
+
+    assert.equal((await app.call('DELETE', `/api/personnel/p-3/documents/${doc.id}`)).status, 200)
+    assert.deepEqual([...(await disk.missing([fileId]))], [fileId], 'deleted in ERP → Bitrix trash')
+  })
+
+  it('drops a document deleted on Disk as soon as someone tries to download it', async () => {
+    const doc = (await workerDoc('p-5', 'Медсправка', '%PDF-med')).documents[0]
+    disk.deleteOnDisk(await diskIdOf(doc.storagePath ?? ''))
+    const response = await app.call('GET', `/api/personnel/p-5/documents/${doc.id}/file`)
+    assert.equal(response.status, 404)
+    assert.equal(response.json.error, 'Файл удалён на Диске Битрикс')
+    const worker = (await app.call('GET', '/api/personnel/p-5')).json.item as Worker
+    assert.ok(!worker.documents.some((d) => d.id === doc.id))
+  })
+
+  it('removes files deleted on Disk from every module on sync', async () => {
+    const doc = (await workerDoc('p-7', 'Удостоверение', '%PDF-id')).documents[0]
+    const photo = await app.upload('/api/personnel/p-7/photo?mimeType=image%2Fpng', 'PUT', 'png-bytes')
+    assert.equal(photo.status, 200)
+
+    const item = ((await app.call('GET', '/api/equipment/state')).json as EquipmentState).items.find((i) => i.category === 'EQUIPMENT')
+    assert.ok(item)
+    const eq = await app.upload(`/api/equipment/${item.id}/documents?fileName=${encodeURIComponent('Паспорт изделия.pdf')}&mimeType=application%2Fpdf`, 'POST', '%PDF-eq')
+    const eqDoc = ((await eq.json()) as { item: typeof item }).item.documents[0]
+    assert.match(eqDoc.storagePath, /^mock-disk\/ERP\/Оборудование\/.+\/Паспорт изделия\.pdf$/)
+
+    const material = await app.upload(
+      `/api/training/materials/upload?${new URLSearchParams({ title: 'Инструкция', programId: 'pr-fire', fileName: 'Инструкция.pdf' })}`,
+      'POST',
+      '%PDF-mat',
+    )
+    assert.equal(material.status, 201)
+    const mat = ((await material.json()) as { item: { id: string; storagePath: string } }).item
+    assert.match(mat.storagePath, /^mock-disk\/ERP\/Учебные материалы\/Пожарная безопасность\//)
+
+    const worker = (await app.call('GET', '/api/personnel/p-7')).json.item as Worker
+    const photoId = (await disk.list(await ensurePath(disk, ['Персонал', worker.fullName]))).find((f) => f.name === 'Фото.png')?.fileId
+    assert.ok(photoId, 'the photo is on Disk')
+    for (const path of [doc.storagePath ?? '', eqDoc.storagePath, mat.storagePath]) disk.deleteOnDisk(await diskIdOf(path))
+    disk.deleteOnDisk(photoId)
+
+    assert.equal((await app.call('POST', '/api/disk/sync', 'office')).status, 403)
+    const sync = await app.call('POST', '/api/disk/sync', 'admin')
+    assert.equal(sync.status, 200)
+    assert.equal(sync.json.item.removed.length, 4)
+
+    const after = (await app.call('GET', '/api/personnel/p-7')).json.item as Worker
+    assert.ok(!after.documents.some((d) => d.id === doc.id))
+    assert.equal(after.photoUpdatedAt, null)
+    assert.equal((await app.call('GET', '/api/personnel/p-7/photo')).status, 404)
+    const items = ((await app.call('GET', '/api/equipment/state')).json as EquipmentState).items
+    assert.ok(!items.find((i) => i.id === item.id)?.documents.some((d) => d.id === eqDoc.id))
+    const history = (await app.call('GET', `/api/equipment/${item.id}/history`)).json.items as { details: string }[]
+    assert.ok(history.some((h) => /удалён на Диске Битрикс/.test(h.details)))
+    const materials = (await app.call('GET', '/api/training/materials')).json.items as { id: string; isUnavailable: boolean }[]
+    assert.equal(materials.find((m) => m.id === mat.id)?.isUnavailable, true, 'tests still refer to the material')
+    assert.deepEqual((await app.call('POST', '/api/disk/sync', 'admin')).json.item.removed, [])
+  })
+
+  it('trashes an uploaded training material on delete but never a linked one', async () => {
+    const upload = await app.upload(
+      `/api/training/materials/upload?${new URLSearchParams({ title: 'Памятка', programId: 'pr-fire', fileName: 'Памятка.pdf' })}`,
+      'POST',
+      '%PDF-memo',
+    )
+    const uploaded = ((await upload.json()) as { item: { id: string; storagePath: string } }).item
+    const uploadedId = await diskIdOf(uploaded.storagePath)
+    const linkedFile = await disk.upload(await ensurePath(disk, ['Учебные материалы']), 'Чужой файл.pdf', { data: Buffer.from('x'), mimeType: 'application/pdf' })
+    const linked = await app.call('POST', '/api/training/materials', 'admin', { title: 'Ссылка', programIds: ['pr-fire'], url: linkedFile.url })
+    assert.equal(linked.status, 201)
+    const outside = await disk.upload(await ensurePath(disk, ['Оборудование']), 'Вне.pdf', { data: Buffer.from('x'), mimeType: 'application/pdf' })
+    assert.equal((await app.call('POST', '/api/training/materials', 'admin', { title: 'Вне', programIds: ['pr-fire'], url: outside.url })).status, 400)
+
+    assert.equal((await app.call('DELETE', `/api/training/materials/${uploaded.id}`)).status, 204)
+    assert.equal((await app.call('DELETE', `/api/training/materials/${linked.json.item.id}`)).status, 204)
+    assert.deepEqual([...(await disk.missing([uploadedId, linkedFile.fileId]))], [uploadedId])
+  })
+
+  it('reports the Disk root to administrators', async () => {
+    assert.equal((await app.call('GET', '/api/disk/check', 'master')).status, 403)
+    assert.deepEqual((await app.call('GET', '/api/disk/check', 'admin')).json.item, { mode: 'mock', rootPath: 'mock-disk/ERP' })
+  })
+
+  it('uploads through the Bitrix REST API in live mode', async () => {
+    const bitrix = createFakeBitrix()
+    const live = await startApp({ disk: () => createLiveDisk({ webhookUrl: FAKE_WEBHOOK, fetchImpl: bitrix.fetchImpl }) })
+    try {
+      const query = new URLSearchParams({ title: 'Паспорт', fileName: 'Паспорт.pdf', mimeType: 'application/pdf' })
+      const created = await live.upload(`/api/personnel/p-2/documents?${query}`, 'POST', '%PDF-live')
+      assert.equal(created.status, 201)
+      const worker = ((await created.json()) as { item: Worker }).item
+      assert.equal(worker.documents[0].storagePath, `ERP/Персонал/${worker.fullName}/Паспорт.pdf`)
+      const stored = [...bitrix.objects.values()].find((o) => o.NAME === 'Паспорт.pdf')
+      assert.equal(stored?.content?.toString(), '%PDF-live')
+      assert.equal((await live.call('GET', `/api/personnel/p-2/documents/${worker.documents[0].id}/file`)).text, '%PDF-live')
+      assert.equal((await live.call('DELETE', `/api/personnel/p-2/documents/${worker.documents[0].id}`)).status, 200)
+      assert.equal(stored?.DELETED_TYPE, '3', 'moved to the Bitrix trash, not erased')
+    } finally {
+      await live.close()
+    }
   })
 })
 
