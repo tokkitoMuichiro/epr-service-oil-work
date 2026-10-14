@@ -4,7 +4,7 @@ import { RouterLink } from 'vue-router'
 import { addDaysIso, daysBetweenIso } from '@shared/dates'
 import type { OverviewObject } from '@shared/overview'
 import type { DateSpan } from '@shared/schedule'
-import { formatDateRu, isWeekend } from '@/shared/lib/date'
+import { formatDateRu, formatDayMonth, isWeekend, parseIsoDate } from '@/shared/lib/date'
 
 const props = defineProps<{ objects: OverviewObject[]; window: DateSpan; today: string }>()
 
@@ -37,20 +37,31 @@ function dayStyle(day: string) {
   return { left: percent(indexOf(day)), width: percent(1) }
 }
 
+const weekStarts = computed(() =>
+  days.value.filter((day, i) => parseIsoDate(day).getDay() === 1 && i <= days.value.length - 4),
+)
+
 const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))} + ${50 / days.value.length}%)` }))
 </script>
 
 <template>
   <div class="mini" :style="{ '--days': days.length }">
     <div class="mini__head" aria-hidden="true">
-      <span class="mini__label">{{ formatDateRu(window.from) }} — {{ formatDateRu(window.to) }}</span>
-      <span class="mini__track mini__days">
-        <span
-          v-for="day in days"
-          :key="day"
-          :class="{ 'is-weekend': isWeekend(day), 'is-today': day === today, 'is-month': day.endsWith('-01') }"
-        >
-          {{ Number(day.slice(8)) }}
+      <span class="mini__label">{{ formatDayMonth(window.from) }} — {{ formatDayMonth(window.to) }}</span>
+      <span class="mini__track">
+        <span class="mini__days">
+          <span
+            v-for="day in days"
+            :key="day"
+            :class="{ 'is-weekend': isWeekend(day), 'is-today': day === today, 'is-month': day.endsWith('-01') }"
+          >
+            {{ Number(day.slice(8)) }}
+          </span>
+        </span>
+        <span class="mini__weeks">
+          <span v-for="day in weekStarts" :key="day" class="mini__week" :style="{ left: percent(indexOf(day)) }">
+            {{ formatDayMonth(day) }}
+          </span>
         </span>
       </span>
     </div>
@@ -145,6 +156,8 @@ const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))
 }
 
 .mini__days {
+  position: absolute;
+  inset: 0;
   display: grid;
   grid-template-columns: repeat(var(--days), minmax(0, 1fr));
   align-items: stretch;
@@ -169,6 +182,24 @@ const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))
   background: var(--chart-today-bg);
   color: var(--chart-today);
   font-weight: 700;
+}
+
+.mini__weeks {
+  display: none;
+}
+
+.mini__week {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding-left: 3px;
+  border-left: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .mini__plan {
@@ -256,8 +287,24 @@ const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))
     --label-width: 140px;
   }
 
-  .mini__days > span:not(.is-today, .is-month) {
+  .mini__days > span,
+  .mini__days > .is-weekend,
+  .mini__days > .is-today {
     color: transparent;
+  }
+
+  .mini__days > .is-month {
+    box-shadow: none;
+  }
+
+  .mini__weeks {
+    display: block;
+  }
+}
+
+@media (max-width: 560px) {
+  .mini {
+    --label-width: 120px;
   }
 }
 </style>

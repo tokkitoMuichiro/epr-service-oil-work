@@ -502,7 +502,11 @@ const description = computed(() =>
   }
 
   .lag {
-    width: 96px;
+    width: 112px;
+  }
+
+  .lag__text {
+    white-space: nowrap;
   }
 }
 </style>
