@@ -43,6 +43,12 @@ for (const theme of ['light', 'dark'] as const) {
         await page.waitForTimeout(300)
         await page.screenshot({ path: `test-results/screens/${name}-${size}-${theme}.png`, fullPage: size !== '1440' })
       }
+      if (theme === 'light') {
+        await page.goto('/personnel')
+        await page.getByRole('button', { name: 'Фильтры' }).click()
+        await page.waitForTimeout(300)
+        await page.screenshot({ path: `test-results/screens/personnel-filters-${size}-${theme}.png` })
+      }
       await context.close()
     })
   }

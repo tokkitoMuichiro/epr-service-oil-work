@@ -102,7 +102,7 @@ onBeforeUnmount(() => {
         </select>
       </label>
       <label v-if="showTesting" class="field">
-        <span>Тестирование</span>
+        <span>Проверка знаний</span>
         <select v-model="testing">
           <option value="">Все</option>
           <option v-for="o in TESTING_FILTER_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</option>
@@ -175,8 +175,10 @@ onBeforeUnmount(() => {
   right: 0;
   z-index: var(--z-header);
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
   width: 280px;
+  box-sizing: border-box;
   padding: var(--space-4);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
@@ -191,6 +193,7 @@ onBeforeUnmount(() => {
 .field {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 
 .field span {
@@ -202,6 +205,9 @@ onBeforeUnmount(() => {
 }
 
 .field select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   min-height: var(--control-height);
   padding: 0 12px;
   border: 1px solid var(--border-subtle);
@@ -218,7 +224,7 @@ onBeforeUnmount(() => {
 
 .reset {
   justify-self: start;
-  min-height: 36px;
+  min-height: var(--control-height-sm);
   padding: 0;
   border: 0;
   background: transparent;
