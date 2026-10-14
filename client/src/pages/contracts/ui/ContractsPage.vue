@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useRoute, useRouter } from 'vue-router'
 import { useBrigadesStore, type AssignmentDraft, type BrigadeAssignment } from '@/entities/brigade'
 import {
   isObjectArchived,
@@ -20,7 +21,7 @@ import { ContractFormDialog, ObjectFormDialog, type ObjectFormValue } from '@/fe
 import { ObjectStatusDialog } from '@/features/object-status'
 import { WorkFormDialog } from '@/features/work-form'
 import { formatShortRange } from '@/shared/lib/date'
-import { IconChevron, IconClose, IconSearch, UiButton, UiState } from '@/shared/ui'
+import { IconChevron, IconClose, IconSearch, PageHeader, UiButton, UiState, askConfirm } from '@/shared/ui'
 import { ContractsSchedule } from '@/widgets/contracts-schedule'
 import ContractList from './ContractList.vue'
 
@@ -33,10 +34,22 @@ const access = useAccessStore()
 const canPlan = computed(() => access.can('brigades_plan'))
 const canEdit = computed(() => access.can('contracts_edit'))
 
-onMounted(() => {
-  void store.load()
+const route = useRoute()
+const router = useRouter()
+
+onMounted(async () => {
   void brigadesStore.load()
+  await store.load()
+  openLinkedObject()
 })
+
+function openLinkedObject() {
+  const objectId = typeof route.query.object === 'string' ? route.query.object : ''
+  if (!objectId) return
+  const contract = items.value.find((c) => c.objects.some((o) => o.id === objectId))
+  if (contract) store.selectObject(objectId, contract.id)
+  void router.replace({ query: {} })
+}
 
 const bounds = computed(() => scheduleBounds(items.value, reportDays.value.map((d) => d.date)))
 
@@ -137,7 +150,12 @@ async function saveContract(draft: ContractDraft) {
 async function removeContract() {
   const contract = selectedContract.value
   if (!contract) return
-  if (!confirm(`Удалить контракт «${contract.name}»? Договор с отчётами или назначениями можно только отправить в архив.`)) return
+  const confirmed = await askConfirm({
+    title: `Удалить контракт «${contract.name}»?`,
+    message: 'Договор с отчётами или назначениями бригад удалить нельзя — его можно только отправить в архив.',
+    confirmText: 'Удалить контракт',
+  })
+  if (!confirmed) return
   if (await store.removeContract(contract.id)) void brigadesStore.load()
 }
 
@@ -145,7 +163,15 @@ async function toggleContractArchive() {
   const contract = selectedContract.value
   if (!contract) return
   const archived = !contract.archived
-  if (archived && !confirm(`Отправить «${contract.name}» в архив? Будущие назначения бригад на его объекты будут сняты.`)) return
+  if (
+    archived &&
+    !(await askConfirm({
+      title: `Отправить «${contract.name}» в архив?`,
+      message: 'Будущие назначения бригад на его объекты будут сняты.',
+      confirmText: 'В архив',
+    }))
+  )
+    return
   if (!(await store.setContractArchived(contract.id, archived))) return
   void brigadesStore.load()
   setView(archived ? 'archive' : 'active')
@@ -155,7 +181,15 @@ async function toggleObjectArchive(object: ContractObject) {
   const contract = selectedContract.value
   if (!contract) return
   const archived = !object.archived
-  if (archived && !confirm(`Отправить объект «${object.name}» в архив без завершения? Будущие назначения бригад будут сняты.`)) return
+  if (
+    archived &&
+    !(await askConfirm({
+      title: `Отправить объект «${object.name}» в архив?`,
+      message: 'Объект уйдёт в архив без завершения. Будущие назначения бригад будут сняты.',
+      confirmText: 'В архив',
+    }))
+  )
+    return
   if (!(await store.setObjectArchived(contract.id, object.id, archived))) return
   void brigadesStore.load()
   if (!archived) setView('active')
@@ -203,7 +237,13 @@ async function saveObject(value: ObjectFormValue, note: string) {
 async function removeObject(objectId: string) {
   const contract = selectedContract.value
   if (!contract) return
-  if (!confirm('Удалить объект из контракта? Объект с отчётами или назначениями можно только отправить в архив.')) return
+  const object = contract.objects.find((o) => o.id === objectId)
+  const confirmed = await askConfirm({
+    title: object ? `Удалить объект «${object.name}»?` : 'Удалить объект?',
+    message: 'Объект с отчётами или назначениями бригад удалить нельзя — его можно только отправить в архив.',
+    confirmText: 'Удалить объект',
+  })
+  if (!confirmed) return
   if (await store.removeObject(contract.id, objectId)) void brigadesStore.load()
 }
 
@@ -252,7 +292,7 @@ async function saveWork(draft: WorkDraft) {
 async function removeWork(workId: string) {
   const contract = selectedContract.value
   if (!contract || !workObject.value) return
-  if (!confirm('Удалить работу из объекта?')) return
+  if (!(await askConfirm({ title: 'Удалить работу из объекта?', confirmText: 'Удалить работу' }))) return
   if (await store.removeWork(contract.id, workObject.value.id, workId)) workDialogOpen.value = false
 }
 
@@ -300,7 +340,7 @@ async function saveAssignment(draft: AssignmentDraft) {
 }
 
 async function removeAssignment(id: string) {
-  if (!confirm('Снять бригаду с объекта?')) return
+  if (!(await askConfirm({ title: 'Снять бригаду с объекта?', confirmText: 'Снять бригаду' }))) return
   if (await brigadesStore.removeAssignment(id)) assignmentDialogOpen.value = false
 }
 
@@ -311,20 +351,21 @@ const isDialogOpen = computed(
 
 <template>
   <section class="page">
-    <header class="page__header">
-      <h1>Контракты</h1>
-      <div class="ui-segmented views" role="tablist" aria-label="Активные и архивные объекты">
-        <button type="button" role="tab" :aria-selected="!isArchive" @click="setView('active')">
-          Активные <span class="views__count">{{ counts.active }}</span>
-        </button>
-        <button type="button" role="tab" :aria-selected="isArchive" @click="setView('archive')">
-          Архив <span class="views__count">{{ counts.archive }}</span>
-        </button>
-      </div>
-      <UiButton v-if="canEdit" variant="primary" size="sm" class="page__create" @click="openCreateContract">
-        Новый контракт
-      </UiButton>
-    </header>
+    <PageHeader title="Контракты" description="Договоры, объекты, работы и линейный график с фактом по ежедневным отчётам.">
+      <template v-if="canEdit" #actions>
+        <UiButton variant="primary" @click="openCreateContract">Новый контракт</UiButton>
+      </template>
+      <template #tabs>
+        <div class="ui-segmented" role="tablist" aria-label="Активные и архивные объекты">
+          <button type="button" role="tab" :aria-selected="!isArchive" @click="setView('active')">
+            Активные <span class="ui-segmented__count">{{ counts.active }}</span>
+          </button>
+          <button type="button" role="tab" :aria-selected="isArchive" @click="setView('archive')">
+            Архив <span class="ui-segmented__count">{{ counts.archive }}</span>
+          </button>
+        </div>
+      </template>
+    </PageHeader>
 
     <p v-if="actionError && !isDialogOpen" class="alert" role="alert">
       {{ actionError }}
@@ -509,38 +550,6 @@ const isDialogOpen = computed(
   min-height: 100%;
 }
 
-.page__header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3) var(--space-4);
-  flex-wrap: wrap;
-}
-
-.page__header h1 {
-  margin: 0;
-  font-size: var(--page-title-size);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: var(--line-height-tight);
-  color: var(--text-primary);
-}
-
-.page__create {
-  margin-left: auto;
-}
-
-.views > button {
-  min-height: 32px;
-  padding: 0 var(--space-3);
-}
-
-.views__count {
-  font-size: var(--font-size-2xs);
-  font-weight: 700;
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
 .info,
 .notice {
   display: flex;
@@ -699,25 +708,6 @@ const isDialogOpen = computed(
 }
 
 @media (max-width: 860px) {
-  .page__header {
-    gap: var(--space-2);
-  }
-
-  .views {
-    order: 3;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    width: 100%;
-  }
-
-  .views > button {
-    min-height: 40px;
-  }
-
-  .page__create {
-    min-height: var(--tap-size);
-  }
-
   .layout,
   .layout--collapsed {
     grid-template-columns: minmax(0, 1fr);

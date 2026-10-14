@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import {
   BrigadeStatusBadge,
@@ -16,8 +16,8 @@ import { WorkerStatusBadge, usePersonnelStore, type Worker } from '@/entities/pe
 import { useAccessStore } from '@/entities/role'
 import { AssignmentDialog, type AssignmentObjectOption } from '@/features/brigade-assignment'
 import { formatDateRu } from '@/shared/lib/date'
-import { useScrollLock } from '@/shared/lib/scroll-lock'
-import { IconClose, UiButton } from '@/shared/ui'
+import { useEscape, useScrollLock } from '@/shared/lib/scroll-lock'
+import { IconClose, UiButton, askConfirm } from '@/shared/ui'
 import { NEW_BRIGADE } from '../model/constants'
 import CrewSection from './CrewSection.vue'
 
@@ -170,10 +170,14 @@ async function save() {
 
 async function disband() {
   const b = brigade.value
-  const question =
-    `Удалить «${b?.name}»? Будущие назначения будут сняты. ` +
-    'Бригаду с завершёнными или текущими назначениями можно только отправить в архив.'
-  if (!b || !confirm(question)) return
+  if (!b) return
+  const confirmed = await askConfirm({
+    title: `Удалить «${b.name}»?`,
+    message:
+      'Будущие назначения будут сняты. Бригаду с завершёнными или текущими назначениями можно только отправить в архив.',
+    confirmText: 'Удалить бригаду',
+  })
+  if (!confirmed) return
   if (!(await brigadesStore.removeBrigade(b.id))) return
   close()
   await personnel.refresh()
@@ -183,7 +187,15 @@ async function toggleArchive() {
   const b = brigade.value
   if (!b) return
   const archived = !b.archived
-  if (archived && !confirm(`Отправить «${b.name}» в архив? Состав освободится для других бригад.`)) return
+  if (
+    archived &&
+    !(await askConfirm({
+      title: `Отправить «${b.name}» в архив?`,
+      message: 'Состав освободится для других бригад.',
+      confirmText: 'В архив',
+    }))
+  )
+    return
   if (await brigadesStore.setBrigadeArchived(b.id, archived)) await personnel.refresh()
 }
 
@@ -211,22 +223,10 @@ async function removeAssignment(id: string) {
   await personnel.refresh()
 }
 
-function onKeydown(event: KeyboardEvent) {
-  if (event.key !== 'Escape' || assignmentOpen.value) return
+useEscape(isOpen, () => {
   if (isEditing.value && !isCreating.value) isEditing.value = false
   else close()
-}
-
-watch(
-  isOpen,
-  (open) => {
-    if (open) window.addEventListener('keydown', onKeydown)
-    else window.removeEventListener('keydown', onKeydown)
-  },
-  { immediate: true },
-)
-
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+})
 </script>
 
 <template>

@@ -26,6 +26,7 @@ import {
   personnelRouter,
   qualificationsRouter,
 } from './modules/personnel/router.js'
+import { overviewRouter } from './modules/overview/router.js'
 import { createReportsRepository } from './modules/reports/repository.js'
 import { reportsRouter } from './modules/reports/router.js'
 import { createTrainingStorage } from './modules/training/bitrix.js'
@@ -132,6 +133,7 @@ export function createApp(options: AppOptions = {}) {
         'assignments',
         'qualifications',
         'training',
+        'overview',
       ],
       storage: 'sqlite',
       bitrix: disk.mode,
@@ -164,6 +166,7 @@ export function createApp(options: AppOptions = {}) {
   api.use('/brigades', access.guard('brigades'), brigadesRouter(personnel))
   api.use('/assignments', access.guard('brigades'), assignmentsRouter(personnel, access))
   api.use('/training', trainingRouter(training, access, { publicUrl: options.publicUrl }))
+  api.use('/overview', overviewRouter({ access, contracts, reports, equipment, personnel, training, today: options.today }))
   api.use(() => notFound('Метод API не найден'))
   app.use('/api', api)
 

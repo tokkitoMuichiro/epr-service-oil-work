@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useBrigadesStore } from '@/entities/brigade'
 import {
@@ -20,8 +20,8 @@ import {
 import { useAccessStore, useRoleStore } from '@/entities/role'
 import { formatDateRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
-import { useScrollLock } from '@/shared/lib/scroll-lock'
-import { IconClose, UiButton } from '@/shared/ui'
+import { useEscape, useScrollLock } from '@/shared/lib/scroll-lock'
+import { IconClose, UiButton, askConfirm } from '@/shared/ui'
 import DocumentDropzone from './DocumentDropzone.vue'
 
 interface ProfileTab {
@@ -144,11 +144,19 @@ async function onEmploymentChange(event: Event) {
   if (!worker.value) return
   const select = event.target as HTMLSelectElement
   const value = select.value as EmploymentStatus
-  if (value === 'fired' && !confirm(`Уволить «${worker.value.fullName}»? Сотрудник будет выведен из бригады.`)) {
-    select.value = worker.value.employment
-    return
+  const current = worker.value
+  if (value === 'fired') {
+    const confirmed = await askConfirm({
+      title: `Уволить «${current.fullName}»?`,
+      message: 'Сотрудник будет выведен из бригады.',
+      confirmText: 'Уволить',
+    })
+    if (!confirmed) {
+      select.value = current.employment
+      return
+    }
   }
-  if (await personnel.setEmployment(worker.value.id, value)) await brigadesStore.load()
+  if (await personnel.setEmployment(current.id, value)) await brigadesStore.load()
 }
 
 async function upload(uploads: DocumentUpload[]) {
@@ -157,8 +165,10 @@ async function upload(uploads: DocumentUpload[]) {
 }
 
 async function removeDocument(docId: string, title: string) {
-  if (!worker.value || !confirm(`Удалить документ «${title}»?`)) return
-  await personnel.removeDocument(worker.value.id, docId)
+  if (!worker.value) return
+  const workerId = worker.value.id
+  if (!(await askConfirm({ title: `Удалить документ «${title}»?`, confirmText: 'Удалить документ' }))) return
+  await personnel.removeDocument(workerId, docId)
 }
 
 async function setPhoto(file: File | undefined) {
@@ -182,35 +192,31 @@ function onPhotoDrop(event: DragEvent) {
 }
 
 async function removePhoto() {
-  if (!worker.value || !confirm('Удалить фото сотрудника?')) return
-  await personnel.removePhoto(worker.value.id)
+  if (!worker.value) return
+  const workerId = worker.value.id
+  if (!(await askConfirm({ title: 'Удалить фото сотрудника?', confirmText: 'Удалить фото' }))) return
+  await personnel.removePhoto(workerId)
 }
 
 async function removeWorker() {
   const w = worker.value
-  const question =
-    `Удалить карточку «${w?.fullName}»? Удалить можно только сотрудника без истории работ; ` +
-    'иначе переведите его в статус «Уволен».'
-  if (!w || !confirm(question)) return
+  if (!w) return
+  const confirmed = await askConfirm({
+    title: `Удалить карточку «${w.fullName}»?`,
+    message: 'Удалить можно только сотрудника без истории работ, иначе переведите его в статус «Уволен».',
+    confirmText: 'Удалить карточку',
+  })
+  if (!confirmed) return
   if (await personnel.removeWorker(w.id)) await brigadesStore.load()
 }
 
-function onKeydown(event: KeyboardEvent) {
-  if (event.key !== 'Escape') return
-  if (isEditing.value) isEditing.value = false
-  else close()
-}
-
-watch(
+useEscape(
   () => Boolean(worker.value),
-  (open) => {
-    if (open) window.addEventListener('keydown', onKeydown)
-    else window.removeEventListener('keydown', onKeydown)
+  () => {
+    if (isEditing.value) isEditing.value = false
+    else close()
   },
-  { immediate: true },
 )
-
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>

@@ -497,7 +497,8 @@ export function ownerLabel(item: EquipmentItem, people: Pick<EquipmentPerson, 'i
     return people.find((p) => p.id === item.ownerUserId)?.fullName ?? 'Сотрудник'
   }
   const wh = warehouses.find((w) => w.id === item.ownerWarehouseId)
-  return wh ? `База: ${wh.name}` : 'Производственная база'
+  if (!wh) return 'Производственная база'
+  return /^база\s/i.test(wh.name) ? wh.name : `База: ${wh.name}`
 }
 
 export function equipmentTypeLabel(item: EquipmentItem) {

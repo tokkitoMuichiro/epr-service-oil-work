@@ -205,6 +205,17 @@
   --select-chevron-inverse: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='m5 7.5 5 5 5-5' fill='none' stroke='%23ced9eb' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
+/* Плотность: с мышью контролы компактнее, на сенсорных экранах остаются 44 px. */
+@media (pointer: fine) {
+  :root,
+  :root[data-theme] {
+    --control-height: 36px;
+    --control-height-sm: 32px;
+    --tap-size: 36px;
+    --timeline-row: 40px;
+  }
+}
+
 /* Тёмная тема: только на экране — печать всегда идёт в светлых токенах. */
 @media screen {
   :root[data-theme='dark'] {
@@ -767,7 +778,7 @@ textarea::placeholder {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  min-height: 36px;
+  min-height: calc(var(--control-height) - 6px);
   padding: 0 var(--space-4);
   border: 0;
   border-radius: var(--radius);
@@ -785,6 +796,13 @@ textarea::placeholder {
   background: var(--surface-card);
   color: var(--text-primary);
   box-shadow: 0 1px 2px var(--scroll-shadow);
+}
+
+.ui-segmented__count {
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Модальное окно: общий вид для UiDialog и собственных профилей */

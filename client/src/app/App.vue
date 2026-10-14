@@ -3,7 +3,7 @@ import { watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { useRoleStore } from '@/entities/role'
 import { useTheme } from '@/features/theme-switch'
-import { UiButton, UiState } from '@/shared/ui'
+import { UiButton, UiConfirmHost, UiState } from '@/shared/ui'
 import { AppShell } from '@/widgets/app-shell'
 
 useTheme()
@@ -35,6 +35,7 @@ async function retry() {
     </UiState>
   </main>
   <AppShell v-else-if="session.isAuthenticated" />
+  <UiConfirmHost />
 </template>
 
 <style scoped>

@@ -1,4 +1,5 @@
 import { workbook, type ExcelCell, type ExcelStyle } from '../../excel.js'
+import { GPR_FONT, GPR_STYLES, gprSheet } from './gpr.js'
 import {
   OBJECT_STATUS_LABEL,
   PROGRESS_LABEL,
@@ -6,7 +7,6 @@ import {
   addDaysIso,
   contractDates,
   formatIsoDate,
-  objectSpan,
   objectStatus,
   periodContaining,
   progressState,
@@ -79,12 +79,6 @@ function weekStarts(span: DateSpan): string[] {
   const weeks: string[] = []
   for (let day = periodContaining('week', span.from).start; day <= span.to; day = addDaysIso(day, 7)) weeks.push(day)
   return weeks
-}
-
-function daysOf(span: DateSpan): string[] {
-  const days: string[] = []
-  for (let day = span.from; day <= span.to; day = addDaysIso(day, 1)) days.push(day)
-  return days
 }
 
 function overlaps(from: string, to: string, plan: ScheduledDates): boolean {
@@ -203,9 +197,14 @@ export function summaryWorkbook({ title, contracts, reports, today }: SummaryExp
         columns: [220, 160, 90, 100, 76, 76, 76, 76, 56, ...weeks.map(() => 34)],
         rows: [...rows, [], ...legendRows()],
         freeze: { rows: headRow, columns: 1 },
+        print: { paper: 'A3', landscape: true, fitWidth: true, titleRows: [headRow, headRow] },
       },
+      ...contracts.flatMap((contract) =>
+        contract.objects.map((object) => gprSheet({ name: object.name, contract, object, reports, today })),
+      ),
     ],
-    STYLES,
+    [...STYLES, ...GPR_STYLES],
+    { font: GPR_FONT },
   )
 }
 
@@ -216,101 +215,10 @@ export interface ObjectExport {
   today: string
 }
 
-const OBJECT_HEAD = [
-  'Работа',
-  'Ед.',
-  'Объём по плану',
-  'Выполнено',
-  '%',
-  'По отчётам',
-  'План начала',
-  'План окончания',
-  'Факт начала',
-  'Факт окончания',
-  'Статус',
-]
-
-function volume(value: number): number {
-  return Math.round(value * 1000) / 1000
-}
-
 export function objectWorkbook({ contract, object, reports, today }: ObjectExport): Buffer {
-  const own = reportsOf(reports, object.id)
-  const span = spanOf([
-    objectSpan(object)?.from ?? '',
-    objectSpan(object)?.to ?? '',
-    ...own.map((r) => r.date),
-  ])
-  const days = span ? daysOf(span) : []
-  const reportDates = new Set(own.map((r) => r.date))
-
-  function reportedOn(workId: string, day: string): number {
-    return own
-      .filter((r) => r.date === day)
-      .flatMap((r) => r.workItems)
-      .filter((w) => w.itemId === workId)
-      .reduce((sum, w) => sum + w.volume, 0)
-  }
-
-  function isReported(workId: string, day: string): boolean {
-    return own.some((r) => r.date === day && r.workItems.some((w) => w.itemId === workId))
-  }
-
-  const objectTone = toneOf(object, today)
-  const rows: ExcelCell[][] = [
-    [text(`График объекта «${object.name}»`, 'title')],
-    [text('Договор', 'label'), text(contract.name)],
-    [text('Заказчик', 'label'), text(contract.customer)],
-    [text('Площадка', 'label'), text(object.location)],
-    [text('Статус', 'label'), text(`${OBJECT_STATUS_LABEL[objectStatus(object)]} · ${PROGRESS_LABEL[progressState(object, today)]}`)],
-    [text('План', 'label'), text(`${date(object.plannedStart)} — ${date(object.plannedEnd)}`)],
-    [text('Факт', 'label'), text(object.actualStart ? `${date(object.actualStart)} — ${date(object.actualEnd) || 'в работе'}` : 'не начат')],
-    [text('Дней с отчётами', 'label'), text(reportDates.size, 'num')],
-    [text('Состояние на', 'label'), text(formatIsoDate(today))],
-    [],
-    [
-      ...OBJECT_HEAD.map((value) => text(value, 'head')),
-      ...days.map((day) => text(shortDate(day), day === today ? 'headToday' : 'headDay')),
-    ],
-  ]
-  const headRow = rows.length
-
-  rows.push([
-    text('Объект целиком', 'group'),
-    ...Array.from({ length: 5 }, () => text('', 'group')),
-    text(date(object.plannedStart), 'group'),
-    text(date(object.plannedEnd), 'group'),
-    text(date(object.actualStart), 'group'),
-    text(date(object.actualEnd), 'group'),
-    text(OBJECT_STATUS_LABEL[objectStatus(object)], 'group'),
-    ...days.map((day) => timelineCell(reportDates.has(day) ? '●' : '', overlaps(day, day, object), objectTone)),
-  ])
-
-  for (const work of object.works) {
-    const reported = volume(own.flatMap((r) => r.workItems).filter((w) => w.itemId === work.id).reduce((s, w) => s + w.volume, 0))
-    const tone = toneOf(work, today)
-    rows.push([
-      text(work.title),
-      text(work.unit),
-      text(work.plannedVolume, 'num'),
-      text(work.actualVolume, 'num'),
-      text(work.plannedVolume ? Math.round((work.actualVolume / work.plannedVolume) * 100) : 0, 'num'),
-      text(reported, 'num'),
-      text(date(work.plannedStart)),
-      text(date(work.plannedEnd)),
-      text(date(work.actualStart)),
-      text(date(work.actualEnd)),
-      text(OBJECT_STATUS_LABEL[work.status]),
-      ...days.map((day) => {
-        const value = isReported(work.id, day) ? volume(reportedOn(work.id, day)) || '●' : ''
-        return timelineCell(value, overlaps(day, day, work), tone)
-      }),
-    ])
-  }
-
   const reportRows: ExcelCell[][] = [
     ['Дата', 'Составил', 'Работа', 'Объём', 'Ед.', 'Этап работ'].map((value) => text(value, 'head')),
-    ...own.flatMap((r) => {
+    ...reportsOf(reports, object.id).flatMap((r) => {
       const items = r.workItems.length ? r.workItems : [{ itemId: '', name: '', unit: '', volume: 0 }]
       return items.map((w) => [
         text(formatIsoDate(r.date)),
@@ -325,14 +233,10 @@ export function objectWorkbook({ contract, object, reports, today }: ObjectExpor
 
   return workbook(
     [
-      {
-        name: 'График',
-        columns: [220, 40, 70, 70, 40, 70, 76, 76, 76, 76, 90, ...days.map(() => 34)],
-        rows: [...rows, [], ...legendRows()],
-        freeze: { rows: headRow, columns: 1 },
-      },
+      gprSheet({ name: 'Прил.2 ГПР', contract, object, reports, today }),
       { name: 'Отчёты', columns: [76, 140, 220, 60, 40, 320], rows: reportRows, freeze: { rows: 1, columns: 0 } },
     ],
-    STYLES,
+    [...STYLES, ...GPR_STYLES],
+    { font: GPR_FONT },
   )
 }

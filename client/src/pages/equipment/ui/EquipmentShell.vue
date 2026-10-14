@@ -3,7 +3,7 @@ import { computed, onMounted, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { canExport, useEquipmentStore } from '@/entities/equipment'
 import { useRoleStore } from '@/entities/role'
-import { IconClose, UiButton, UiState } from '@/shared/ui'
+import { IconClose, IconDownload, PageHeader, UiButton, UiState } from '@/shared/ui'
 import { EquipmentAlerts } from '@/widgets/equipment-board'
 
 const store = useEquipmentStore()
@@ -27,17 +27,14 @@ watch(
 
 <template>
   <section class="shell">
-    <header class="shell__header">
-      <div>
-        <p class="ui-overline shell__eyebrow ui-hide-mobile">Учёт оборудования</p>
-        <h1>{{ title }}</h1>
-        <p v-if="route.meta.description" class="shell__text ui-hide-mobile">{{ route.meta.description }}</p>
-      </div>
-      <div v-if="store.isReady && canExport(store.auth)" class="shell__actions">
-        <UiButton variant="ghost" size="sm" :disabled="store.busy" @click="store.exportExcel()">Excel</UiButton>
+    <PageHeader :title="title" :description="route.meta.description">
+      <template v-if="store.isReady && canExport(store.auth)" #actions>
+        <UiButton variant="ghost" size="sm" :disabled="store.busy" @click="store.exportExcel()">
+          <IconDownload :size="16" />Excel
+        </UiButton>
         <UiButton variant="ghost" size="sm" :disabled="store.busy" @click="store.exportToBitrix()">В Битрикс</UiButton>
-      </div>
-    </header>
+      </template>
+    </PageHeader>
 
     <p v-if="store.lastBitrixExport" class="notice" role="status">
       <span>
@@ -62,42 +59,8 @@ watch(
 .shell {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
   min-height: 100%;
-}
-
-.shell__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: var(--space-3) var(--space-4);
-  flex-wrap: wrap;
-}
-
-.shell__eyebrow {
-  margin: 0 0 var(--space-1);
-}
-
-.shell__header h1 {
-  margin: 0;
-  font-size: var(--page-title-size);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: var(--line-height-tight);
-  color: var(--text-primary);
-}
-
-.shell__text {
-  margin: var(--space-2) 0 0;
-  max-width: 70ch;
-  color: var(--text-secondary);
-  line-height: var(--line-height-base);
-}
-
-.shell__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
 }
 
 .notice {
@@ -125,15 +88,6 @@ watch(
 @media (max-width: 860px) {
   .shell {
     gap: var(--space-3);
-  }
-
-  .shell__header {
-    align-items: center;
-    gap: var(--space-2);
-  }
-
-  .shell__actions {
-    gap: var(--space-1);
   }
 
   .notice {

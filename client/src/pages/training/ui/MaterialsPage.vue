@@ -13,7 +13,7 @@ import { errorMessage } from '@/shared/api'
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
 import { useMobilePagination } from '@/shared/lib/pagination'
-import { UiButton, UiDialog, UiFileDrop, UiPagination, UiState } from '@/shared/ui'
+import { UiButton, UiDialog, UiFileDrop, UiPagination, UiState, askConfirm } from '@/shared/ui'
 
 interface MaterialForm {
   id: string | null
@@ -125,8 +125,13 @@ function toggleArchive(material: TrainingMaterial) {
   return act(() => trainingApi.updateMaterial(material.id, { isArchived: !material.isArchived }))
 }
 
-function remove(material: TrainingMaterial) {
-  if (!window.confirm(`Удалить материал «${material.title}»? Файл в Битрикс останется.`)) return
+async function remove(material: TrainingMaterial) {
+  const confirmed = await askConfirm({
+    title: `Удалить материал «${material.title}»?`,
+    message: 'Файл в Битрикс останется.',
+    confirmText: 'Удалить материал',
+  })
+  if (!confirmed) return
   return act(() => trainingApi.removeMaterial(material.id))
 }
 

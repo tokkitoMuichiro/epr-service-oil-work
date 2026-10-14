@@ -26,6 +26,7 @@ import {
   normalizeConditionNote,
   normalizeEquipmentFields,
   normalizePlate,
+  ownerLabel,
   positionsLabel,
   repairOrigin,
   sortEquipment,
@@ -251,6 +252,18 @@ describe('equipment lists', () => {
     assert.equal(matchesEquipmentQuery(vehicle, 'а123'), true)
     assert.equal(matchesEquipmentQuery(vehicle, 'грузовой'), true)
     assert.equal(matchesEquipmentQuery(vehicle, 'насос'), false)
+  })
+
+  it('labels owners without repeating the word «База»', () => {
+    const warehouses: Warehouse[] = [
+      { id: 'wh-north', name: 'База Север', slug: 'north', isSystem: false, keeperIds: [] },
+      { id: 'wh-repair', name: 'Ремонт', slug: 'repair', isSystem: true, keeperIds: [] },
+    ]
+    const atWarehouse = (id: string) => item({ ownerType: 'WAREHOUSE', ownerUserId: null, ownerWarehouseId: id })
+    assert.equal(ownerLabel(atWarehouse('wh-north'), people, warehouses), 'База Север')
+    assert.equal(ownerLabel(atWarehouse('wh-repair'), people, warehouses), 'База: Ремонт')
+    assert.equal(ownerLabel(atWarehouse('wh-gone'), people, warehouses), 'Производственная база')
+    assert.equal(ownerLabel(item(), people, warehouses), 'Мастер')
   })
 
   it('puts flagged cards first', () => {

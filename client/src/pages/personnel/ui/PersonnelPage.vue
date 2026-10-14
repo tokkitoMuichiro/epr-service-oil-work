@@ -16,7 +16,7 @@ import { useAccessStore, useRoleStore } from '@/entities/role'
 import { TestingMarkIcon, testingMark, useTrainingStore, type TestingMark } from '@/entities/training'
 import { WorkerFormDialog } from '@/features/worker-form'
 import { useMobilePagination } from '@/shared/lib/pagination'
-import { IconClose, IconSearch, UiButton, UiPagination, UiState } from '@/shared/ui'
+import { IconClose, IconSearch, PageHeader, UiButton, UiPagination, UiState } from '@/shared/ui'
 import { BrigadeProfileDialog, NEW_BRIGADE } from '@/widgets/brigade-profile'
 import { WorkerCertifications } from '@/widgets/worker-certifications'
 import { WorkerProfileDialog } from '@/widgets/worker-profile'
@@ -144,46 +144,30 @@ function openCreateBrigade() {
 
 <template>
   <section class="page">
-    <header class="page__header">
-      <div>
-        <h1>Персонал</h1>
-        <p class="ui-hide-mobile">Карточки сотрудников, документы и бригады.</p>
-      </div>
-      <div class="page__actions">
-        <UiButton v-if="tab === 'workers' && canEdit" variant="primary" @click="openCreateWorker">
-          Добавить сотрудника
-        </UiButton>
-        <UiButton v-if="tab === 'brigades' && canPlan" variant="primary" @click="openCreateBrigade">
-          Новая бригада
-        </UiButton>
-      </div>
-    </header>
-
-    <div class="tabs ui-segmented" role="tablist" aria-label="Разделы персонала">
-      <button
-        type="button"
-        class="tabs__btn"
-        :class="{ 'tabs__btn--active': tab === 'workers' }"
-        role="tab"
-        :aria-selected="tab === 'workers'"
-        @click="tab = 'workers'"
-      >
-        Сотрудники
-        <span v-if="attentionCount" class="tabs__badge" title="Истекающие или просроченные документы">
-          {{ attentionCount }}
-        </span>
-      </button>
-      <button
-        type="button"
-        class="tabs__btn"
-        :class="{ 'tabs__btn--active': tab === 'brigades' }"
-        role="tab"
-        :aria-selected="tab === 'brigades'"
-        @click="tab = 'brigades'"
-      >
-        Бригады
-      </button>
-    </div>
+    <PageHeader title="Персонал" description="Карточки сотрудников, документы и бригады.">
+      <template v-if="(tab === 'workers' && canEdit) || (tab === 'brigades' && canPlan)" #actions>
+        <UiButton v-if="tab === 'workers'" variant="primary" @click="openCreateWorker">Добавить сотрудника</UiButton>
+        <UiButton v-else variant="primary" @click="openCreateBrigade">Новая бригада</UiButton>
+      </template>
+      <template #tabs>
+        <div class="ui-segmented" role="tablist" aria-label="Разделы персонала">
+          <button type="button" role="tab" :aria-selected="tab === 'workers'" @click="tab = 'workers'">
+            Сотрудники <span class="ui-segmented__count">{{ workers.length }}</span>
+            <span
+              v-if="attentionCount"
+              class="tabs__badge"
+              :title="`Документы истекают или просрочены: ${attentionCount}`"
+              :aria-label="`документы требуют внимания: ${attentionCount}`"
+            >
+              {{ attentionCount }}
+            </span>
+          </button>
+          <button type="button" role="tab" :aria-selected="tab === 'brigades'" @click="tab = 'brigades'">
+            Бригады <span class="ui-segmented__count">{{ brigades.length }}</span>
+          </button>
+        </div>
+      </template>
+    </PageHeader>
 
     <p v-if="actionError && !profileId && !workerDialogOpen" class="alert" role="alert">
       {{ actionError }}
@@ -278,7 +262,7 @@ function openCreateBrigade() {
                     </span>
                   </button>
                 </th>
-                <th v-if="showTraining" class="col--testing"><span class="sort sort--static">Тестирование</span></th>
+                <th v-if="showTraining" class="col--testing"><span class="sort sort--static">Проверка знаний</span></th>
               </tr>
             </thead>
             <tbody>
@@ -290,15 +274,15 @@ function openCreateBrigade() {
                 @click="personnel.openProfile(w.id)"
                 @keydown.enter="personnel.openProfile(w.id)"
               >
-                <td data-label="ФИО"><strong>{{ w.fullName }}</strong></td>
-                <td data-label="Должность">{{ w.position }}</td>
-                <td data-label="Бригада">{{ brigadeName(w.brigadeId) }}</td>
+                <td data-label="ФИО" :title="w.fullName"><strong>{{ w.fullName }}</strong></td>
+                <td data-label="Должность" :title="w.position">{{ w.position }}</td>
+                <td data-label="Бригада" :title="brigadeName(w.brigadeId)">{{ brigadeName(w.brigadeId) }}</td>
                 <td class="nowrap col--phone" data-label="Телефон">{{ w.phone || '—' }}</td>
                 <td data-label="Занятость"><WorkerStatusBadge :status="w.status" /></td>
                 <td class="nowrap" :class="{ 'ui-hide-mobile': w.employment === 'active' }" data-label="В компании">
                   {{ EMPLOYMENT_STATUS_LABEL[w.employment] }}
                 </td>
-                <td v-if="showTraining" class="col--testing" data-label="Тестирование">
+                <td v-if="showTraining" class="col--testing" data-label="Проверка знаний">
                   <TestingMarkIcon :mark="testingOf(w.id)" />
                 </td>
               </tr>
@@ -416,43 +400,6 @@ function openCreateBrigade() {
   min-height: 100%;
 }
 
-.page__header {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-4);
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-
-.page__header h1 {
-  margin: 0;
-  font-size: var(--page-title-size);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: var(--line-height-tight);
-  color: var(--text-primary);
-}
-
-.page__header p {
-  margin: var(--space-2) 0 0;
-  color: var(--text-secondary);
-  max-width: 62ch;
-  line-height: 1.45;
-}
-
-.page__actions {
-  display: flex;
-  gap: 8px;
-}
-
-.tabs {
-  align-self: flex-start;
-}
-
-.tabs__btn {
-  min-height: 36px;
-}
-
 .tabs__badge {
   display: inline-grid;
   place-items: center;
@@ -562,21 +509,16 @@ function openCreateBrigade() {
 }
 
 .legend__swatch {
-  width: 14px;
-  height: 10px;
-  border-radius: var(--radius);
+  width: 4px;
+  height: 14px;
 }
 
 .legend__swatch--expiring {
-  background: var(--status-warn-bg);
-  border: 1px solid var(--status-warn-solid);
-  border-left-width: 3px;
+  background: var(--status-warn-solid);
 }
 
 .legend__swatch--expired {
-  background: var(--status-bad-bg);
-  border: 1px solid var(--status-bad-solid);
-  border-left-width: 3px;
+  background: var(--status-bad-solid);
 }
 
 .legend__count {
@@ -604,14 +546,18 @@ table {
 th,
 td {
   text-align: left;
-  padding: 10px 12px;
+  padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--border-subtle);
   font-size: var(--font-size-sm);
   vertical-align: middle;
 }
 
 td {
-  height: 44px;
+  height: calc(var(--control-height) + 4px);
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 tbody tr:last-child td {
@@ -635,7 +581,7 @@ th {
   align-items: center;
   gap: 6px;
   width: 100%;
-  min-height: 40px;
+  min-height: var(--control-height);
   padding: 0 12px;
   border: 0;
   background: transparent;
@@ -725,20 +671,12 @@ tbody tr.row--archived td {
   color: var(--text-secondary);
 }
 
-tbody tr.row--expiring td {
-  background-color: var(--status-warn-bg);
-}
-
-tbody tr.row--expired td {
-  background-color: var(--status-bad-bg);
-}
-
 tbody tr.row--expiring td:first-child {
-  box-shadow: inset 3px 0 0 var(--status-warn-solid);
+  box-shadow: inset 4px 0 0 var(--status-warn-solid);
 }
 
 tbody tr.row--expired td:first-child {
-  box-shadow: inset 3px 0 0 var(--status-bad-solid);
+  box-shadow: inset 4px 0 0 var(--status-bad-solid);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -746,14 +684,8 @@ tbody tr.row--expired td:first-child {
     color: var(--text-primary);
   }
 
-  tbody tr:not(.row--expiring, .row--expired):hover td {
+  tbody tr:hover td {
     background-color: var(--row-hover-bg);
-  }
-
-  tbody tr.row--expiring:hover td,
-  tbody tr.row--expired:hover td {
-    text-decoration: underline;
-    text-decoration-color: var(--border-strong);
   }
 }
 
@@ -875,13 +807,11 @@ tbody tr.row--expired td:first-child {
   }
 
   tbody tr.row--expiring {
-    background: var(--status-warn-bg);
-    box-shadow: inset 3px 0 0 var(--status-warn-solid);
+    box-shadow: inset 4px 0 0 var(--status-warn-solid);
   }
 
   tbody tr.row--expired {
-    background: var(--status-bad-bg);
-    box-shadow: inset 3px 0 0 var(--status-bad-solid);
+    box-shadow: inset 4px 0 0 var(--status-bad-solid);
   }
 
   td,
@@ -891,6 +821,8 @@ tbody tr.row--expired td:first-child {
   tbody tr.row--expired td {
     position: static;
     height: auto;
+    max-width: none;
+    white-space: normal;
     padding: 0;
     border: 0;
     background: none;

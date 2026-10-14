@@ -1,4 +1,4 @@
-import type { Contract, ContractObject } from './contracts.js'
+import type { Contract, ContractObject, WorkItem } from './contracts.js'
 import { addDaysIso, daysBetweenIso } from './dates.js'
 
 export type ScheduleScale = 'week' | 'month' | 'year'
@@ -174,6 +174,14 @@ export function progressState(dates: ScheduledDates, today: string): ProgressSta
   }
   if (dates.actualStart) return today > dates.plannedEnd ? 'overdue' : 'in_progress'
   return today > dates.plannedStart ? 'late_start' : 'planned'
+}
+
+/** Volume that should be done by the end of `day` if the work goes evenly through its planned dates. */
+export function plannedVolumeOn(work: Pick<WorkItem, 'plannedStart' | 'plannedEnd' | 'plannedVolume'>, day: string): number {
+  if (!work.plannedStart || !work.plannedEnd || day < work.plannedStart) return 0
+  if (day >= work.plannedEnd) return work.plannedVolume
+  const total = daysBetweenIso(work.plannedStart, work.plannedEnd) + 1
+  return (work.plannedVolume * (daysBetweenIso(work.plannedStart, day) + 1)) / total
 }
 
 export function contractDates(contract: Contract): ScheduledDates | null {

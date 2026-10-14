@@ -22,7 +22,7 @@ import { AssignTestDialog } from '@/features/training-assign'
 import { errorMessage } from '@/shared/api'
 import { copyText } from '@/shared/lib/clipboard'
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/date'
-import { UiButton, UiDialog } from '@/shared/ui'
+import { UiButton, UiDialog, askConfirm } from '@/shared/ui'
 
 const props = defineProps<{ workerId: string; isFired?: boolean }>()
 
@@ -116,8 +116,13 @@ function copyLink(item: AssignmentView, withText: boolean) {
   })
 }
 
-function cancel(item: AssignmentView) {
-  if (!window.confirm(`Отозвать проверку «${item.programLabel}»? Ссылка перестанет работать.`)) return
+async function cancel(item: AssignmentView) {
+  const confirmed = await askConfirm({
+    title: `Отозвать проверку «${item.programLabel}»?`,
+    message: 'Ссылка перестанет работать.',
+    confirmText: 'Отозвать',
+  })
+  if (!confirmed) return
   return run(item.id, async () => {
     await trainingApi.cancel(item.id, '')
     await load()
@@ -381,7 +386,7 @@ function onAssigned() {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2) var(--space-3);
-  min-height: 44px;
+  min-height: var(--control-height);
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);

@@ -597,7 +597,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  min-height: 40px;
+  min-height: var(--control-height);
   padding: 0 var(--space-3);
   border-radius: var(--radius);
   font-size: var(--font-size-sm);
@@ -704,7 +704,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  min-height: 40px;
+  min-height: var(--control-height);
   padding: 0 var(--space-3);
   border-radius: var(--radius);
   color: var(--text-on-inverse-muted);
