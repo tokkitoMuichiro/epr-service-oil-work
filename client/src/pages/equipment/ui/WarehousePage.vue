@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { canStockWarehouse, useEquipmentStore } from '@/entities/equipment'
 import { EquipmentFormDialog } from '@/features/equipment-form'
-import { IconChevron, UiButton, UiState } from '@/shared/ui'
+import { IconChevron, IconEquipment, UiButton, UiState } from '@/shared/ui'
 import { EquipmentBoard } from '@/widgets/equipment-board'
 import { useRouteCategory } from '../model/category'
 import CategoryTabs from './CategoryTabs.vue'
@@ -22,7 +22,7 @@ const canStock = computed(() => !isRepair.value && canStockWarehouse(store.auth,
 </script>
 
 <template>
-  <UiState v-if="!warehouse" title="База не найдена" text="Возможно, её удалили.">
+  <UiState v-if="!warehouse" title="База не найдена" :icon="IconEquipment" text="Возможно, её удалили.">
     <RouterLink class="back" :to="{ name: 'equipment-warehouses' }">К списку баз</RouterLink>
   </UiState>
 

@@ -12,7 +12,7 @@ import {
 import { AssignTestDialog } from '@/features/training-assign'
 import { formatDateRu } from '@/shared/lib/date'
 import { useMobilePagination } from '@/shared/lib/pagination'
-import { UiButton, UiPagination, UiState } from '@/shared/ui'
+import { IconSearch, UiAvatar, UiButton, UiPagination, UiState } from '@/shared/ui'
 
 /** One row per worker × programme; a worker without trainings gets a single row with `status: null`. */
 interface SummaryItem {
@@ -156,7 +156,7 @@ function onAssigned() {
         </label>
       </div>
 
-      <UiState v-if="!visible.length" title="Никого нет" text="По выбранным фильтрам сотрудников нет." />
+      <UiState v-if="!visible.length" title="Никого нет" :icon="IconSearch" text="По выбранным фильтрам сотрудников нет." />
       <template v-else>
         <div class="ui-table-wrap ui-table-wrap--stack">
           <table class="ui-table">
@@ -184,8 +184,13 @@ function onAssigned() {
                   />
                 </td>
                 <td class="summary__worker ui-cell--main">
-                  <strong>{{ item.row.fullName }}</strong>
-                  <small class="summary__position">{{ item.row.position }}</small>
+                  <span class="summary__person">
+                    <UiAvatar :name="item.row.fullName" />
+                    <span class="summary__name">
+                      <strong>{{ item.row.fullName }}</strong>
+                      <small class="summary__position">{{ item.row.position }}</small>
+                    </span>
+                  </span>
                 </td>
                 <td class="summary__program" :class="{ 'ui-hide-mobile': !item.status }">
                   {{ item.status ? store.labelOf(item.status.programId) : '—' }}
@@ -302,6 +307,17 @@ function onAssigned() {
 
 .summary__select-all {
   display: none;
+}
+
+.summary__person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.summary__name {
+  min-width: 0;
 }
 
 .summary__position {

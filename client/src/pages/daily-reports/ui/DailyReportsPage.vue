@@ -11,7 +11,7 @@ import { useAccessStore } from '@/entities/role'
 import { todayIso } from '@shared/dates'
 import { ReportForm } from '@/features/report-form'
 import { useMobilePagination } from '@/shared/lib/pagination'
-import { IconChevron, PageHeader, UiButton, UiInput, UiPagination, UiState } from '@/shared/ui'
+import { IconChevron, IconReports, PageHeader, UiButton, UiInput, UiPagination, UiState } from '@/shared/ui'
 
 const store = useDailyReportsStore()
 const {
@@ -147,6 +147,7 @@ function changeObject() {
     <UiState
       v-else-if="isEmpty"
       title="Объектов пока нет"
+      :icon="IconReports"
       text="Добавьте объекты в модуле «Контракты» — они появятся здесь для отчётов."
     />
 
@@ -197,6 +198,7 @@ function changeObject() {
           <UiState
             compact
             title="Выберите объект"
+            :icon="IconReports"
             :text="
               mode === 'create'
                 ? 'Выберите объект слева и заполните смену.'
@@ -249,6 +251,7 @@ function changeObject() {
                 v-if="archiveDates.length === 0"
                 compact
                 title="Архив пуст"
+                :icon="IconReports"
                 text="По этому объекту ещё нет сохранённых отчётов."
               />
               <button

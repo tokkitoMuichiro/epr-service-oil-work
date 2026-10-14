@@ -19,6 +19,7 @@ import {
   IconReports,
   IconSettings,
   IconTraining,
+  UiAvatar,
 } from '@/shared/ui'
 import { RoleSwitcher } from '@/widgets/role-switcher'
 
@@ -111,7 +112,7 @@ const navGroups = computed(() => [trainingGroup.value, equipmentGroup.value].fil
 const hasNavBadge = computed(() => navGroups.value.some((group) => Boolean(group.badge)))
 
 const isRail = computed(() => isTablet.value && isCollapsed.value)
-const roleInitial = computed(() => (roleStore.user?.fullName || roleStore.currentRoleLabel).charAt(0).toUpperCase())
+const displayName = computed(() => roleStore.user?.fullName || roleStore.currentRoleLabel)
 
 watch(
   () => access.permissions,
@@ -279,7 +280,7 @@ onUnmounted(() => {
         aria-controls="app-sidebar"
         @click="openMobile"
       >
-        <span class="avatar" aria-hidden="true">{{ roleInitial }}</span>
+        <UiAvatar :name="displayName" size="md" inverse />
       </button>
     </header>
 
@@ -395,7 +396,7 @@ onUnmounted(() => {
       </nav>
 
       <div class="shell__footer">
-        <ThemeSwitch :compact="isRail" />
+        <ThemeSwitch v-if="isRail" compact />
         <button
           v-if="isRail"
           type="button"
@@ -404,9 +405,11 @@ onUnmounted(() => {
           :aria-label="`Роль: ${roleStore.currentRoleLabel}. Развернуть меню`"
           @click="toggleCollapsed"
         >
-          <span class="avatar" aria-hidden="true">{{ roleInitial }}</span>
+          <UiAvatar :name="displayName" size="md" inverse />
         </button>
-        <RoleSwitcher v-else />
+        <RoleSwitcher v-else>
+          <template #actions><ThemeSwitch compact /></template>
+        </RoleSwitcher>
       </div>
 
       <button
@@ -544,13 +547,14 @@ onUnmounted(() => {
 }
 
 .nav__link--active {
-  background: var(--surface-inverse-hover);
+  background: var(--nav-active-bg);
   color: var(--text-on-inverse);
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .nav__link--active .nav__icon {
   opacity: 1;
+  color: var(--text-on-inverse-accent);
 }
 
 .nav__link--separated {
@@ -609,7 +613,7 @@ onUnmounted(() => {
 }
 
 .nav__sublink--active {
-  background: var(--surface-inverse-hover);
+  background: var(--nav-active-bg);
   color: var(--text-on-inverse);
   font-weight: 600;
   box-shadow: inset 3px 0 0 var(--accent);
@@ -644,8 +648,9 @@ onUnmounted(() => {
   display: grid;
   gap: var(--space-3);
   margin-top: auto;
-  padding: var(--space-3);
-  background: var(--border-inverse);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  background: var(--surface-inverse-raised);
+  border: 1px solid var(--border-inverse);
   border-radius: var(--radius);
 }
 
@@ -663,18 +668,6 @@ onUnmounted(() => {
   font-size: var(--font-size-sm);
   font-weight: 600;
   cursor: pointer;
-}
-
-.avatar {
-  display: inline-grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-pill);
-  background: var(--brand-mark-bg);
-  color: var(--text-on-accent);
-  font-size: var(--font-size-sm);
-  font-weight: 700;
 }
 
 .rail-popover {
@@ -713,7 +706,7 @@ onUnmounted(() => {
 }
 
 .rail-popover__link--active {
-  background: var(--surface-inverse-hover);
+  background: var(--nav-active-bg);
   color: var(--text-on-inverse);
   box-shadow: inset 3px 0 0 var(--accent);
 }
@@ -766,6 +759,7 @@ onUnmounted(() => {
   justify-items: center;
   gap: var(--space-1);
   padding: 0;
+  border: 0;
   background: transparent;
 }
 

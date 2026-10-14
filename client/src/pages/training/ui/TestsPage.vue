@@ -12,7 +12,7 @@ import {
 } from '@/entities/training'
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { useMobilePagination } from '@/shared/lib/pagination'
-import { UiPagination, UiState } from '@/shared/ui'
+import { IconTraining, UiPagination, UiState } from '@/shared/ui'
 
 const STATUS_TONE: Record<TestStatus, string> = { draft: 'warn', published: 'ok', archived: '' }
 
@@ -70,7 +70,7 @@ const pager = useMobilePagination(visible, { resetOn: [search, programFilter, st
       <RouterLink class="tests__new" to="/training/tests/new">Создать тест</RouterLink>
     </div>
 
-    <UiState v-if="!visible.length" title="Тестов нет" text="Создайте тест: добавьте вопросы и опубликуйте его." />
+    <UiState v-if="!visible.length" title="Тестов нет" :icon="IconTraining" text="Создайте тест: добавьте вопросы и опубликуйте его." />
     <template v-else>
       <div class="ui-table-wrap ui-table-wrap--stack">
         <table class="ui-table">

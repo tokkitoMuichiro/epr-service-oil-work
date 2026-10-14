@@ -3,7 +3,7 @@ import { computed, onMounted, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { canExport, useEquipmentStore } from '@/entities/equipment'
 import { useRoleStore } from '@/entities/role'
-import { IconClose, IconDownload, PageHeader, UiButton, UiState } from '@/shared/ui'
+import { IconClose, IconDownload, PageHeader, UiButton, UiMenu, UiState, type UiMenuSection } from '@/shared/ui'
 import { EquipmentAlerts } from '@/widgets/equipment-board'
 
 const store = useEquipmentStore()
@@ -11,6 +11,20 @@ const roleStore = useRoleStore()
 const route = useRoute()
 
 const title = computed(() => route.meta.title ?? 'Оборудование')
+
+const exportSections = computed<UiMenuSection[]>(() => [
+  {
+    items: [
+      { id: 'excel', label: 'Скачать Excel', disabled: store.busy },
+      { id: 'bitrix', label: 'Выгрузить в Битрикс', disabled: store.busy },
+    ],
+  },
+])
+
+function onExport(id: string) {
+  if (id === 'excel') void store.exportExcel()
+  else if (id === 'bitrix') void store.exportToBitrix()
+}
 
 onMounted(() => {
   if (store.status === 'idle' || store.status === 'error') void store.load()
@@ -29,10 +43,9 @@ watch(
   <section class="shell">
     <PageHeader :title="title" :description="route.meta.description">
       <template v-if="store.isReady && canExport(store.auth)" #actions>
-        <UiButton variant="ghost" size="sm" :disabled="store.busy" @click="store.exportExcel()">
-          <IconDownload :size="16" />Excel
-        </UiButton>
-        <UiButton variant="ghost" size="sm" :disabled="store.busy" @click="store.exportToBitrix()">В Битрикс</UiButton>
+        <UiMenu label="Экспорт оборудования" text="Экспорт" :sections="exportSections" @select="onExport">
+          <template #icon><IconDownload :size="16" /></template>
+        </UiMenu>
       </template>
     </PageHeader>
 

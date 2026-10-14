@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRoleStore, type RoleId } from '@/entities/role'
 import { errorMessage } from '@/shared/api'
+import { IconLogout, UiAvatar } from '@/shared/ui'
+
+defineSlots<{ actions?(): unknown }>()
 
 const session = useRoleStore()
 const router = useRouter()
 const error = ref('')
+
+const displayName = computed(() => session.user?.fullName || session.currentRoleLabel)
 
 async function onChange(event: Event) {
   error.value = ''
@@ -31,11 +36,18 @@ async function logout() {
 <template>
   <div class="user">
     <div class="user__head">
+      <UiAvatar :name="displayName" size="md" inverse />
       <div class="user__info">
-        <span class="user__name">{{ session.user?.fullName }}</span>
-        <span class="user__role">{{ session.currentRoleLabel }}</span>
+        <span class="user__name" :title="displayName">{{ displayName }}</span>
+        <span class="user__role" :title="session.currentRoleLabel">{{ session.currentRoleLabel }}</span>
+        <span class="user__role role__hint" :data-on="session.piiVisible">
+          {{ session.piiVisible ? 'ПДн видны' : 'ПДн скрыты' }}
+        </span>
       </div>
-      <button type="button" class="user__logout" @click="logout">Выйти</button>
+      <slot name="actions" />
+      <button type="button" class="user__logout" aria-label="Выйти" title="Выйти" @click="logout">
+        <IconLogout :size="20" />
+      </button>
     </div>
 
     <label v-if="session.devLogin" class="role">
@@ -47,9 +59,6 @@ async function logout() {
       </select>
     </label>
 
-    <span class="role__hint" :data-on="session.piiVisible">
-      {{ session.piiVisible ? 'ПДн видны' : 'ПДн скрыты' }}
-    </span>
     <p v-if="error" class="user__error" role="alert">{{ error }}</p>
   </div>
 </template>
@@ -57,44 +66,50 @@ async function logout() {
 <style scoped>
 .user {
   display: grid;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .user__head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-2);
 }
 
 .user__info {
   display: grid;
+  flex: 1;
   min-width: 0;
 }
 
-.user__name {
+.user__name,
+.user__role {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.user__name {
   color: var(--text-on-inverse);
+  font-size: var(--font-size-sm);
   font-weight: 600;
 }
 
 .user__role {
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-2xs);
   color: var(--text-on-inverse-subtle);
 }
 
 .user__logout {
   flex: 0 0 auto;
-  min-height: 36px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border-inverse-strong);
+  display: inline-grid;
+  place-items: center;
+  width: var(--tap-size);
+  height: var(--tap-size);
+  padding: 0;
+  border: 0;
   border-radius: var(--radius);
   background: transparent;
-  color: var(--text-on-inverse-muted);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
+  color: var(--text-on-inverse-subtle);
   cursor: pointer;
 }
 
@@ -107,14 +122,12 @@ async function logout() {
 
 .role {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .role__label {
   font-size: var(--font-size-xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-weight: 600;
   color: var(--text-on-inverse-subtle);
 }
 
@@ -139,11 +152,6 @@ async function logout() {
 .role__select option {
   color: var(--text-primary);
   background: var(--surface-raised);
-}
-
-.role__hint {
-  font-size: var(--font-size-xs);
-  color: var(--text-on-inverse-muted);
 }
 
 .role__hint[data-on='true'] {
