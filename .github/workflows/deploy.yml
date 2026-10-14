@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Тег релиза для отката или повторного выката (например v12). Пусто — предыдущий релиз
+        description: Тег релиза для отката или повторного выката (например v2.0.14). Пусто — предыдущий релиз
         type: string
         required: false
 

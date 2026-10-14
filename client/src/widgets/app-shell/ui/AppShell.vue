@@ -5,6 +5,7 @@ import { authFor, canViewAllList, useEquipmentStore } from '@/entities/equipment
 import { equipmentPermissionsOf, useAccessStore, useRoleStore, type AccessBlock } from '@/entities/role'
 import { ThemeSwitch } from '@/features/theme-switch'
 import { APP_NAME } from '@/shared/config'
+import { useIsMobile, useMediaQuery } from '@/shared/lib/media'
 import { useEscape, useScrollLock } from '@/shared/lib/scroll-lock'
 import {
   AppLogo,
@@ -49,8 +50,9 @@ const equipment = useEquipmentStore()
 const access = useAccessStore()
 const roleStore = useRoleStore()
 const mobileOpen = ref(false)
-const isMobile = ref(false)
-const isTablet = ref(false)
+const isMobile = useIsMobile()
+const isDesktop = useMediaQuery('(min-width: 1280px)')
+const isTablet = computed(() => !isMobile.value && !isDesktop.value)
 const isCollapsed = ref(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) !== '0')
 const openGroups = ref<string[]>([])
 const railPopover = ref<{ id: string; top: number } | null>(null)
@@ -181,12 +183,13 @@ function toggleCollapsed() {
 
 watch(isCollapsed, (collapsed) => localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0'))
 
-function checkViewport() {
-  isMobile.value = window.matchMedia('(max-width: 860px)').matches
-  isTablet.value = !isMobile.value && !window.matchMedia('(min-width: 1280px)').matches
-  if (!isMobile.value) mobileOpen.value = false
-  if (!isRail.value) closeRailPopover()
-}
+watch(isMobile, (mobile) => {
+  if (!mobile) mobileOpen.value = false
+})
+
+watch(isRail, (rail) => {
+  if (!rail) closeRailPopover()
+})
 
 async function openMobile() {
   mobileOpen.value = true
@@ -236,13 +239,10 @@ watch(
 )
 
 onMounted(() => {
-  checkViewport()
-  window.addEventListener('resize', checkViewport)
   document.addEventListener('pointerdown', onDocumentPointer)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', checkViewport)
   document.removeEventListener('pointerdown', onDocumentPointer)
 })
 </script>

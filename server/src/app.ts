@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import cors from 'cors'
 import express from 'express'
+import { compressJson, precompressedFiles } from './compression.js'
 import { createAuditLog, createStorage, openDatabase, type Database, type DatabaseSeed, type Storage } from './db.js'
 import { createDisk, type BitrixConfig, type Disk } from './disk/index.js'
 import { diskRouter } from './disk/router.js'
@@ -62,6 +63,12 @@ export interface AppOptions {
   version?: string
 }
 
+function staticCacheControl(relative: string): string {
+  if (/(?:^|[\\/])assets[\\/]/.test(relative)) return 'public, max-age=31536000, immutable'
+  if (/(?:sw\.js|registerSW\.js|manifest\.webmanifest)$/.test(relative)) return 'no-cache'
+  return 'public, max-age=3600'
+}
+
 export function createApp(options: AppOptions = {}) {
   const db = options.db ?? openDatabase()
   const storage = createStorage(db, { seed: options.seed })
@@ -110,6 +117,7 @@ export function createApp(options: AppOptions = {}) {
   app.use(securityHeaders)
   if (options.corsOrigins?.length) app.use(cors({ origin: options.corsOrigins, credentials: true }))
   app.use(express.json({ limit: '1mb' }))
+  app.use(compressJson())
 
   app.get('/health', (_req, res) => {
     res.json({ ok: true, service: 'erp-ammir-api', version: options.version ?? 'dev', time: new Date().toISOString() })
@@ -174,20 +182,23 @@ export function createApp(options: AppOptions = {}) {
   if (clientDist && existsSync(clientDist)) {
     const indexFile = path.join(clientDist, 'index.html')
     const csp = spaContentSecurityPolicy(existsSync(indexFile) ? readFileSync(indexFile, 'utf8') : '')
+    const precompressed = precompressedFiles(clientDist)
+    app.use((req, res, next) => {
+      const relative = req.path.slice(1)
+      const isGet = req.method === 'GET' || req.method === 'HEAD'
+      if (!isGet || !precompressed.send(res, relative, req.headers['accept-encoding'], staticCacheControl(relative))) next()
+    })
     app.use(
       express.static(clientDist, {
         index: false,
         maxAge: '1h',
-        setHeaders: (res, file) => {
-          if (/(?:^|[\\/])assets[\\/]/.test(file)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
-          else if (/(?:sw\.js|registerSW\.js|manifest\.webmanifest)$/.test(file)) res.setHeader('Cache-Control', 'no-cache')
-        },
+        setHeaders: (res, file) => res.setHeader('Cache-Control', staticCacheControl(path.relative(clientDist, file))),
       }),
     )
-    app.get(/^(?!\/api\/|\/health$).*/, (_req, res) => {
+    app.get(/^(?!\/api\/|\/health$).*/, (req, res) => {
       res.setHeader('Cache-Control', 'no-cache')
       res.setHeader('Content-Security-Policy', csp)
-      res.sendFile(indexFile)
+      if (!precompressed.send(res, 'index.html', req.headers['accept-encoding'], 'no-cache')) res.sendFile(indexFile)
     })
   }
 
