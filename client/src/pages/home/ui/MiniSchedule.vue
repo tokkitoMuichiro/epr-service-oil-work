@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { addDaysIso, daysBetweenIso } from '@shared/dates'
 import type { OverviewObject } from '@shared/overview'
 import type { DateSpan } from '@shared/schedule'
-import { formatDateRu, isWeekend } from '@/shared/lib/date'
+import { formatDateRu, formatDayMonth, isWeekend } from '@/shared/lib/date'
 
 const props = defineProps<{ objects: OverviewObject[]; window: DateSpan; today: string }>()
 
@@ -37,20 +37,45 @@ function dayStyle(day: string) {
   return { left: percent(indexOf(day)), width: percent(1) }
 }
 
+const DAY_LABEL_MIN_WIDTH = 18
+
+const headTrack = ref<HTMLElement | null>(null)
+const trackWidth = ref(0)
+let observer: ResizeObserver | null = null
+
+onMounted(() => {
+  if (!headTrack.value) return
+  observer = new ResizeObserver(([entry]) => {
+    trackWidth.value = entry.contentRect.width
+  })
+  observer.observe(headTrack.value)
+})
+
+onBeforeUnmount(() => observer?.disconnect())
+
+const labelStep = computed(() => {
+  if (!trackWidth.value) return 1
+  return Math.max(1, Math.ceil(DAY_LABEL_MIN_WIDTH / (trackWidth.value / days.value.length)))
+})
+
+function isLabeled(day: string): boolean {
+  return (indexOf(day) - indexOf(props.today)) % labelStep.value === 0
+}
+
 const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))} + ${50 / days.value.length}%)` }))
 </script>
 
 <template>
   <div class="mini" :style="{ '--days': days.length }">
     <div class="mini__head" aria-hidden="true">
-      <span class="mini__label">{{ formatDateRu(window.from) }} — {{ formatDateRu(window.to) }}</span>
-      <span class="mini__track mini__days">
+      <span class="mini__label">{{ formatDayMonth(window.from) }} — {{ formatDayMonth(window.to) }}</span>
+      <span ref="headTrack" class="mini__track mini__days">
         <span
           v-for="day in days"
           :key="day"
           :class="{ 'is-weekend': isWeekend(day), 'is-today': day === today, 'is-month': day.endsWith('-01') }"
         >
-          {{ Number(day.slice(8)) }}
+          <template v-if="isLabeled(day)">{{ Number(day.slice(8)) }}</template>
         </span>
       </span>
     </div>
@@ -153,6 +178,7 @@ const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))
 .mini__days > span {
   display: grid;
   place-items: center;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
@@ -256,8 +282,11 @@ const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))
     --label-width: 140px;
   }
 
-  .mini__days > span:not(.is-today, .is-month) {
-    color: transparent;
+}
+
+@media (max-width: 560px) {
+  .mini {
+    --label-width: 120px;
   }
 }
 </style>

@@ -12,7 +12,7 @@ import {
 } from '@/entities/equipment'
 import { WarehouseFormDialog } from '@/features/warehouse-form'
 import { useMobilePagination } from '@/shared/lib/pagination'
-import { IconClose, UiButton, UiPagination, UiState, askConfirm } from '@/shared/ui'
+import { IconClose, IconEquipment, UiButton, UiPagination, UiState, askConfirm } from '@/shared/ui'
 
 const store = useEquipmentStore()
 
@@ -72,7 +72,7 @@ async function remove(w: Warehouse) {
       <button type="button" aria-label="Скрыть" @click="store.clearActionError()"><IconClose :size="16" /></button>
     </p>
 
-    <UiState v-if="!bases.length" title="Баз пока нет" text="Создайте первую производственную базу." />
+    <UiState v-if="!bases.length" title="Баз пока нет" :icon="IconEquipment" text="Создайте первую производственную базу." />
 
     <ul v-else class="bases">
       <li v-for="w in pager.pageItems" :key="w.id" class="base" :class="{ 'base--system': w.isSystem }">

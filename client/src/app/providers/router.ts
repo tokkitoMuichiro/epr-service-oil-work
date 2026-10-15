@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteLocationNormalized } from 'vue-router'
 import { authFor, canViewAllList, useEquipmentStore } from '@/entities/equipment'
 import {
   bitrixLoginUrl,
@@ -9,30 +9,24 @@ import {
   type AccessBlock,
   type Permission,
 } from '@/entities/role'
-import { ContractsPage } from '@/pages/contracts'
-import { DailyReportsPage } from '@/pages/daily-reports'
-import {
-  EquipmentListPage,
-  EquipmentPeoplePage,
-  EquipmentShell,
-  TransferHistoryPage,
-  WarehousePage,
-  WarehousesPage,
-} from '@/pages/equipment'
 import { HomePage } from '@/pages/home'
 import { LoginPage } from '@/pages/login'
-import { PersonnelPage } from '@/pages/personnel'
-import { SettingsPage } from '@/pages/settings'
-import { TestRunPage } from '@/pages/test-run'
-import {
-  AssignmentsPage,
-  DirectionsPage,
-  MaterialsPage,
-  TestEditorPage,
-  TestsPage,
-  TrainingShell,
-  TrainingSummaryPage,
-} from '@/pages/training'
+
+const loadContracts = () => import('@/pages/contracts')
+const loadReports = () => import('@/pages/daily-reports')
+const loadEquipment = () => import('@/pages/equipment')
+const loadPersonnel = () => import('@/pages/personnel')
+const loadSettings = () => import('@/pages/settings')
+const loadTestRun = () => import('@/pages/test-run')
+const loadTraining = () => import('@/pages/training')
+
+/** Starts downloading the lazy page chunks of a route without waiting for the session check. */
+function prefetchRoute(to: RouteLocationNormalized) {
+  for (const record of to.matched) {
+    const component = record.components?.default
+    if (typeof component === 'function') void (component as () => Promise<unknown>)()
+  }
+}
 
 function defaultEquipmentRoute() {
   const equipment = useEquipmentStore()
@@ -75,19 +69,19 @@ export const router = createRouter({
       },
     },
     { path: '/', name: 'home', component: HomePage },
-    { path: '/contracts', name: 'contracts', component: ContractsPage, meta: { block: 'contracts' } },
-    { path: '/personnel', name: 'personnel', component: PersonnelPage, meta: { block: 'personnel' } },
-    { path: '/reports', name: 'reports', component: DailyReportsPage, meta: { block: 'reports' } },
+    { path: '/contracts', name: 'contracts', component: () => loadContracts().then((m) => m.ContractsPage), meta: { block: 'contracts' } },
+    { path: '/personnel', name: 'personnel', component: () => loadPersonnel().then((m) => m.PersonnelPage), meta: { block: 'personnel' } },
+    { path: '/reports', name: 'reports', component: () => loadReports().then((m) => m.DailyReportsPage), meta: { block: 'reports' } },
     {
       path: '/equipment',
-      component: EquipmentShell,
+      component: () => loadEquipment().then((m) => m.EquipmentShell),
       meta: { block: 'equipment' },
       children: [
         { path: '', name: 'equipment', redirect: () => ({ name: defaultEquipmentRoute() }) },
         {
           path: `mine/${CATEGORY}`,
           name: 'equipment-mine',
-          component: EquipmentListPage,
+          component: () => loadEquipment().then((m) => m.EquipmentListPage),
           meta: {
             title: 'Моё оборудование',
             description: 'Всё, что числится за вами, и входящие передачи, которые ждут вашего принятия.',
@@ -97,13 +91,13 @@ export const router = createRouter({
         {
           path: `people/${CATEGORY}`,
           name: 'equipment-people',
-          component: EquipmentPeoplePage,
+          component: () => loadEquipment().then((m) => m.EquipmentPeoplePage),
           meta: { title: 'У сотрудников', description: 'Что числится за каждым сотрудником.' },
         },
         {
           path: `all/${CATEGORY}`,
           name: 'equipment-all',
-          component: EquipmentListPage,
+          component: () => loadEquipment().then((m) => m.EquipmentListPage),
           meta: {
             title: 'Всё оборудование',
             description: 'Полный учёт: сотрудники, базы и ремонт. Отмеченные карточки — первыми.',
@@ -113,19 +107,19 @@ export const router = createRouter({
         {
           path: 'warehouses',
           name: 'equipment-warehouses',
-          component: WarehousesPage,
+          component: () => loadEquipment().then((m) => m.WarehousesPage),
           meta: { title: 'Производственные базы' },
         },
         {
           path: `warehouses/:id/${CATEGORY}`,
           name: 'equipment-warehouse',
-          component: WarehousePage,
+          component: () => loadEquipment().then((m) => m.WarehousePage),
           meta: { title: 'Производственная база' },
         },
         {
           path: 'history',
           name: 'equipment-history',
-          component: TransferHistoryPage,
+          component: () => loadEquipment().then((m) => m.TransferHistoryPage),
           meta: { title: 'История передач', description: 'Кто, что, откуда и куда передавал.' },
         },
       ],
@@ -133,37 +127,37 @@ export const router = createRouter({
     { path: '/equipment/rights', redirect: { name: 'settings' } },
     {
       path: '/training',
-      component: TrainingShell,
+      component: () => loadTraining().then((m) => m.TrainingShell),
       meta: { block: 'training' },
       children: [
         {
           path: '',
           name: 'training',
-          component: TrainingSummaryPage,
+          component: () => loadTraining().then((m) => m.TrainingSummaryPage),
           meta: { title: 'Сводка', description: 'Статусы обучения сотрудников: сдана, истекает, просрочена, назначена, не назначена.' },
         },
         {
           path: 'assignments',
           name: 'training-assignments',
-          component: AssignmentsPage,
+          component: () => loadTraining().then((m) => m.AssignmentsPage),
           meta: { title: 'Назначения', description: 'Выданные ссылки на проверку знаний и их статусы.' },
         },
         {
           path: 'tests',
           name: 'training-tests',
-          component: TestsPage,
+          component: () => loadTraining().then((m) => m.TestsPage),
           meta: { title: 'Тесты', permission: 'training_manage' },
         },
         {
           path: 'tests/:id',
           name: 'training-test',
-          component: TestEditorPage,
+          component: () => loadTraining().then((m) => m.TestEditorPage),
           meta: { title: 'Конструктор теста', permission: 'training_manage' },
         },
         {
           path: 'materials',
           name: 'training-materials',
-          component: MaterialsPage,
+          component: () => loadTraining().then((m) => m.MaterialsPage),
           meta: {
             title: 'Учебные материалы',
             description: 'Файлы хранятся в Битрикс, в папке программы.',
@@ -173,7 +167,7 @@ export const router = createRouter({
         {
           path: 'directions',
           name: 'training-directions',
-          component: DirectionsPage,
+          component: () => loadTraining().then((m) => m.DirectionsPage),
           meta: {
             title: 'Направления и программы',
             description: 'Каталог обучения: программы, периодичность, связь с видами допусков.',
@@ -182,12 +176,13 @@ export const router = createRouter({
         },
       ],
     },
-    { path: '/settings', name: 'settings', component: SettingsPage, meta: { block: 'settings' } },
-    { path: '/t/:token', name: 'test-run', component: TestRunPage, meta: { isPublic: true, isSessionless: true } },
+    { path: '/settings', name: 'settings', component: () => loadSettings().then((m) => m.SettingsPage), meta: { block: 'settings' } },
+    { path: '/t/:token', name: 'test-run', component: () => loadTestRun().then((m) => m.TestRunPage), meta: { isPublic: true, isSessionless: true } },
   ],
 })
 
 router.beforeEach(async (to) => {
+  prefetchRoute(to)
   if (to.meta.isSessionless) return true
   const session = useRoleStore()
   await session.ensureSession()

@@ -20,6 +20,7 @@ import {
 import { useAccessStore, useRoleStore } from '@/entities/role'
 import { formatDateRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
+import { initialsOf } from '@/shared/lib/initials'
 import { useEscape, useScrollLock } from '@/shared/lib/scroll-lock'
 import { IconClose, UiButton, askConfirm } from '@/shared/ui'
 import DocumentDropzone from './DocumentDropzone.vue'
@@ -87,14 +88,7 @@ function documentMeta(doc: { qualificationTypeId?: string; number?: string; grou
     .join(' · ')
 }
 
-const initials = computed(() =>
-  (worker.value?.fullName ?? '')
-    .split(' ')
-    .slice(0, 2)
-    .map((part) => part[0] ?? '')
-    .join('')
-    .toUpperCase(),
-)
+const initials = computed(() => initialsOf(worker.value?.fullName ?? ''))
 
 const draft = computed<WorkerDraft | null>(() => {
   const w = worker.value
@@ -609,9 +603,7 @@ useEscape(
 
 .facts dt {
   font-size: var(--font-size-xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-weight: 600;
   color: var(--text-secondary);
 }
 

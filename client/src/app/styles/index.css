@@ -76,7 +76,9 @@
   --surface-sunken: var(--white-smoke);
   --surface-inverse: var(--midnight);
   --surface-inverse-hover: var(--midnight-soft);
+  --surface-inverse-raised: var(--midnight-soft);
   --surface-overlay: rgb(36 45 61 / 45%);
+  --nav-active-bg: rgb(0 136 255 / 16%);
 
   --text-primary: var(--ink);
   --text-secondary: var(--muted);
@@ -160,6 +162,7 @@
   --font-size-lg: 18px;
   --font-size-xl: 22px;
   --font-size-2xl: 28px;
+  --font-size-display: 32px;
   --line-height-tight: 1.25;
   --line-height-base: 1.5;
   --page-title-size: var(--font-size-2xl);
@@ -227,7 +230,9 @@
     --surface-sunken: #0d1117;
     --surface-inverse: #0c1016;
     --surface-inverse-hover: #1a222d;
+    --surface-inverse-raised: #141b24;
     --surface-overlay: rgb(3 6 10 / 70%);
+    --nav-active-bg: rgb(61 155 255 / 16%);
 
     --text-primary: #e7ecf3;
     --text-secondary: #a3afc2;
@@ -491,9 +496,7 @@ time,
 
 .ui-form label > span {
   font-size: var(--font-size-xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-weight: 600;
   color: var(--text-secondary);
 }
 
@@ -705,16 +708,14 @@ textarea::placeholder {
   background: var(--table-head-bg);
   border-bottom: 1px solid var(--border-subtle);
   font-size: var(--font-size-xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-weight: 600;
   color: var(--text-secondary);
   text-align: left;
   white-space: nowrap;
 }
 
 .ui-table td {
-  height: 44px;
+  height: calc(var(--control-height) + 4px);
   padding: 8px 12px;
   border-bottom: 1px solid var(--border-subtle);
   vertical-align: middle;
@@ -964,6 +965,7 @@ textarea::placeholder {
     --font-size-lg: 16px;
     --font-size-xl: 19px;
     --font-size-2xl: 24px;
+    --font-size-display: 26px;
     --page-title-size: var(--font-size-xl);
   }
 

@@ -23,14 +23,13 @@ set_tag() {
   fi
 }
 
-# Предыдущий успешно запущенный релиз — ближайший меньший тег из releases.log.
+# Предыдущий успешно запущенный релиз — по порядку записей releases.log, а не по номеру:
+# схемы тегов менялись (v11 → v2.0.N), и сравнение версий их путает.
 previous_tag() {
   local current
   current=$(env_value IMAGE_TAG)
   [ -f releases.log ] && [ -n "$current" ] || return 0
-  local previous
-  previous=$({ awk '{print $2}' releases.log; echo "$current"; } | sort -Vu | grep -B1 -x -- "$current" | head -n 1)
-  if [ "$previous" != "$current" ]; then echo "$previous"; fi
+  awk -v current="$current" '$2 == current { found = last } $2 != current { last = $2 } END { print found }' releases.log
 }
 
 # Оставляем образы текущего и предыдущего релиза; более старые при откате скачаются заново.

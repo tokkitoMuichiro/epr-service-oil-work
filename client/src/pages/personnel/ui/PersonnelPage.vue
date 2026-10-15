@@ -16,7 +16,16 @@ import { useAccessStore, useRoleStore } from '@/entities/role'
 import { TestingMarkIcon, testingMark, useTrainingStore, type TestingMark } from '@/entities/training'
 import { WorkerFormDialog } from '@/features/worker-form'
 import { useMobilePagination } from '@/shared/lib/pagination'
-import { IconClose, IconSearch, PageHeader, UiButton, UiPagination, UiState } from '@/shared/ui'
+import {
+  IconClose,
+  IconPersonnel,
+  IconSearch,
+  PageHeader,
+  UiAvatar,
+  UiButton,
+  UiPagination,
+  UiState,
+} from '@/shared/ui'
 import { BrigadeProfileDialog, NEW_BRIGADE } from '@/widgets/brigade-profile'
 import { WorkerCertifications } from '@/widgets/worker-certifications'
 import { WorkerProfileDialog } from '@/widgets/worker-profile'
@@ -191,7 +200,7 @@ function openCreateBrigade() {
     </UiState>
 
     <template v-else-if="tab === 'workers'">
-      <UiState v-if="isEmpty" title="Сотрудников пока нет" text="Добавьте первую карточку сотрудника.">
+      <UiState v-if="isEmpty" title="Сотрудников пока нет" :icon="IconPersonnel" text="Добавьте первую карточку сотрудника.">
         <UiButton v-if="canEdit" variant="primary" @click="openCreateWorker">Добавить</UiButton>
       </UiState>
 
@@ -238,7 +247,7 @@ function openCreateBrigade() {
           <MobileSort v-model:sort-key="sortKey" v-model:direction="sortDirection" class="legend__sort" :options="COLUMNS" />
         </div>
 
-        <UiState v-if="!rows.length" title="Ничего не найдено" text="Измените поиск или фильтры." />
+        <UiState v-if="!rows.length" title="Ничего не найдено" :icon="IconSearch" text="Измените поиск или фильтры." />
 
         <div v-else class="table-wrap ui-table-wrap">
           <table class="table--workers">
@@ -274,7 +283,12 @@ function openCreateBrigade() {
                 @click="personnel.openProfile(w.id)"
                 @keydown.enter="personnel.openProfile(w.id)"
               >
-                <td data-label="ФИО" :title="w.fullName"><strong>{{ w.fullName }}</strong></td>
+                <td data-label="ФИО" :title="w.fullName">
+                  <span class="person">
+                    <UiAvatar :name="w.fullName" />
+                    <strong>{{ w.fullName }}</strong>
+                  </span>
+                </td>
                 <td data-label="Должность" :title="w.position">{{ w.position }}</td>
                 <td data-label="Бригада" :title="brigadeName(w.brigadeId)">{{ brigadeName(w.brigadeId) }}</td>
                 <td class="nowrap col--phone" data-label="Телефон">{{ w.phone || '—' }}</td>
@@ -304,6 +318,7 @@ function openCreateBrigade() {
       <UiState
         v-if="!brigades.length"
         title="Бригад пока нет"
+        :icon="IconPersonnel"
         text="Соберите бригаду из сотрудников и назначьте бригадира."
       >
         <UiButton v-if="canPlan" variant="primary" @click="openCreateBrigade">Новая бригада</UiButton>
@@ -564,6 +579,18 @@ tbody tr:last-child td {
   border-bottom: 0;
 }
 
+.person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.person strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 th {
   padding: 0;
   background: var(--table-head-bg);
@@ -586,9 +613,7 @@ th {
   border: 0;
   background: transparent;
   font-size: var(--font-size-xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-weight: 600;
   color: var(--text-secondary);
   text-align: left;
   white-space: nowrap;

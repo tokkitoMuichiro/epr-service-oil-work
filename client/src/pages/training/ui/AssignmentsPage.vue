@@ -19,7 +19,7 @@ import { formatDateRu, formatDateTimeRu } from '@/shared/lib/date'
 import { reloadStatus } from '@/shared/lib/load-status'
 import { useMobilePagination } from '@/shared/lib/pagination'
 import { todayIso } from '@shared/dates'
-import { UiButton, UiDialog, UiPagination, UiState, askConfirm } from '@/shared/ui'
+import { IconTraining, UiButton, UiDialog, UiPagination, UiState, askConfirm } from '@/shared/ui'
 
 const store = useTrainingStore()
 const access = useAccessStore()
@@ -163,7 +163,7 @@ function onAssigned() {
     <UiState v-else-if="status === 'error'" kind="error" title="Не удалось загрузить" :text="errorText">
       <UiButton variant="primary" @click="load">Повторить</UiButton>
     </UiState>
-    <UiState v-else-if="!visible.length" title="Назначений нет" text="Измените фильтры или назначьте проверку." />
+    <UiState v-else-if="!visible.length" title="Назначений нет" :icon="IconTraining" text="Измените фильтры или назначьте проверку." />
     <template v-else>
       <div class="ui-table-wrap ui-table-wrap--stack">
         <table class="ui-table">

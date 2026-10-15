@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { TRANSFER_STATUS_LABEL, pluralRu, useEquipmentStore, type TransferStatus } from '@/entities/equipment'
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { useMobilePagination } from '@/shared/lib/pagination'
-import { UiPagination, UiState } from '@/shared/ui'
+import { IconEquipment, UiPagination, UiState } from '@/shared/ui'
 
 const store = useEquipmentStore()
 
@@ -56,7 +56,7 @@ function tone(value: TransferStatus) {
 
       <p class="count muted">{{ rows.length }} {{ pluralRu(rows.length, 'передача', 'передачи', 'передач') }}</p>
 
-      <UiState v-if="!rows.length" title="Передач нет" text="Измените фильтры или дождитесь первых передач." />
+      <UiState v-if="!rows.length" title="Передач нет" :icon="IconEquipment" text="Измените фильтры или дождитесь первых передач." />
 
       <div v-else class="table-wrap ui-table-wrap ui-table-wrap--stack">
         <table class="ui-table">

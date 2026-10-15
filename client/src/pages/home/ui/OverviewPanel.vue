@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import type { Component } from 'vue'
 import { RouterLink } from 'vue-router'
 import { IconArrowRight } from '@/shared/ui'
 
 withDefaults(
   defineProps<{
     title: string
+    icon?: Component
     count?: number | null
     tone?: 'neutral' | 'warn' | 'bad'
     to?: string
@@ -12,7 +14,7 @@ withDefaults(
     emptyText?: string
     isEmpty?: boolean
   }>(),
-  { count: null, tone: 'neutral', to: undefined, linkText: 'Открыть', emptyText: 'Всё в порядке', isEmpty: false },
+  { icon: undefined, count: null, tone: 'neutral', to: undefined, linkText: 'Открыть', emptyText: 'Всё в порядке', isEmpty: false },
 )
 </script>
 
@@ -20,6 +22,7 @@ withDefaults(
   <section class="panel">
     <header class="panel__head">
       <h2>
+        <component :is="icon" v-if="icon" class="panel__icon" :size="16" aria-hidden="true" />
         {{ title }}
         <span v-if="count !== null" class="panel__count" :class="`panel__count--${count ? tone : 'neutral'}`">{{ count }}</span>
       </h2>
@@ -61,6 +64,11 @@ withDefaults(
   font-size: var(--font-size-base);
   font-weight: 700;
   color: var(--text-primary);
+}
+
+.panel__icon {
+  flex: none;
+  color: var(--text-secondary);
 }
 
 .panel__count {

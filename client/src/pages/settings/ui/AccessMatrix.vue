@@ -130,9 +130,7 @@ thead th {
   z-index: 2;
   background: var(--table-head-bg);
   font-size: var(--font-size-xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-weight: 600;
   color: var(--text-secondary);
 }
 
@@ -153,7 +151,7 @@ thead th:first-child {
   z-index: 3;
   background: var(--table-head-bg);
   color: var(--text-secondary);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .matrix__section th {

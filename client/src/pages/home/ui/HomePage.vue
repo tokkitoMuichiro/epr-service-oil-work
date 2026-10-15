@@ -1,12 +1,26 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, type Component } from 'vue'
 import { RouterLink } from 'vue-router'
 import { daysBetweenIso } from '@shared/dates'
 import { volumeLag, type OverviewObject } from '@shared/overview'
 import { PROGRESS_LABEL, PROGRESS_TONE, type ProgressTone } from '@shared/schedule'
 import { useAccessStore } from '@/entities/role'
 import { formatDateRu } from '@/shared/lib/date'
-import { PageHeader, UiButton, UiState } from '@/shared/ui'
+import {
+  IconAlert,
+  IconCalendar,
+  IconContracts,
+  IconEquipment,
+  IconHome,
+  IconPersonnel,
+  IconRefresh,
+  IconReports,
+  IconTraining,
+  PageHeader,
+  UiAvatar,
+  UiButton,
+  UiState,
+} from '@/shared/ui'
 import { useOverview } from '../model/use-overview'
 import MiniSchedule from './MiniSchedule.vue'
 import OverviewPanel from './OverviewPanel.vue'
@@ -16,7 +30,8 @@ interface Kpi {
   label: string
   value: number
   hint: string
-  tone: 'neutral' | 'warn' | 'bad'
+  tone: 'info' | 'warn' | 'bad'
+  icon: Component
   to: string | null
 }
 
@@ -45,16 +60,16 @@ const kpis = computed<Kpi[]>(() => {
   const list: Kpi[] = []
   if (objects.value) {
     list.push(
-      { id: 'work', label: 'Объектов в работе', value: inWork.value.length, hint: `активных всего: ${objects.value.length}`, tone: 'neutral', to: '/contracts' },
-      { id: 'lag', label: 'Отстают от графика', value: lagging.value.length, hint: 'по срокам или объёму', tone: 'bad', to: '/contracts' },
-      { id: 'reports', label: 'Нет отчёта за вчера', value: missing.value.length, hint: `из ${inWork.value.length} в работе`, tone: 'warn', to: canReports.value ? '/reports' : null },
+      { id: 'work', label: 'Объектов в работе', value: inWork.value.length, hint: `активных всего: ${objects.value.length}`, tone: 'info', icon: IconContracts, to: '/contracts' },
+      { id: 'lag', label: 'Отстают от графика', value: lagging.value.length, hint: 'по срокам или объёму', tone: 'bad', icon: IconAlert, to: '/contracts' },
+      { id: 'reports', label: 'Нет отчёта за вчера', value: missing.value.length, hint: `из ${inWork.value.length} в работе`, tone: 'warn', icon: IconReports, to: canReports.value ? '/reports' : null },
     )
   }
   if (d.equipment) {
-    list.push({ id: 'incoming', label: 'Ждут принятия', value: d.equipment.incoming, hint: 'передачи оборудования вам', tone: 'warn', to: '/equipment/mine' })
+    list.push({ id: 'incoming', label: 'Ждут принятия', value: d.equipment.incoming, hint: 'передачи оборудования вам', tone: 'warn', icon: IconEquipment, to: '/equipment/mine' })
   }
   if (d.documents) {
-    list.push({ id: 'docs', label: 'Документы просрочены', value: d.documents.expired, hint: `истекают за 30 дней: ${d.documents.expiring}`, tone: 'bad', to: '/personnel' })
+    list.push({ id: 'docs', label: 'Документы просрочены', value: d.documents.expired, hint: `истекают за 30 дней: ${d.documents.expiring}`, tone: 'bad', icon: IconPersonnel, to: '/personnel' })
   }
   if (d.training) {
     list.push({
@@ -63,11 +78,24 @@ const kpis = computed<Kpi[]>(() => {
       value: d.training.expired + d.training.failed,
       hint: `просрочены или не сданы, истекают: ${d.training.expiring}`,
       tone: 'bad',
+      icon: IconTraining,
       to: '/training',
     })
   }
   return list
 })
+
+function isCalm(kpi: Kpi): boolean {
+  return kpi.value === 0 && kpi.tone !== 'info'
+}
+
+function kpiHint(kpi: Kpi): string {
+  return isCalm(kpi) ? 'всё в порядке' : kpi.hint
+}
+
+function lagFillOf(object: OverviewObject): string {
+  return `var(--status-${BADGE_OF_TONE[PROGRESS_TONE[object.state]]}-solid)`
+}
 
 const equipmentRows = computed(() => {
   const e = data.value?.equipment
@@ -116,9 +144,17 @@ const description = computed(() =>
   <section class="overview">
     <PageHeader title="Обзор" :description="description">
       <template #actions>
-        <UiButton class="ui-hide-mobile" variant="ghost" size="sm" :disabled="status === 'loading'" @click="load()">
-          Обновить
-        </UiButton>
+        <button
+          type="button"
+          class="ui-icon-button refresh ui-hide-mobile"
+          :class="{ 'is-loading': status === 'loading' }"
+          :disabled="status === 'loading'"
+          aria-label="Обновить"
+          title="Обновить"
+          @click="load()"
+        >
+          <IconRefresh :size="18" />
+        </button>
       </template>
     </PageHeader>
 
@@ -135,11 +171,14 @@ const description = computed(() =>
           :key="kpi.id"
           :to="kpi.to ?? undefined"
           class="kpi"
-          :class="kpi.value ? `kpi--${kpi.tone}` : ''"
+          :class="isCalm(kpi) ? 'kpi--calm' : `kpi--${kpi.tone}`"
         >
+          <span class="kpi__head">
+            <span class="kpi__label">{{ kpi.label }}</span>
+            <span class="kpi__icon" aria-hidden="true"><component :is="kpi.icon" :size="16" /></span>
+          </span>
           <strong>{{ kpi.value }}</strong>
-          <span class="kpi__label">{{ kpi.label }}</span>
-          <span class="kpi__hint">{{ kpi.hint }}</span>
+          <span class="kpi__hint">{{ kpiHint(kpi) }}</span>
         </component>
       </nav>
 
@@ -147,6 +186,7 @@ const description = computed(() =>
         v-if="!kpis.length"
         compact
         title="Сводка пуста"
+        :icon="IconHome"
         text="Вашей роли пока не открыт ни один модуль со сводкой. Обратитесь к администратору."
       />
 
@@ -154,6 +194,7 @@ const description = computed(() =>
         <div v-if="objects" class="grid__main">
           <OverviewPanel
             title="Отстают от графика"
+            :icon="IconAlert"
             :count="lagging.length"
             tone="bad"
             to="/contracts"
@@ -174,7 +215,10 @@ const description = computed(() =>
                     :title="`Отставание по объёму: ${volumeLag(object)} п. п.`"
                   >
                     <span class="lag__bar">
-                      <span class="lag__fact" :style="{ width: `${object.progress.actual}%` }" />
+                      <span
+                        class="lag__fact"
+                        :style="{ width: `${object.progress.actual}%`, background: lagFillOf(object) }"
+                      />
                       <span class="lag__plan" :style="{ left: `${object.progress.expected}%` }" />
                     </span>
                     <span class="lag__text">
@@ -188,7 +232,7 @@ const description = computed(() =>
             <p v-if="lagging.length > LIST_LIMIT" class="more">И ещё {{ lagging.length - LIST_LIMIT }} — в разделе «Контракты».</p>
           </OverviewPanel>
 
-          <OverviewPanel title="График на две недели" to="/contracts" link-text="Сводный график">
+          <OverviewPanel title="График на две недели" :icon="IconContracts" to="/contracts" link-text="Сводный график">
             <MiniSchedule :objects="objects" :window="data.window" :today="data.today" />
           </OverviewPanel>
         </div>
@@ -197,6 +241,7 @@ const description = computed(() =>
           <OverviewPanel
             v-if="objects"
             title="Нет отчёта за смену"
+            :icon="IconReports"
             :count="missing.length"
             tone="warn"
             :to="canReports ? '/reports' : undefined"
@@ -220,6 +265,7 @@ const description = computed(() =>
           <OverviewPanel
             v-if="objects"
             title="Ближайшие две недели"
+            :icon="IconCalendar"
             :count="events.length"
             :is-empty="!events.length"
             empty-text="Стартов и окончаний по плану нет."
@@ -240,6 +286,7 @@ const description = computed(() =>
           <OverviewPanel
             v-if="data.equipment"
             title="Оборудование"
+            :icon="IconEquipment"
             to="/equipment"
             link-text="Учёт"
             :is-empty="!equipmentRows.length"
@@ -258,6 +305,7 @@ const description = computed(() =>
           <OverviewPanel
             v-if="data.documents"
             title="Документы и допуски"
+            :icon="IconPersonnel"
             :count="data.documents.expired + data.documents.expiring"
             :tone="data.documents.expired ? 'bad' : 'warn'"
             to="/personnel"
@@ -268,6 +316,7 @@ const description = computed(() =>
             <ul class="list">
               <li v-for="alert in data.documents.alerts" :key="alert.workerId">
                 <div class="row row--static">
+                  <UiAvatar :name="alert.fullName" />
                   <span class="row__text">
                     <strong :title="alert.fullName">{{ alert.fullName }}</strong>
                     <small>{{ alert.state === 'expired' ? 'истёк' : 'истекает' }} {{ formatDateRu(alert.expiresAt) }}</small>
@@ -301,49 +350,100 @@ const description = computed(() =>
 }
 
 .kpi {
+  --kpi-solid: var(--status-neutral-solid);
+  --kpi-fg: var(--text-primary);
+  --kpi-tint: var(--status-neutral-bg);
+
   display: grid;
   align-content: start;
-  gap: 2px;
-  padding: var(--space-3) var(--space-4);
+  gap: var(--space-1);
+  padding: var(--space-4);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--surface-card);
-  box-shadow: inset 3px 0 0 var(--status-neutral-solid), var(--shadow-card);
+  box-shadow: inset 0 3px 0 var(--kpi-solid), var(--shadow-card);
   color: var(--text-primary);
   text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+
+.kpi--info {
+  --kpi-solid: var(--status-info-solid);
+  --kpi-tint: var(--status-info-bg);
+  --kpi-icon: var(--status-info-fg);
 }
 
 .kpi--warn {
-  box-shadow: inset 3px 0 0 var(--status-warn-solid), var(--shadow-card);
+  --kpi-solid: var(--status-warn-solid);
+  --kpi-fg: var(--status-warn-fg);
+  --kpi-tint: var(--status-warn-bg);
 }
 
 .kpi--bad {
-  box-shadow: inset 3px 0 0 var(--status-bad-solid), var(--shadow-card);
+  --kpi-solid: var(--status-bad-solid);
+  --kpi-fg: var(--status-bad-fg);
+  --kpi-tint: var(--status-bad-bg);
 }
 
-.kpi strong {
-  font-size: var(--font-size-2xl);
-  font-weight: 700;
-  line-height: var(--line-height-tight);
-  font-variant-numeric: tabular-nums;
+.kpi--calm {
+  --kpi-solid: var(--border-subtle);
+  --kpi-fg: var(--text-disabled);
 }
 
-.kpi--bad strong {
-  color: var(--status-bad-fg);
-}
-
-.kpi--warn strong {
-  color: var(--status-warn-fg);
+.kpi__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
 .kpi__label {
   font-size: var(--font-size-sm);
   font-weight: 600;
+  line-height: var(--line-height-tight);
+}
+
+.kpi__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius);
+  background: var(--kpi-tint);
+  color: var(--kpi-icon, var(--kpi-fg));
+}
+
+.kpi--calm .kpi__icon {
+  color: var(--text-secondary);
+}
+
+.kpi strong {
+  color: var(--kpi-fg);
+  font-size: var(--font-size-display);
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
 }
 
 .kpi__hint {
   color: var(--text-secondary);
-  font-size: var(--font-size-2xs);
+  font-size: var(--font-size-xs);
+}
+
+.kpi--calm .kpi__hint {
+  color: var(--status-ok-fg);
+  font-weight: 600;
+}
+
+.refresh.is-loading svg {
+  animation: refresh-spin 0.8s linear infinite;
+}
+
+@keyframes refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .grid {
@@ -417,16 +517,16 @@ const description = computed(() =>
 
 .lag__bar {
   position: relative;
-  height: 6px;
+  height: 8px;
   border-radius: var(--radius-pill);
   background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
 }
 
 .lag__fact {
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: var(--radius-pill);
-  background: var(--accent);
 }
 
 .lag__plan {
@@ -435,7 +535,8 @@ const description = computed(() =>
   bottom: -3px;
   width: 2px;
   margin-left: -1px;
-  background: var(--status-bad-solid);
+  border-radius: var(--radius-pill);
+  background: var(--text-primary);
 }
 
 .lag__text {
@@ -488,11 +589,12 @@ const description = computed(() =>
   }
 
   .kpi {
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-3);
   }
 
-  .kpi strong {
-    font-size: var(--font-size-xl);
+  .kpi__icon {
+    width: 24px;
+    height: 24px;
   }
 
   .grid,
@@ -502,7 +604,11 @@ const description = computed(() =>
   }
 
   .lag {
-    width: 96px;
+    width: 112px;
+  }
+
+  .lag__text {
+    white-space: nowrap;
   }
 }
 </style>

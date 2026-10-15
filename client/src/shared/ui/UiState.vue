@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Component } from 'vue'
 import { IconAlert, IconInbox } from './icons'
 
 withDefaults(
@@ -8,8 +9,9 @@ withDefaults(
     kind?: 'empty' | 'loading' | 'error'
     rows?: number
     compact?: boolean
+    icon?: Component
   }>(),
-  { kind: 'empty', rows: 5, compact: false },
+  { kind: 'empty', rows: 5, compact: false, icon: undefined },
 )
 </script>
 
@@ -30,7 +32,7 @@ withDefaults(
   <div v-else class="state" :class="[`state--${kind}`, { 'state--compact': compact }]" :role="kind === 'error' ? 'alert' : undefined">
     <span class="state__icon" aria-hidden="true">
       <IconAlert v-if="kind === 'error'" :size="24" />
-      <IconInbox v-else :size="24" />
+      <component :is="icon ?? IconInbox" v-else :size="24" />
     </span>
     <h3>{{ title }}</h3>
     <p v-if="text">{{ text }}</p>
@@ -57,8 +59,8 @@ withDefaults(
   height: 48px;
   margin-bottom: var(--space-1);
   border-radius: var(--radius-pill);
-  background: var(--surface-sunken);
-  color: var(--text-secondary);
+  background: var(--accent-subtle);
+  color: var(--text-link);
 }
 
 .state--error .state__icon {

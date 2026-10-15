@@ -21,7 +21,7 @@ import { ContractFormDialog, ObjectFormDialog, type ObjectFormValue } from '@/fe
 import { ObjectStatusDialog } from '@/features/object-status'
 import { WorkFormDialog } from '@/features/work-form'
 import { formatShortRange } from '@/shared/lib/date'
-import { IconChevron, IconClose, IconSearch, PageHeader, UiButton, UiState, askConfirm } from '@/shared/ui'
+import { IconChevron, IconClose, IconContracts, IconSearch, PageHeader, UiButton, UiState, askConfirm } from '@/shared/ui'
 import { ContractsSchedule } from '@/widgets/contracts-schedule'
 import ContractList from './ContractList.vue'
 
@@ -399,6 +399,7 @@ const isDialogOpen = computed(
     <UiState
       v-else-if="isEmpty"
       title="Контрактов пока нет"
+      :icon="IconContracts"
       :text="canEdit ? 'Создайте договор: название и заказчик, затем добавьте объекты со сроками и объёмами.' : 'Договоры заводит администратор.'"
     >
       <UiButton v-if="canEdit" variant="primary" @click="openCreateContract">Создать контракт</UiButton>

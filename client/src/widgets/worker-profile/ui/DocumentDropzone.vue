@@ -238,9 +238,7 @@ defineExpose({ clear })
 
 .pending__fields label span {
   font-size: var(--font-size-xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-weight: 600;
   color: var(--text-secondary);
 }
 

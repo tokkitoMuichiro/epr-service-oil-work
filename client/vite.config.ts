@@ -1,7 +1,43 @@
+import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig } from 'vite'
+import { brotliCompressSync, constants, gzipSync } from 'node:zlib'
+import { defineConfig, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
+
+const COMPRESSIBLE = /\.(?:js|css|html|svg|webmanifest|json)$/
+const MIN_COMPRESS_BYTES = 1024
+
+/** Writes `.br` and `.gz` next to every text asset; the server picks one by `Accept-Encoding`. */
+function precompress(): Plugin {
+  let outDir = 'dist'
+  return {
+    name: 'erp-precompress',
+    apply: 'build',
+    enforce: 'post',
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir)
+    },
+    closeBundle: {
+      order: 'post',
+      handler() {
+        const walk = (dir: string): string[] =>
+          readdirSync(dir).flatMap((name) => {
+            const full = path.join(dir, name)
+            return statSync(full).isDirectory() ? walk(full) : [full]
+          })
+        for (const file of walk(outDir)) {
+          if (!COMPRESSIBLE.test(file)) continue
+          const data = readFileSync(file)
+          if (data.length < MIN_COMPRESS_BYTES) continue
+          writeFileSync(`${file}.br`, brotliCompressSync(data, { params: { [constants.BROTLI_PARAM_QUALITY]: 11 } }))
+          writeFileSync(`${file}.gz`, gzipSync(data, { level: 9 }))
+        }
+      },
+    },
+  }
+}
 
 const apiTarget = process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:4568'
 const apiProxy = {
@@ -37,6 +73,7 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//, /^\/health$/],
       },
     }),
+    precompress(),
   ],
   build: {
     target: 'baseline-widely-available',

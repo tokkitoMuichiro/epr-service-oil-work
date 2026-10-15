@@ -204,9 +204,7 @@ function onBarClick(event: MouseEvent, row: T, bar: GridBar) {
 .grid__label--head {
   background: var(--table-head-bg);
   font-size: var(--font-size-2xs);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-weight: 600;
   color: var(--text-secondary);
 }
 

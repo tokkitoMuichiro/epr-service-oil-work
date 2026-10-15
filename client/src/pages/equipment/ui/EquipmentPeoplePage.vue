@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { canCreateFor, positionsLabel, useEquipmentStore } from '@/entities/equipment'
 import { EquipmentFormDialog } from '@/features/equipment-form'
-import { UiButton, UiState } from '@/shared/ui'
+import { IconPersonnel, UiButton, UiState } from '@/shared/ui'
 import { EquipmentBoard } from '@/widgets/equipment-board'
 import { addLabel, useRouteCategory } from '../model/category'
 import CategoryTabs from './CategoryTabs.vue'
@@ -69,7 +69,7 @@ function personLabel(id: string, fullName: string) {
       <p v-if="!people.length" class="muted">Никого не найдено</p>
     </aside>
 
-    <UiState v-if="!person" title="Выберите сотрудника" text="Слева список сотрудников с числом позиций." />
+    <UiState v-if="!person" title="Выберите сотрудника" :icon="IconPersonnel" text="Слева список сотрудников с числом позиций." />
     <div v-else class="page">
       <div class="page__bar">
         <CategoryTabs :active="category" :items="items" />

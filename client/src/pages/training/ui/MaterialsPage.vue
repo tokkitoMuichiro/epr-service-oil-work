@@ -13,7 +13,7 @@ import { errorMessage } from '@/shared/api'
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
 import { useMobilePagination } from '@/shared/lib/pagination'
-import { UiButton, UiDialog, UiFileDrop, UiPagination, UiState, askConfirm } from '@/shared/ui'
+import { IconTraining, UiButton, UiDialog, UiFileDrop, UiPagination, UiState, askConfirm } from '@/shared/ui'
 
 interface MaterialForm {
   id: string | null
@@ -160,7 +160,7 @@ function openHref(material: TrainingMaterial) {
       <button type="button" aria-label="Скрыть" @click="actionError = ''">×</button>
     </p>
 
-    <UiState v-if="!visible.length" title="Материалов нет" text="Загрузите файл или добавьте ссылку на файл в Битрикс." />
+    <UiState v-if="!visible.length" title="Материалов нет" :icon="IconTraining" text="Загрузите файл или добавьте ссылку на файл в Битрикс." />
     <template v-else>
       <div class="ui-table-wrap ui-table-wrap--stack">
         <table class="ui-table">
