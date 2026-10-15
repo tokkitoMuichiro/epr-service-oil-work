@@ -610,6 +610,7 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: var(--font-size-lg);
   line-height: var(--line-height-base);
+  overflow-wrap: anywhere;
 }
 
 .run__question img {
@@ -634,6 +635,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: var(--space-3);
   width: 100%;
+  overflow-wrap: anywhere;
   min-height: 56px;
   padding: var(--space-3);
   border: 1px solid var(--border-strong);

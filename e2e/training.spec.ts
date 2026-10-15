@@ -89,6 +89,32 @@ test('назначенный тест проходят по ссылке с те
   await expect(card.getByText('Активные назначения')).toHaveCount(0)
 })
 
+test('новый тест сохраняется черновиком и открывается, длинный вопрос не выходит за карточку предпросмотра', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/training/tests/new')
+  await page.getByLabel('Название').fill('E2E: длинные вопросы')
+  await page.getByLabel('Программа').selectOption({ index: 1 })
+  await page.getByRole('tab', { name: /Вопросы/ }).click()
+  await page.getByRole('button', { name: 'Добавить вопрос' }).click()
+  const longWord = 'Электробезопасность'.repeat(8)
+  await page.getByLabel('Текст вопроса').fill(`Вопрос с очень длинным словом ${longWord} и обычным текстом после него`)
+  await page.getByRole('button', { name: 'Сохранить черновик' }).click()
+
+  await expect(page).toHaveURL(/\/training\/tests\/(?!new)[\w-]+$/)
+  await expect(page.getByText('Не удалось загрузить')).toHaveCount(0)
+  await expect(page.getByLabel('Название')).toHaveValue('E2E: длинные вопросы')
+
+  await page.getByRole('tab', { name: 'Предпросмотр' }).click()
+  const question = page.locator('.preview__question').first()
+  await expect(question).toContainText(longWord)
+  const fits = await question.evaluate((box) => {
+    const legend = box.querySelector('legend')
+    return Boolean(legend) && legend!.getBoundingClientRect().right <= box.getBoundingClientRect().right
+  })
+  expect(fits, 'текст вопроса не выходит за рамку').toBe(true)
+  await expectFitsScreen(page)
+})
+
 test('несуществующая ссылка не открывает тест', async ({ browser }) => {
   const context = await browser.newContext({ ...PHONE, storageState: NO_SESSION })
   const page = await context.newPage()

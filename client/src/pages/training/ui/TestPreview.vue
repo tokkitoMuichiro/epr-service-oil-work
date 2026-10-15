@@ -95,17 +95,23 @@ function reset() {
 .preview__question {
   display: grid;
   gap: var(--space-2);
+  min-width: 0;
   margin: 0;
   padding: var(--space-4);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--surface-card);
+  overflow-wrap: anywhere;
 }
 
+/* A floated legend is laid out as ordinary content instead of being drawn over the border. */
 .preview__question legend {
-  padding: 0 var(--space-1);
+  float: left;
+  width: 100%;
+  padding: 0;
   font-weight: 600;
   line-height: var(--line-height-base);
+  white-space: pre-line;
 }
 
 .preview__question img {
@@ -122,6 +128,7 @@ function reset() {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  min-width: 0;
   min-height: var(--tap-size);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-subtle);

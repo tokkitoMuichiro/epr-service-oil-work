@@ -50,8 +50,9 @@ async function load() {
   notice.value = ''
   try {
     if (testId.value) {
-      test.value = await trainingApi.test(testId.value)
-      const { id: _id, status: _status, version: _version, updatedAt: _updatedAt, updatedBy: _updatedBy, ...rest } = test.value
+      const loaded = await trainingApi.test(testId.value)
+      test.value = loaded
+      const { id: _id, status: _status, version: _version, updatedAt: _updatedAt, updatedBy: _updatedBy, ...rest } = loaded
       content.value = structuredClone(rest)
     } else {
       test.value = null
