@@ -48,6 +48,8 @@ declare module 'vue-router' {
     isPublic?: boolean
     /** Public page that never touches the ERP session (knowledge-check link). */
     isSessionless?: boolean
+    /** Bitrix24 iframe module: slim shell, no full ERP navigation. */
+    isEmbed?: boolean
   }
 }
 
@@ -72,6 +74,12 @@ export const router = createRouter({
     { path: '/contracts', name: 'contracts', component: () => loadContracts().then((m) => m.ContractsPage), meta: { block: 'contracts' } },
     { path: '/personnel', name: 'personnel', component: () => loadPersonnel().then((m) => m.PersonnelPage), meta: { block: 'personnel' } },
     { path: '/reports', name: 'reports', component: () => loadReports().then((m) => m.DailyReportsPage), meta: { block: 'reports' } },
+    {
+      path: '/e/reports',
+      name: 'embed-reports',
+      component: () => loadReports().then((m) => m.DailyReportsPage),
+      meta: { block: 'reports', isEmbed: true },
+    },
     {
       path: '/equipment',
       component: () => loadEquipment().then((m) => m.EquipmentShell),
@@ -121,6 +129,50 @@ export const router = createRouter({
           name: 'equipment-history',
           component: () => loadEquipment().then((m) => m.TransferHistoryPage),
           meta: { title: 'История передач', description: 'Кто, что, откуда и куда передавал.' },
+        },
+      ],
+    },
+    {
+      path: '/e/equipment',
+      component: () => loadEquipment().then((m) => m.EquipmentShell),
+      meta: { block: 'equipment', isEmbed: true },
+      children: [
+        { path: '', name: 'embed-equipment', redirect: () => ({ name: 'embed-equipment-mine' }) },
+        {
+          path: `mine/${CATEGORY}`,
+          name: 'embed-equipment-mine',
+          component: () => loadEquipment().then((m) => m.EquipmentListPage),
+          meta: { title: 'Моё оборудование', scope: 'mine', isEmbed: true },
+        },
+        {
+          path: `people/${CATEGORY}`,
+          name: 'embed-equipment-people',
+          component: () => loadEquipment().then((m) => m.EquipmentPeoplePage),
+          meta: { title: 'У сотрудников', isEmbed: true },
+        },
+        {
+          path: `all/${CATEGORY}`,
+          name: 'embed-equipment-all',
+          component: () => loadEquipment().then((m) => m.EquipmentListPage),
+          meta: { title: 'Всё оборудование', scope: 'all', isEmbed: true },
+        },
+        {
+          path: 'warehouses',
+          name: 'embed-equipment-warehouses',
+          component: () => loadEquipment().then((m) => m.WarehousesPage),
+          meta: { title: 'Производственные базы', isEmbed: true },
+        },
+        {
+          path: `warehouses/:id/${CATEGORY}`,
+          name: 'embed-equipment-warehouse',
+          component: () => loadEquipment().then((m) => m.WarehousePage),
+          meta: { title: 'Производственная база', isEmbed: true },
+        },
+        {
+          path: 'history',
+          name: 'embed-equipment-history',
+          component: () => loadEquipment().then((m) => m.TransferHistoryPage),
+          meta: { title: 'История передач', isEmbed: true },
         },
       ],
     },

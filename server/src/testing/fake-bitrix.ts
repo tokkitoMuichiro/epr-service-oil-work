@@ -35,6 +35,8 @@ export function createFakeBitrix() {
   const users = new Map<string, FakeUser>()
   const codes = new Map<string, { userId: string; endpoint: string }>()
   const tokens = new Map<string, string>()
+  const bitrixTasks = new Map<string, { id: string; title: string; status: string }>()
+  const comments: { taskId: string; message: string }[] = []
   objects.set(COMMON_ROOT, { ID: COMMON_ROOT, NAME: 'Общий диск', TYPE: 'folder', PARENT_ID: '', DELETED_TYPE: '0' })
 
   function add(parentId: string, name: string, type: FakeObject['TYPE'], content?: Buffer): FakeObject {
@@ -125,6 +127,28 @@ export function createFakeBitrix() {
         const find = String(params.FIND ?? '').toLowerCase()
         return [...users.values()].filter((u) => `${u.LAST_NAME} ${u.NAME} ${u.EMAIL}`.toLowerCase().includes(find))
       }
+      case 'tasks.task.add': {
+        seq += 1
+        const id = String(seq)
+        const task = {
+          id,
+          title: String(params.fields?.TITLE ?? `Задача ${id}`),
+          status: String(params.fields?.STATUS ?? '3'),
+        }
+        bitrixTasks.set(id, task)
+        return { task: { ID: task.id, TITLE: task.title, STATUS: task.status } }
+      }
+      case 'tasks.task.get': {
+        const task = bitrixTasks.get(String(params.taskId))
+        if (!task) throw new NotFound()
+        return { task: { ID: task.id, TITLE: task.title, STATUS: task.status } }
+      }
+      case 'task.commentitem.add': {
+        const taskId = String(params.TASKID ?? params.taskId ?? '')
+        if (!bitrixTasks.has(taskId) && taskId) bitrixTasks.set(taskId, { id: taskId, title: `Задача ${taskId}`, status: '3' })
+        comments.push({ taskId, message: String(params.FIELDS?.POST_MESSAGE ?? '') })
+        return true
+      }
       default:
         throw new Error(`Fake Bitrix: unknown method ${method}`)
     }
@@ -184,5 +208,16 @@ export function createFakeBitrix() {
       codes.set(code, { userId, endpoint })
       return code
     },
+    /** AUTH_ID for a local-app iframe placement (`POST /api/auth/bitrix/embed`). */
+    issueAuth: (userId: string) => {
+      const auth = `auth-${(seq += 1)}`
+      tokens.set(auth, userId)
+      return auth
+    },
+    seedTask: (id: string, title: string, status = '3') => {
+      bitrixTasks.set(id, { id, title, status })
+    },
+    comments,
+    bitrixTasks,
   }
 }

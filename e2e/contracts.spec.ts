@@ -1,38 +1,54 @@
 import { expect, test } from '@playwright/test'
 
-const CONTRACT = 'Договор E2E-1'
 const CUSTOMER = 'ООО «Проверка»'
-const OBJECT = 'РВС-5000 E2E'
 
 function moscowDate(offsetDays = 0) {
   const date = new Date(Date.now() + offsetDays * 86_400_000)
   return date.toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' })
 }
 
+function unique(label: string) {
+  return `${label} ${Date.now().toString(36)}`
+}
+
 test('новый договор с объектом и ежедневный отчёт по этому объекту', async ({ page }) => {
+  const contract = unique('Договор E2E')
+  const object = unique('РВС-5000 E2E')
+
   await page.goto('/contracts')
   await page.getByRole('button', { name: 'Новый контракт' }).click()
   const contractDialog = page.getByRole('dialog', { name: 'Новый контракт' })
-  await contractDialog.getByLabel('Название контракта').fill(CONTRACT)
+  await contractDialog.getByLabel('Название контракта').fill(contract)
   await contractDialog.getByLabel('Заказчик').fill(CUSTOMER)
   await contractDialog.getByRole('button', { name: 'Сохранить' }).click()
   await expect(contractDialog).toBeHidden()
 
   const list = page.getByRole('navigation', { name: 'Договоры' })
-  await expect(list.getByRole('button', { name: new RegExp(CONTRACT) })).toContainText(CUSTOMER)
+  const contractButton = list.getByRole('button', { name: new RegExp(contract.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })
+  await expect(contractButton).toContainText(CUSTOMER)
 
   const objectDialog = page.getByRole('dialog', { name: 'Новый объект' })
-  await objectDialog.getByLabel('Объект').fill(OBJECT)
+  await objectDialog.getByLabel('Объект').fill(object)
   await objectDialog.getByLabel('Площадка / НПС').fill('НПС «Тестовая»')
   await objectDialog.getByLabel('План: начало').fill(moscowDate())
   await objectDialog.getByLabel('План: окончание').fill(moscowDate(30))
   await objectDialog.getByRole('button', { name: 'Сохранить' }).click()
   await expect(objectDialog).toBeHidden()
-  await expect(list.getByRole('button', { name: new RegExp(OBJECT) })).toBeVisible()
+
+  const objectButton = list.getByRole('button', { name: new RegExp(object.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })
+  await expect(objectButton).toBeVisible()
+
+  // Отчёт доступен только по объекту «в работе» с задачей Битрикс (mock создаёт задачу).
+  await objectButton.click()
+  await page.getByRole('button', { name: 'Начать работы' }).click()
+  const startDialog = page.getByRole('dialog', { name: 'Начать работы' })
+  await expect(startDialog.getByText('Задача в Битрикс24')).toBeVisible()
+  await startDialog.getByRole('button', { name: 'Начать работы' }).click()
+  await expect(startDialog).toBeHidden()
 
   await page.goto('/reports')
-  await page.getByLabel('Поиск объекта').fill('E2E')
-  await page.getByRole('button', { name: new RegExp(OBJECT) }).click()
+  await page.getByLabel('Поиск объекта').fill(object)
+  await page.getByRole('button', { name: new RegExp(object.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).click()
 
   await page.getByLabel('Составил').fill('Козлов А. В.')
   await page.getByLabel('Предполагаемое завершение работ').fill(moscowDate(20))
@@ -58,8 +74,8 @@ test('новый договор с объектом и ежедневный от
 })
 
 test('удаление объекта и контракта спрашивает подтверждение в окне приложения', async ({ page }) => {
-  const contractName = 'Договор E2E-удаление'
-  const objectName = 'РВС-700 E2E-удаление'
+  const contractName = unique('Договор E2E-удаление')
+  const objectName = unique('РВС-700 E2E-удаление')
   await page.goto('/contracts')
   await page.getByRole('button', { name: 'Новый контракт' }).click()
   const contractDialog = page.getByRole('dialog', { name: 'Новый контракт' })
@@ -76,7 +92,8 @@ test('удаление объекта и контракта спрашивает
   await expect(objectDialog).toBeHidden()
 
   const list = page.getByRole('navigation', { name: 'Договоры' })
-  const objectButton = list.getByRole('button', { name: new RegExp(objectName) })
+  const escapedObject = objectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const objectButton = list.getByRole('button', { name: new RegExp(escapedObject) })
   await objectButton.click()
 
   const confirm = page.getByRole('alertdialog')
@@ -100,5 +117,6 @@ test('удаление объекта и контракта спрашивает
   await page.getByRole('button', { name: 'Редактировать контракт' }).click()
   await page.getByRole('menuitem', { name: 'Удалить контракт' }).click()
   await confirm.getByRole('button', { name: 'Удалить контракт' }).click()
-  await expect(list.getByRole('button', { name: new RegExp(contractName) })).toHaveCount(0)
+  const escapedContract = contractName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  await expect(list.getByRole('button', { name: new RegExp(escapedContract) })).toHaveCount(0)
 })

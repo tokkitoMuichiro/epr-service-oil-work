@@ -54,6 +54,9 @@ export interface ContractObject {
   /** Qualifications every brigade member needs on this object. */
   requiredQualificationIds?: string[]
   archived?: boolean
+  /** Linked Bitrix24 task; required to start work and to file daily reports. */
+  bitrixTaskId?: string | null
+  bitrixTaskTitle?: string | null
 }
 
 export interface Contract {
@@ -120,11 +123,18 @@ export const OBJECT_STATUS_MOVES: Record<ObjectStatus, readonly ObjectStatus[]> 
   done: ['in_progress'],
 }
 
+/** How to attach a Bitrix24 task when starting work on an object. */
+export type BitrixTaskBinding =
+  | { mode: 'create'; title?: string }
+  | { mode: 'link'; taskRef: string }
+
 export interface ObjectStatusChange {
   status: ObjectStatus
   /** Day the work started or finished; ignored when the change is rolled back. */
   date?: string
   note?: string
+  /** Required when moving planned → in_progress without an existing `bitrixTaskId`. */
+  bitrixTask?: BitrixTaskBinding
 }
 
 type ActualDates = Pick<ContractObject, 'actualStart' | 'actualEnd'>

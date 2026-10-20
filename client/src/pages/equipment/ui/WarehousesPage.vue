@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useEquipmentRouteName } from '@/shared/lib/equipment-routes'
 import {
   CATEGORY_LABEL,
   canManageWarehouses,
@@ -15,6 +16,7 @@ import { useMobilePagination } from '@/shared/lib/pagination'
 import { IconClose, IconEquipment, UiButton, UiPagination, UiState, askConfirm } from '@/shared/ui'
 
 const store = useEquipmentStore()
+const { nameOf } = useEquipmentRouteName()
 
 const isFormOpen = ref(false)
 const editing = ref<Warehouse | null>(null)
@@ -76,7 +78,7 @@ async function remove(w: Warehouse) {
 
     <ul v-else class="bases">
       <li v-for="w in pager.pageItems" :key="w.id" class="base" :class="{ 'base--system': w.isSystem }">
-        <RouterLink class="base__link" :to="{ name: 'equipment-warehouse', params: { id: w.id } }">
+        <RouterLink class="base__link" :to="{ name: nameOf('equipment-warehouse'), params: { id: w.id } }">
           <div class="base__head">
             <strong>{{ w.name }}</strong>
             <span v-if="w.isSystem" class="tag ui-badge ui-badge--info">Системная</span>

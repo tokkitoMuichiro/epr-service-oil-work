@@ -17,6 +17,7 @@ const editing = ref<User | null>(null)
 const sorted = computed(() =>
   [...users.value].sort((a, b) => Number(b.active) - Number(a.active) || a.fullName.localeCompare(b.fullName, 'ru')),
 )
+const inactiveBitrix = computed(() => users.value.filter((u) => !u.active && u.bitrixUserId).length)
 const pager = useMobilePagination(sorted)
 
 function roleLabel(id: string) {
@@ -54,6 +55,11 @@ onMounted(load)
     <div class="users__bar">
       <UiButton variant="primary" size="sm" @click="open(null)">Добавить пользователя</UiButton>
     </div>
+
+    <p v-if="inactiveBitrix" class="notice" role="status">
+      Неактивных учёток с привязкой к Битрикс24: <strong>{{ inactiveBitrix }}</strong>.
+      После импорта оборудования активируйте нужных сотрудников — до этого они не смогут войти.
+    </p>
 
     <p v-if="isLoading && !users.length" class="muted">Загрузка…</p>
     <p v-else-if="error" class="alert" role="alert">
@@ -112,6 +118,16 @@ onMounted(load)
 .users__bar {
   display: flex;
   justify-content: flex-end;
+}
+
+.notice {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--status-warn-border);
+  border-radius: var(--radius);
+  background: var(--status-warn-bg);
+  color: var(--status-warn-fg);
+  font-size: var(--font-size-sm);
 }
 
 .users__table {

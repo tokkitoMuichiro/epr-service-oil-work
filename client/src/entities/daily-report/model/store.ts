@@ -143,12 +143,13 @@ export const useDailyReportsStore = defineStore('daily-reports', () => {
     saving.value = true
     saveError.value = ''
     try {
-      const saved = await dailyReportsApi.save(draft)
+      const { item: saved, bitrixWarning } = await dailyReportsApi.save(draft)
       lastSaved.value = saved
       reports.value = await dailyReportsApi.listReports()
       if (mode.value === 'archive' && selectedObjectId.value) {
         await loadArchiveDates(selectedObjectId.value)
       }
+      if (bitrixWarning) saveError.value = `Отчёт сохранён. ${bitrixWarning}`
       return saved
     } catch (e) {
       saveError.value = toMessage(e, 'Не удалось сохранить')

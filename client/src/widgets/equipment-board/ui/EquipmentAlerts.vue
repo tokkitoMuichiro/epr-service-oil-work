@@ -3,8 +3,10 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { assetDisplayName, pendingTransfer, positionsLabel, useEquipmentStore } from '@/entities/equipment'
 import { UiButton } from '@/shared/ui'
+import { useEquipmentRouteName } from '@/shared/lib/equipment-routes'
 
 const store = useEquipmentStore()
+const { nameOf } = useEquipmentRouteName()
 
 const incoming = computed(() =>
   store.pendingIncoming.map((item) => ({ item, transfer: pendingTransfer(item, store.transfers) })),
@@ -31,13 +33,13 @@ const incoming = computed(() =>
     <section v-if="store.needsFixMine.length" class="alerts__box" data-tone="fix" role="alert">
       <strong>Неверно заполнены: {{ positionsLabel(store.needsFixMine.length) }}</strong>
       <span>Откройте карточку, исправьте данные по замечанию администратора — передача до этого недоступна.</span>
-      <RouterLink to="/equipment/mine" class="alerts__link">К моему оборудованию</RouterLink>
+      <RouterLink :to="{ name: nameOf('equipment-mine') }" class="alerts__link">К моему оборудованию</RouterLink>
     </section>
 
     <section v-if="store.pendingReview.length" class="alerts__box" data-tone="review">
       <strong>Ждут проверки заполнения: {{ positionsLabel(store.pendingReview.length) }}</strong>
       <span>{{ store.pendingReview.map((i) => assetDisplayName(i)).join(', ') }}</span>
-      <RouterLink to="/equipment/all" class="alerts__link">Ко всему оборудованию</RouterLink>
+      <RouterLink :to="{ name: nameOf('equipment-all') }" class="alerts__link">Ко всему оборудованию</RouterLink>
     </section>
   </div>
 </template>

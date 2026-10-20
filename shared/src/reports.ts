@@ -1,6 +1,6 @@
 import { isIsoDate } from './dates.js'
 
-/** Ссылка на объект из модуля контрактов (не задача Битрикс). */
+/** Ссылка на объект из модуля контрактов (отчёт — только при активной задаче Битрикс). */
 export interface ReportObjectRef {
   id: string
   name: string
@@ -8,6 +8,7 @@ export interface ReportObjectRef {
   contractId: string
   contractName: string
   customer: string
+  bitrixTaskId?: string | null
 }
 
 export interface DronePeriod {

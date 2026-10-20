@@ -1,3 +1,6 @@
+import { EMBED_TOKEN_HEADER } from '@shared/auth'
+import { clearEmbedToken, readEmbedToken } from '@/shared/lib/embed'
+
 const API_BASE = (import.meta.env.VITE_API_BASE ?? '/api').replace(/\/$/, '')
 
 const UNAVAILABLE = 'Сервер недоступен. Проверьте, что API запущен, и повторите.'
@@ -43,14 +46,29 @@ async function toError(response: Response, path: string): Promise<ApiError> {
   }
 }
 
+function requestHeaders(extra: HeadersInit = {}): Headers {
+  const headers = new Headers(extra)
+  const embed = readEmbedToken()
+  if (embed && !headers.has(EMBED_TOKEN_HEADER)) headers.set(EMBED_TOKEN_HEADER, embed)
+  return headers
+}
+
 async function send(path: string, init: RequestInit = {}, query?: Query): Promise<Response> {
   let response: Response
   try {
-    response = await fetch(buildUrl(path, query), { credentials: 'include', ...init })
+    const { headers: initHeaders, ...rest } = init
+    response = await fetch(buildUrl(path, query), {
+      credentials: 'include',
+      ...rest,
+      headers: requestHeaders(initHeaders),
+    })
   } catch (e) {
     throw new ApiError(0, UNAVAILABLE, {}, { cause: e })
   }
-  if (!response.ok) throw await toError(response, path)
+  if (!response.ok) {
+    if (response.status === 401) clearEmbedToken()
+    throw await toError(response, path)
+  }
   return response
 }
 

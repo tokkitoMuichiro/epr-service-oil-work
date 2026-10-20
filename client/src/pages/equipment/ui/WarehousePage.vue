@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { useEquipmentRouteName } from '@/shared/lib/equipment-routes'
 import { canStockWarehouse, useEquipmentStore } from '@/entities/equipment'
 import { EquipmentFormDialog } from '@/features/equipment-form'
 import { IconChevron, IconEquipment, UiButton, UiState } from '@/shared/ui'
@@ -10,6 +11,7 @@ import CategoryTabs from './CategoryTabs.vue'
 
 const store = useEquipmentStore()
 const route = useRoute()
+const { nameOf } = useEquipmentRouteName()
 const category = useRouteCategory()
 const isCreateOpen = ref(false)
 
@@ -23,11 +25,11 @@ const canStock = computed(() => !isRepair.value && canStockWarehouse(store.auth,
 
 <template>
   <UiState v-if="!warehouse" title="База не найдена" :icon="IconEquipment" text="Возможно, её удалили.">
-    <RouterLink class="back" :to="{ name: 'equipment-warehouses' }">К списку баз</RouterLink>
+    <RouterLink class="back" :to="{ name: nameOf('equipment-warehouses') }">К списку баз</RouterLink>
   </UiState>
 
   <div v-else class="page">
-    <RouterLink class="back" :to="{ name: 'equipment-warehouses' }"><IconChevron class="back__icon" :size="18" />Все базы</RouterLink>
+    <RouterLink class="back" :to="{ name: nameOf('equipment-warehouses') }"><IconChevron class="back__icon" :size="18" />Все базы</RouterLink>
 
     <div class="panel head">
       <div>
