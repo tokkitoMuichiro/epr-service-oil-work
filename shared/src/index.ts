@@ -1,5 +1,6 @@
 export * from './access.js'
 export * from './auth.js'
+export * from './bitrix-tasks.js'
 export * from './contracts.js'
 export * from './dates.js'
 export * from './equipment.js'

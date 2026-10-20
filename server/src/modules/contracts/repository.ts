@@ -5,6 +5,7 @@ import {
   TANK_CLEANING_QUALIFICATIONS,
   OBJECT_STATUSES,
   isIsoDate,
+  isObjectArchived,
   isQualificationTypeId,
   isRollback,
   nextActualDates,
@@ -101,14 +102,17 @@ export function createContractsRepository(storage: Storage, deps: { today?: () =
     reportObjects(query = ''): ReportObjectRef[] {
       const q = query.trim().toLowerCase()
       const refs = contracts.flatMap((c) =>
-        c.objects.map((o) => ({
-          id: o.id,
-          name: o.name,
-          location: o.location,
-          contractId: c.id,
-          contractName: c.name,
-          customer: c.customer,
-        })),
+        c.objects
+          .filter((o) => objectStatus(o) === 'in_progress' && o.bitrixTaskId && !isObjectArchived(c, o))
+          .map((o) => ({
+            id: o.id,
+            name: o.name,
+            location: o.location,
+            contractId: c.id,
+            contractName: c.name,
+            customer: c.customer,
+            bitrixTaskId: o.bitrixTaskId ?? null,
+          })),
       )
       if (!q) return refs
       return refs.filter((o) =>
@@ -190,7 +194,11 @@ export function createContractsRepository(storage: Storage, deps: { today?: () =
       return structuredClone(contract)
     },
 
-    setObjectStatus(contractId: string, objectId: string, body: Partial<ObjectStatusChange>): Contract {
+    setObjectStatus(
+      contractId: string,
+      objectId: string,
+      body: Partial<ObjectStatusChange> & { bitrixTaskId?: string; bitrixTaskTitle?: string },
+    ): Contract {
       const contract = get(contractId)
       const object = getObject(contractId, objectId)
       if (contract.archived || object.archived) conflict('Объект в архиве — сначала верните его из архива')
@@ -199,11 +207,18 @@ export function createContractsRepository(storage: Storage, deps: { today?: () =
         status: body.status as ObjectStatus,
         date: optionalDate(body.date, 'Дата'),
         note: trimmed(body.note),
+        bitrixTask: body.bitrixTask,
       }
       const error = validateObjectStatusChange(object, change, today())
       if (error) badRequest(error)
 
-      const rollback = isRollback(objectStatus(object), change.status)
+      const from = objectStatus(object)
+      const starting = from === 'planned' && change.status === 'in_progress'
+      if (starting && !object.bitrixTaskId && !body.bitrixTaskId) {
+        badRequest('Укажите задачу Битрикс: создайте новую или привяжите существующую')
+      }
+
+      const rollback = isRollback(from, change.status)
       const defaultNote = rollback ? 'Статус возвращён' : change.status === 'done' ? 'Объект завершён' : 'Работы начаты'
       const dates = nextActualDates(object, change)
       const edits: DeadlineEdit[] = []
@@ -215,7 +230,31 @@ export function createContractsRepository(storage: Storage, deps: { today?: () =
         else delete object[field]
       }
       object.deadlineEdits = [...edits, ...object.deadlineEdits]
+      if (body.bitrixTaskId) {
+        object.bitrixTaskId = body.bitrixTaskId
+        object.bitrixTaskTitle = body.bitrixTaskTitle ?? object.bitrixTaskTitle ?? null
+      }
+      if (change.status === 'planned') {
+        object.bitrixTaskId = null
+        object.bitrixTaskTitle = null
+      }
       return structuredClone(contract)
+    },
+
+    setObjectBitrixTask(
+      contractId: string,
+      objectId: string,
+      task: { id: string; title: string } | null,
+    ): Contract {
+      const object = getObject(contractId, objectId)
+      if (task) {
+        object.bitrixTaskId = task.id
+        object.bitrixTaskTitle = task.title
+      } else {
+        object.bitrixTaskId = null
+        object.bitrixTaskTitle = null
+      }
+      return structuredClone(get(contractId))
     },
 
     addWork(contractId: string, objectId: string, body: Partial<WorkDraft>): Contract {
@@ -270,6 +309,7 @@ export function createContractsRepository(storage: Storage, deps: { today?: () =
       'addObject',
       'updateObject',
       'setObjectStatus',
+      'setObjectBitrixTask',
       'addWork',
       'updateWork',
       'removeWork',

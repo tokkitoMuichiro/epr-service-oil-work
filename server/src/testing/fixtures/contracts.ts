@@ -40,6 +40,7 @@ function object(
   list: WorkSeed[],
   deadlineEdits: DeadlineEdit[] = [],
 ): ContractObject {
+  const taskId = actualStart && !actualEnd ? String(1000 + Number(id.replace(/\D/g, '') || 0)) : undefined
   return {
     id,
     name,
@@ -51,6 +52,7 @@ function object(
     works: works(list),
     deadlineEdits,
     requiredQualificationIds: [...TANK_CLEANING_QUALIFICATIONS],
+    ...(taskId ? { bitrixTaskId: taskId, bitrixTaskTitle: name } : {}),
   }
 }
 

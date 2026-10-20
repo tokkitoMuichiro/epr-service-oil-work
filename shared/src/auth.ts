@@ -78,11 +78,22 @@ export function wouldLoseLastAdmin(
   return !users.some((u) => u.id !== userId && u.role === 'admin' && u.active)
 }
 
+/** Header the embed SPA sends when third-party cookies are blocked in the Bitrix iframe. */
+export const EMBED_TOKEN_HEADER = 'x-erp-embed-token'
+
+/** sessionStorage key for the embed bearer (iframe modules). */
+export const EMBED_TOKEN_STORAGE_KEY = 'erp-embed-token'
+
 /** Keeps redirects after sign-in inside the ERP: only same-origin absolute paths. */
 export function safeRedirectPath(value: unknown): string {
   if (typeof value !== 'string' || !value.startsWith('/') || value.length > 2000) return '/'
   if (value.startsWith('//') || value.startsWith('/\\') || /[\u0000-\u001f\\]/.test(value)) return '/'
   return value
+}
+
+/** Embed module landing paths allowed as Bitrix local-app handlers (`to=`). */
+export function isEmbedPath(path: string): boolean {
+  return path === '/e/equipment' || path.startsWith('/e/equipment/') || path === '/e/reports' || path.startsWith('/e/reports/')
 }
 
 export const BITRIX_LOGIN_ERRORS = {

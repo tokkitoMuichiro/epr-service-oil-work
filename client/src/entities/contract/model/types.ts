@@ -21,6 +21,7 @@ export {
   type ObjectDraft,
   type ContractProgress,
   type ObjectPatch,
+  type BitrixTaskBinding,
   type ObjectStatus,
   type ObjectStatusChange,
   type ScheduleVariance,

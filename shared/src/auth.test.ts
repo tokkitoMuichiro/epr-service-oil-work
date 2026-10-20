@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 import {
   bitrixLoginErrorText,
   normalizeLogin,
+  isEmbedPath,
   safeRedirectPath,
   validatePassword,
   validateUserDraft,
@@ -32,6 +33,10 @@ describe('users', () => {
 
   it('redirects after sign-in only inside the ERP', () => {
     assert.equal(safeRedirectPath('/equipment/mine?x=1#top'), '/equipment/mine?x=1#top')
+    assert.equal(safeRedirectPath('/e/reports'), '/e/reports')
+    assert.equal(isEmbedPath('/e/equipment'), true)
+    assert.equal(isEmbedPath('/e/reports'), true)
+    assert.equal(isEmbedPath('/equipment'), false)
     for (const bad of ['//evil.example', '/\\evil.example', 'https://evil.example', 'equipment', '', null, '/a\nb']) {
       assert.equal(safeRedirectPath(bad), '/', String(bad))
     }

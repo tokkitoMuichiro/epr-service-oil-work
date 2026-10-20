@@ -12,10 +12,11 @@ import { log } from './log.js'
 import { securityHeaders, spaContentSecurityPolicy } from './security.js'
 import { accessRouter } from './modules/access/router.js'
 import { createAccessStore } from './modules/access/store.js'
-import { bitrixDirectoryFromConfig, bitrixSsoFromConfig } from './modules/auth/bitrix.js'
+import { bitrixDirectoryFromConfig, bitrixSsoFromConfig, portalOrigin } from './modules/auth/bitrix.js'
 import { createUserRepository } from './modules/auth/repository.js'
 import { createBitrixUserSync } from './modules/auth/sync.js'
 import { authRouter, authenticate, requireSession, usersRouter } from './modules/auth/router.js'
+import { bitrixTasksFromConfig } from './modules/bitrix-tasks/index.js'
 import { createContractsRepository } from './modules/contracts/repository.js'
 import { contractsRouter } from './modules/contracts/router.js'
 import { createEquipmentService } from './modules/equipment/service.js'
@@ -57,6 +58,8 @@ export interface AppOptions {
   bitrixFetch?: typeof fetch
   /** Overrides the Disk built from `bitrix` (tests). */
   disk?: (storage: Storage) => Disk
+  /** Overrides Bitrix tasks API (tests). */
+  bitrixTasks?: import('./modules/bitrix-tasks/index.js').BitrixTasks
   /** Background check for files deleted on Disk; off when not set. */
   diskSyncMs?: number
   /** Release tag of the running image, shown by `/health`. */
@@ -81,6 +84,14 @@ export function createApp(options: AppOptions = {}) {
   const disk = options.disk?.(storage) ?? createDisk(storage, bitrix, options.bitrixFetch)
   const bitrixSso = bitrixSsoFromConfig(bitrix, options.bitrixFetch)
   const bitrixDirectory = bitrixDirectoryFromConfig(bitrix, options.bitrixFetch)
+  const bitrixTasks = options.bitrixTasks ?? bitrixTasksFromConfig(bitrix, options.bitrixFetch)
+  const bitrixPortal =
+    bitrixSso?.portal ??
+    (bitrix.portal?.trim()
+      ? portalOrigin(bitrix.portal)
+      : bitrix.webhookUrl?.trim()
+        ? portalOrigin(bitrix.webhookUrl)
+        : null)
   const equipment = createEquipmentService(storage, {
     disk,
     users: () => users.list(),
@@ -159,15 +170,24 @@ export function createApp(options: AppOptions = {}) {
   api.use(
     '/contracts',
     access.guard('contracts'),
-    contractsRouter(contracts, {
-      hasHistory: (objectId) => reports.hasReports(objectId) || personnel.hasObjectHistory(objectId),
-      isBusy: (objectId) => personnel.isObjectBusy(objectId),
-      removed: (objectId) => personnel.removeAssignmentsForObject(objectId),
-      archived: (objectId) => personnel.removeFutureAssignmentsForObject(objectId),
-      completed: (objectId, lastDay) => personnel.closeAssignmentsForObject(objectId, lastDay),
-    }, { reports: () => reports.list(), today: options.today }),
+    contractsRouter(
+      contracts,
+      {
+        hasHistory: (objectId) => reports.hasReports(objectId) || personnel.hasObjectHistory(objectId),
+        isBusy: (objectId) => personnel.isObjectBusy(objectId),
+        removed: (objectId) => personnel.removeAssignmentsForObject(objectId),
+        archived: (objectId) => personnel.removeFutureAssignmentsForObject(objectId),
+        completed: (objectId, lastDay) => personnel.closeAssignmentsForObject(objectId, lastDay),
+      },
+      { reports: () => reports.list(), today: options.today },
+      { tasks: bitrixTasks },
+    ),
   )
-  api.use('/reports', access.guard('reports'), reportsRouter(reports, contracts))
+  api.use(
+    '/reports',
+    access.guard('reports'),
+    reportsRouter(reports, contracts, { tasks: bitrixTasks, audit }),
+  )
   api.use('/equipment', equipmentRouter(equipment))
   api.use('/personnel', access.guard('personnel'), personnelRouter(personnel))
   api.use('/qualifications', qualificationsRouter(personnel, access))
@@ -181,7 +201,10 @@ export function createApp(options: AppOptions = {}) {
   const clientDist = options.clientDist ? path.resolve(options.clientDist) : null
   if (clientDist && existsSync(clientDist)) {
     const indexFile = path.join(clientDist, 'index.html')
-    const csp = spaContentSecurityPolicy(existsSync(indexFile) ? readFileSync(indexFile, 'utf8') : '')
+    const indexHtml = existsSync(indexFile) ? readFileSync(indexFile, 'utf8') : ''
+    const csp = spaContentSecurityPolicy(indexHtml)
+    const embedAncestors = bitrixPortal ? `'self' ${bitrixPortal}` : "'self'"
+    const embedCsp = spaContentSecurityPolicy(indexHtml, embedAncestors)
     const precompressed = precompressedFiles(clientDist)
     app.use((req, res, next) => {
       const relative = req.path.slice(1)
@@ -196,8 +219,13 @@ export function createApp(options: AppOptions = {}) {
       }),
     )
     app.get(/^(?!\/api\/|\/health$).*/, (req, res) => {
+      const isEmbed = req.path === '/e' || req.path.startsWith('/e/')
       res.setHeader('Cache-Control', 'no-cache')
-      res.setHeader('Content-Security-Policy', csp)
+      res.setHeader('Content-Security-Policy', isEmbed ? embedCsp : csp)
+      if (isEmbed) {
+        res.removeHeader('X-Frame-Options')
+        res.removeHeader('Cross-Origin-Opener-Policy')
+      }
       if (!precompressed.send(res, 'index.html', req.headers['accept-encoding'], 'no-cache')) res.sendFile(indexFile)
     })
   }

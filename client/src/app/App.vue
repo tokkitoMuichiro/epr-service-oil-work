@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { useRoleStore } from '@/entities/role'
 import { useTheme } from '@/features/theme-switch'
 import { UiButton, UiConfirmHost, UiState } from '@/shared/ui'
 import { AppShell } from '@/widgets/app-shell'
+import { EmbedShell } from '@/widgets/embed-shell'
 
 useTheme()
 
 const session = useRoleStore()
 const route = useRoute()
 const router = useRouter()
+
+const isEmbed = computed(() => route.matched.some((r) => r.meta.isEmbed))
 
 watch(
   () => session.status,
@@ -34,6 +37,7 @@ async function retry() {
       <UiButton variant="primary" @click="retry">Повторить</UiButton>
     </UiState>
   </main>
+  <EmbedShell v-else-if="session.isAuthenticated && isEmbed" />
   <AppShell v-else-if="session.isAuthenticated" />
   <UiConfirmHost />
 </template>

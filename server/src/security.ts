@@ -50,7 +50,7 @@ export function inlineScriptHashes(html: string): string[] {
   return hashes
 }
 
-export function spaContentSecurityPolicy(indexHtml: string): string {
+export function spaContentSecurityPolicy(indexHtml: string, frameAncestors = "'self'"): string {
   return [
     "default-src 'self'",
     `script-src 'self' ${inlineScriptHashes(indexHtml).join(' ')}`.trim(),
@@ -63,6 +63,6 @@ export function spaContentSecurityPolicy(indexHtml: string): string {
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    "frame-ancestors 'self'",
+    `frame-ancestors ${frameAncestors}`,
   ].join('; ')
 }

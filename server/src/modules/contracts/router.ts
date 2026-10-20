@@ -1,7 +1,16 @@
 import { Router } from 'express'
-import { conflict, notFound, param, sendFile, trimmed } from '../../http.js'
-import { isObjectArchived, reportDaysOf, todayIso, type DailyReport } from '../../shared.js'
+import { badRequest, conflict, notFound, param, sendFile, trimmed } from '../../http.js'
+import {
+  isObjectArchived,
+  objectStatus,
+  reportDaysOf,
+  todayIso,
+  type BitrixTaskBinding,
+  type DailyReport,
+  type ObjectStatusChange,
+} from '../../shared.js'
 import { XLSX_MIME } from '../../excel.js'
+import type { BitrixTasks } from '../bitrix-tasks/index.js'
 import { objectWorkbook, summaryWorkbook } from './excel.js'
 import type { ContractsRepository } from './repository.js'
 
@@ -22,13 +31,32 @@ export interface ScheduleSources {
   today?: () => string
 }
 
+export interface ContractsBitrix {
+  tasks: BitrixTasks
+}
+
 function sendWorkbook(res: Parameters<typeof sendFile>[0], data: Buffer, fileName: string) {
   sendFile(res, { data, mimeType: XLSX_MIME }, fileName)
 }
 
-export function contractsRouter(repo: ContractsRepository, objects: ObjectLifecycle, sources: ScheduleSources) {
+function parseBitrixTaskBody(body: unknown): BitrixTaskBinding | undefined {
+  if (!body || typeof body !== 'object') return undefined
+  const raw = body as Record<string, unknown>
+  const mode = trimmed(raw.mode)
+  if (mode === 'create') return { mode: 'create', title: trimmed(raw.title) || undefined }
+  if (mode === 'link') return { mode: 'link', taskRef: trimmed(raw.taskRef) || trimmed(raw.taskId) }
+  return undefined
+}
+
+export function contractsRouter(
+  repo: ContractsRepository,
+  objects: ObjectLifecycle,
+  sources: ScheduleSources,
+  bitrix?: ContractsBitrix,
+) {
   const router = Router()
   const today = () => sources.today?.() ?? todayIso()
+  const tasks = bitrix?.tasks
 
   function assertCanArchive(objectIds: string[]) {
     if (objectIds.some(objects.isBusy)) conflict('На объекте сейчас работает бригада — сначала завершите назначение')
@@ -127,12 +155,55 @@ export function contractsRouter(repo: ContractsRepository, objects: ObjectLifecy
     res.json({ item })
   })
 
-  router.patch('/:id/objects/:objectId/status', (req, res) => {
+  router.patch('/:id/objects/:objectId/status', async (req, res) => {
+    const contractId = param(req, 'id')
     const objectId = param(req, 'objectId')
-    const item = repo.setObjectStatus(param(req, 'id'), objectId, req.body ?? {})
+    const body = (req.body ?? {}) as Partial<ObjectStatusChange> & { bitrixTask?: unknown }
+    const found = repo.findObject(objectId)
+    if (!found || found.contract.id !== contractId) notFound('Объект не найден')
+    const { contract, object } = found
+    const from = objectStatus(object)
+    const starting = from === 'planned' && body.status === 'in_progress'
+
+    let bitrixTaskId = object.bitrixTaskId ?? undefined
+    let bitrixTaskTitle = object.bitrixTaskTitle ?? undefined
+    if (starting) {
+      if (!tasks) badRequest('Привязка задач Битрикс недоступна')
+      const binding = parseBitrixTaskBody(body.bitrixTask) ?? body.bitrixTask
+      if (!binding || typeof binding !== 'object' || !('mode' in binding)) {
+        badRequest('Выберите: создать задачу в Битрикс или привязать существующую')
+      }
+      const resolved = await tasks.resolveBinding(binding as BitrixTaskBinding, {
+        title: `${object.name} — ${contract.name}`,
+        description: `Объект ERP: ${object.name}\nДоговор: ${contract.name}\nЗаказчик: ${contract.customer}`,
+      })
+      bitrixTaskId = resolved.id
+      bitrixTaskTitle = resolved.title
+    }
+
+    const item = repo.setObjectStatus(contractId, objectId, {
+      ...body,
+      bitrixTaskId,
+      bitrixTaskTitle,
+    })
     const actualEnd = item.objects.find((o) => o.id === objectId)?.actualEnd
     if (actualEnd) objects.completed(objectId, actualEnd)
     res.json({ item })
+  })
+
+  router.put('/:id/objects/:objectId/bitrix-task', async (req, res) => {
+    if (!tasks) badRequest('Привязка задач Битрикс недоступна')
+    const contractId = param(req, 'id')
+    const objectId = param(req, 'objectId')
+    const found = repo.findObject(objectId)
+    if (!found || found.contract.id !== contractId) notFound('Объект не найден')
+    const binding = parseBitrixTaskBody(req.body)
+    if (!binding) badRequest('Укажите mode: create или link')
+    const resolved = await tasks.resolveBinding(binding, {
+      title: `${found.object.name} — ${found.contract.name}`,
+      description: `Объект ERP: ${found.object.name}`,
+    })
+    res.json({ item: repo.setObjectBitrixTask(contractId, objectId, { id: resolved.id, title: resolved.title }) })
   })
 
   router.post('/:id/objects/:objectId/works', (req, res) => {

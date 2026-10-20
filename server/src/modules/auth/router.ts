@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { Router, type CookieOptions, type Request, type RequestHandler, type Response } from 'express'
+import express from 'express'
 import {
   HttpError,
   badRequest,
@@ -11,7 +12,17 @@ import {
   setRequestAuth,
   trimmed,
 } from '../../http.js'
-import { isRoleId, normalizeLogin, safeRedirectPath, type BitrixLoginError, type SessionView } from '../../shared.js'
+import {
+  BITRIX_LOGIN_ERRORS,
+  EMBED_TOKEN_HEADER,
+  EMBED_TOKEN_STORAGE_KEY,
+  isEmbedPath,
+  isRoleId,
+  normalizeLogin,
+  safeRedirectPath,
+  type BitrixLoginError,
+  type SessionView,
+} from '../../shared.js'
 import { log } from '../../log.js'
 import { rateLimit } from '../../security.js'
 import type { AccessStore } from '../access/store.js'
@@ -21,6 +32,7 @@ import type { BitrixUserSync } from './sync.js'
 
 export const SESSION_COOKIE = 'erp_session'
 export const BITRIX_STATE_COOKIE = 'erp_bitrix_state'
+export { EMBED_TOKEN_HEADER }
 
 const MAX_FAILURES = 5
 const LOCK_MS = 5 * 60 * 1000
@@ -76,13 +88,67 @@ function readCookie(req: Request, name: string): string | null {
   return null
 }
 
+function embedTokenFrom(req: Request): string | null {
+  const header = req.headers[EMBED_TOKEN_HEADER]
+  const value = Array.isArray(header) ? header[0] : header
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
 export function authenticate(users: UserRepository): RequestHandler {
   return (req, _res, next) => {
-    const token = readCookie(req, SESSION_COOKIE)
+    const token = readCookie(req, SESSION_COOKIE) ?? embedTokenFrom(req)
     const session = token ? users.sessionUser(token) : null
     if (session) setRequestAuth(req, session)
     next()
   }
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function embedBootstrapPage(token: string, to: string): string {
+  const safeTo = JSON.stringify(to)
+  const safeToken = JSON.stringify(token)
+  const safeKey = JSON.stringify(EMBED_TOKEN_STORAGE_KEY)
+  return `<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ERP АММИР</title>
+</head>
+<body>
+<p style="font-family:Montserrat,Arial,sans-serif;color:#5b6576;text-align:center;margin-top:40vh">Вход…</p>
+<script>
+try { sessionStorage.setItem(${safeKey}, ${safeToken}); } catch (e) {}
+location.replace(${safeTo});
+</script>
+</body>
+</html>`
+}
+
+function embedErrorPage(message: string, portal: string | null): string {
+  return `<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ERP АММИР</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: Montserrat, Arial, sans-serif; color: #242d3d; background: #eef0f3; }
+  main { max-width: 420px; padding: 24px; text-align: center; }
+  h1 { margin: 0 0 12px; font-size: 20px; }
+  p { margin: 0; color: #5b6576; font-size: 14px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Нет доступа</h1>
+  <p>${escapeHtml(message)}</p>
+</main>
+</body>
+</html>`
 }
 
 export const requireSession: RequestHandler = (req, _res, next) => {
@@ -98,20 +164,30 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
   const loginLimit = rateLimit({ windowMs: 60_000, max: 30 })
   const bitrixLimit = rateLimit({ windowMs: 60_000, max: 60 })
 
-  function cookieOptions(req: Request): CookieOptions {
+  function cookieOptions(req: Request, embed = false): CookieOptions {
+    const secure = embed ? true : (options.secureCookies ?? req.secure)
     return {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: options.secureCookies ?? req.secure,
+      sameSite: embed ? 'none' : 'lax',
+      secure,
       path: '/',
+      ...(embed ? ({ partitioned: true } as CookieOptions) : {}),
     }
   }
 
-  function startSession(req: Request, res: Response, userId: string) {
+  function startSession(req: Request, res: Response, userId: string, embed = false): string {
     const previous = optionalAuth(req)
     if (previous) users.destroySession(previous.sessionId)
     const { token } = users.createSession(userId)
-    res.cookie(SESSION_COOKIE, token, { ...cookieOptions(req), maxAge: SESSION_TTL_MS })
+    res.cookie(SESSION_COOKIE, token, { ...cookieOptions(req, embed), maxAge: SESSION_TTL_MS })
+    return token
+  }
+
+  function allowBitrixFrame(res: Response) {
+    res.removeHeader('X-Frame-Options')
+    res.removeHeader('Cross-Origin-Opener-Policy')
+    const ancestors = options.bitrix ? options.bitrix.portal : "'none'"
+    res.setHeader('Content-Security-Policy', `default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors ${ancestors}`)
   }
 
   function view(req: Request): SessionView {
@@ -147,13 +223,39 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
     res.redirect(options.bitrix.authorizeUrl(state))
   })
 
-  // Bitrix24 opens the application from «Приложения» by POSTing the handler URL into its iframe.
-  // The ERP itself cannot live there (third-party cookies), so the frame only offers a new tab.
+  // Full ERP: Bitrix opens the handler in an iframe; cookie would be third-party — offer a new tab.
   router.post('/bitrix/callback', (_req, res) => {
-    res.removeHeader('X-Frame-Options')
-    const ancestors = options.bitrix ? options.bitrix.portal : "'none'"
-    res.setHeader('Content-Security-Policy', `default-src 'none'; style-src 'unsafe-inline'; frame-ancestors ${ancestors}`)
+    allowBitrixFrame(res)
     res.type('html').send(BITRIX_FRAME_PAGE)
+  })
+
+  // Embed modules (equipment / reports): AUTH_ID → session + bootstrap HTML that stores a bearer for the SPA.
+  router.post('/bitrix/embed', express.urlencoded({ extended: false }), async (req, res) => {
+    allowBitrixFrame(res)
+    const toRaw = safeRedirectPath(typeof req.query.to === 'string' ? req.query.to : req.body?.to)
+    const to = isEmbedPath(toRaw) ? toRaw : '/e/equipment'
+    const fail = (code: BitrixLoginError) => {
+      res.status(403).type('html').send(embedErrorPage(BITRIX_LOGIN_ERRORS[code], options.bitrix?.portal ?? null))
+    }
+    if (!options.bitrix) return fail('disabled')
+    const authId = trimmed(req.body?.AUTH_ID || req.body?.auth_id || req.query.AUTH_ID)
+    const domain = trimmed(req.body?.DOMAIN || req.body?.domain || req.query.DOMAIN)
+    if (!authId) return fail('failed')
+
+    let portalUserId: string
+    try {
+      const portalUser = await options.bitrix.userByAuthId(authId, domain || undefined)
+      if (!portalUser.isActive) return fail('blocked')
+      portalUserId = portalUser.id
+    } catch (error) {
+      log.warn('Вход в iframe через Битрикс24 не удался', error)
+      return fail(error instanceof BitrixLoginFailure ? error.code : 'failed')
+    }
+    const user = users.byBitrixUserId(portalUserId)
+    if (!user) return fail('not-linked')
+    if (!user.active) return fail('blocked')
+    const token = startSession(req, res, user.id, true)
+    res.type('html').send(embedBootstrapPage(token, to))
   })
 
   router.get('/bitrix/callback', async (req, res) => {

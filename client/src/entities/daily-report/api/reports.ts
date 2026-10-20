@@ -18,7 +18,7 @@ export const dailyReportsApi = {
     return (await http.get<{ item: DailyReport }>(`/reports/${encodeURIComponent(objectId)}/${date}`)).item
   },
 
-  async save(draft: DailyReportDraft): Promise<DailyReport> {
-    return (await http.post<{ item: DailyReport }>('/reports', draft)).item
+  async save(draft: DailyReportDraft): Promise<{ item: DailyReport; bitrixWarning?: string }> {
+    return await http.post<{ item: DailyReport; bitrixWarning?: string }>('/reports', draft)
   },
 }

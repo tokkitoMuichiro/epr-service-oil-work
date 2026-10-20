@@ -612,7 +612,12 @@ describe('api', () => {
 
     assert.equal((await setStatus({ status: 'done', date: TODAY }, 'office')).status, 403)
     const current = objectOf(await call('GET', `/api/contracts/${assignment.contractId}`))
-    if (!current?.actualStart) assert.equal((await setStatus({ status: 'in_progress', date: TODAY })).status, 200)
+    if (!current?.actualStart) {
+      assert.equal(
+        (await setStatus({ status: 'in_progress', date: TODAY, bitrixTask: { mode: 'create', title: 'Тест' } })).status,
+        200,
+      )
+    }
     assert.equal((await setStatus({ status: 'in_progress', date: TODAY })).status, 400)
     assert.equal((await setStatus({ status: 'done', date: '2099-01-01' })).status, 400)
 
@@ -841,6 +846,32 @@ describe('bitrix sign-in', () => {
 
     const elsewhere = await fetch(`${api.base}/api/auth/bitrix/callback`, { method: 'POST' })
     assert.match(elsewhere.headers.get('content-security-policy') ?? '', /frame-ancestors 'none'/)
+  })
+
+  it('signs into an embed module via AUTH_ID and accepts the bearer header', async () => {
+    bitrix.addUser('91', 'Embedov', 'Ivan')
+    const created = await createUser({ login: 'embed.user', fullName: 'Embedov Ivan', bitrixUserId: '91' })
+    assert.equal(created.status, 201, created.text)
+    const authId = bitrix.issueAuth('91')
+    const response = await fetch(`${sso.base}/api/auth/bitrix/embed?to=%2Fe%2Fequipment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `AUTH_ID=${encodeURIComponent(authId)}&DOMAIN=portal.example`,
+    })
+    assert.equal(response.status, 200, await response.clone().text())
+    assert.equal(response.headers.get('x-frame-options'), null)
+    assert.match(response.headers.get('set-cookie') ?? '', /erp_session=/)
+    assert.match(response.headers.get('set-cookie') ?? '', /SameSite=None/i)
+    const html = await response.text()
+    assert.match(html, /sessionStorage\.setItem/)
+    assert.match(html, /\/e\/equipment/)
+    const token = /sessionStorage\.setItem\("erp-embed-token", "([^"]+)"\)/.exec(html)?.[1]
+    assert.ok(token, 'bootstrap page must expose the embed token')
+    const session = await fetch(`${sso.base}/api/auth/session`, {
+      headers: { 'x-erp-embed-token': token },
+    })
+    assert.equal(session.status, 200)
+    assert.equal((await session.json()).item.user.id, created.json.item.id)
   })
 
   it('links a Bitrix24 user without a password and signs in straight into the module', async () => {

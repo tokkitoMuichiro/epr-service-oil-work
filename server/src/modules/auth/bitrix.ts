@@ -48,6 +48,11 @@ export interface BitrixSso {
   authorizeUrl(state: string): string
   /** Exchanges the code for the Bitrix24 user who granted it; throws {@link BitrixLoginFailure}. */
   userByCode(code: string): Promise<BitrixPortalUser>
+  /**
+   * Resolves the Bitrix24 user from an iframe `AUTH_ID` (local application placement).
+   * Optional `domain` must belong to the configured portal.
+   */
+  userByAuthId(authId: string, domain?: string): Promise<BitrixPortalUser>
 }
 
 /** Employees of the portal for linking ERP accounts. */
@@ -103,6 +108,20 @@ export function createBitrixSso(options: BitrixSsoOptions): BitrixSso {
     return body
   }
 
+  function assertPortalDomain(domain: string | undefined) {
+    if (!domain?.trim()) return
+    const host = domain.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0] ?? ''
+    if (host !== portalHost.toLowerCase()) throw new BitrixLoginFailure('wrong-portal', `Чужой портал: ${domain}`)
+  }
+
+  async function userFromAccessToken(accessToken: string): Promise<BitrixPortalUser> {
+    const current = await getJson<RestBody<BitrixRestUser>>(
+      `${portal}/rest/user.current.json?auth=${encodeURIComponent(accessToken)}`,
+    )
+    if (!current.result?.ID) throw new BitrixLoginFailure('failed', `user.current: ${current.error ?? 'нет пользователя'}`)
+    return toPortalUser(current.result)
+  }
+
   return {
     portal,
 
@@ -130,11 +149,14 @@ export function createBitrixSso(options: BitrixSsoOptions): BitrixSso {
         endpointHost = ''
       }
       if (endpointHost !== portalHost) throw new BitrixLoginFailure('wrong-portal', `Чужой портал: ${token.client_endpoint}`)
-      const current = await getJson<RestBody<BitrixRestUser>>(
-        `${portal}/rest/user.current.json?auth=${encodeURIComponent(token.access_token)}`,
-      )
-      if (!current.result?.ID) throw new BitrixLoginFailure('failed', `user.current: ${current.error ?? 'нет пользователя'}`)
-      return toPortalUser(current.result)
+      return userFromAccessToken(token.access_token)
+    },
+
+    async userByAuthId(authId, domain) {
+      const token = authId.trim()
+      if (!token) throw new BitrixLoginFailure('failed', 'Нет AUTH_ID')
+      assertPortalDomain(domain)
+      return userFromAccessToken(token)
     },
   }
 }
