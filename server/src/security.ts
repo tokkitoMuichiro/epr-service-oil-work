@@ -50,6 +50,20 @@ export function inlineScriptHashes(html: string): string[] {
   return hashes
 }
 
+/**
+ * Who may embed ERP pages in an iframe (Bitrix left menu / mobile app).
+ * Cloud portals use `*.bitrix24.ru`; `portal` covers a custom domain from `BITRIX_PORTAL`.
+ */
+export function bitrixFrameAncestors(portal: string | null | undefined, extra: readonly string[] = []): string {
+  const parts = new Set<string>(["'self'", 'https://*.bitrix24.ru', 'https://*.bitrix24.com'])
+  if (portal?.trim()) parts.add(portal.trim())
+  for (const item of extra) {
+    const value = item.trim()
+    if (value) parts.add(value)
+  }
+  return [...parts].join(' ')
+}
+
 export function spaContentSecurityPolicy(indexHtml: string, frameAncestors = "'self'"): string {
   return [
     "default-src 'self'",

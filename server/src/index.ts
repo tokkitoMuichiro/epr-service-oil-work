@@ -47,8 +47,11 @@ if (isProduction && !process.env.PUBLIC_URL) {
 if (isProduction && bitrix.mode === 'mock') {
   log.warn('BITRIX_MODE=mock: файлы хранятся в базе, а не на Диске Битрикс24')
 }
-if (isProduction && !bitrixSsoFromConfig(bitrix)) {
+const bitrixSso = bitrixSsoFromConfig(bitrix)
+if (isProduction && !bitrixSso) {
   log.warn('BITRIX_CLIENT_ID/BITRIX_CLIENT_SECRET не заданы: кнопка «Войти через Битрикс24» скрыта')
+} else if (isProduction && bitrixSso) {
+  log.info('Вход через Битрикс24', { portal: bitrixSso.portal })
 }
 
 const server = app.listen(port, host, () => {

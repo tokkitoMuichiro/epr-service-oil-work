@@ -24,7 +24,7 @@ import {
   type SessionView,
 } from '../../shared.js'
 import { log } from '../../log.js'
-import { rateLimit } from '../../security.js'
+import { bitrixFrameAncestors, rateLimit } from '../../security.js'
 import type { AccessStore } from '../access/store.js'
 import { BitrixLoginFailure, type BitrixDirectory, type BitrixSso } from './bitrix.js'
 import { SESSION_TTL_MS, type UserRepository } from './repository.js'
@@ -186,8 +186,12 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
   function allowBitrixFrame(res: Response) {
     res.removeHeader('X-Frame-Options')
     res.removeHeader('Cross-Origin-Opener-Policy')
-    const ancestors = options.bitrix ? options.bitrix.portal : "'none'"
-    res.setHeader('Content-Security-Policy', `default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors ${ancestors}`)
+    // Without a portal origin, refuse embedding (safer than an open frame).
+    const ancestors = options.bitrix ? bitrixFrameAncestors(options.bitrix.portal) : "'none'"
+    res.setHeader(
+      'Content-Security-Policy',
+      `default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors ${ancestors}`,
+    )
   }
 
   function view(req: Request): SessionView {
