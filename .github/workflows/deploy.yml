@@ -19,7 +19,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     environment: production
     concurrency:
       group: production
@@ -28,6 +28,8 @@ jobs:
       TAG: ${{ inputs.tag || 'previous' }}
       VDS_PATH: ${{ vars.VDS_PATH || '/opt/erp-ammir' }}
       TARGET: ${{ secrets.VDS_USER }}@${{ secrets.VDS_HOST }}
+      # Keep the session alive while docker pull/up runs without stdout for minutes.
+      SSH_OPTS: -i ~/.ssh/id_deploy -o ServerAliveInterval=20 -o ServerAliveCountMax=15 -o ConnectTimeout=30
     steps:
       - uses: actions/checkout@v4
 
@@ -61,7 +63,7 @@ jobs:
           chmod 600 ~/.ssh/id_deploy ~/.ssh/known_hosts
 
       - name: Upload deploy files
-        run: scp -i ~/.ssh/id_deploy deploy/docker-compose.yml deploy/deploy.sh deploy/backup.sh deploy/erp.env.example "$TARGET:$VDS_PATH/"
+        run: scp $SSH_OPTS deploy/docker-compose.yml deploy/deploy.sh deploy/backup.sh deploy/erp.env.example "$TARGET:$VDS_PATH/"
 
       - name: Release
-        run: ssh -i ~/.ssh/id_deploy "$TARGET" "bash '$VDS_PATH/deploy.sh' '$TAG'"
+        run: ssh $SSH_OPTS "$TARGET" "bash '$VDS_PATH/deploy.sh' '$TAG'"
