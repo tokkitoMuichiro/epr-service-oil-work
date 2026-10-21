@@ -207,7 +207,7 @@ function origin(item: EquipmentItem) {
                 <th class="col-name">Наименование</th>
                 <th class="col-type">{{ category === 'EQUIPMENT' ? 'Тип' : category === 'VEHICLE' ? 'Вид' : 'Тип карты' }}</th>
                 <th class="col-id">{{ category === 'EQUIPMENT' ? '№ / кол-во' : identityTitle(category) }}</th>
-                <th v-if="!isCard" class="col-condition">Состояние</th>
+                <th v-if="!isCard" class="col-condition"><span class="sr-only">Состояние</span></th>
                 <th v-if="showOwner" class="col-owner">Владелец</th>
                 <th v-if="showRepairSender" class="col-origin">Отправил в ремонт</th>
                 <th class="col-actions"><span class="sr-only">Действия</span></th>
@@ -246,7 +246,7 @@ function origin(item: EquipmentItem) {
                     :data-tip="item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)"
                   ><span>{{ item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item) }}</span></span>
                 </td>
-                <td v-if="!isCard" class="col-condition"><ConditionBadge :condition="item.condition" /></td>
+                <td v-if="!isCard" class="col-condition"><ConditionBadge compact :condition="item.condition" /></td>
                 <td v-if="showOwner" class="col-owner">
                   <span class="clip" :data-tip="store.labelForOwner(item)"><span>{{ store.labelForOwner(item) }}</span></span>
                 </td>
@@ -292,32 +292,35 @@ function origin(item: EquipmentItem) {
 
         <ul class="cards">
           <li v-for="item in pager.pageItems" :key="item.id" class="cards__item" :data-state="rowState(item)" @click="detailId = item.id">
-            <div class="cards__head">
-              <label v-if="canTransferItem(auth, item, transfers)" class="check" @click.stop>
-                <input type="checkbox" :checked="isSelected(item)" :aria-label="`Выбрать ${item.name}`" @change="toggle(item)" />
-              </label>
-              <strong class="clip" :data-tip="assetDisplayName(item)"><span>{{ assetDisplayName(item) }}</span></strong>
-              <ConditionBadge v-if="!isCard" :condition="item.condition" />
+            <label v-if="canTransferItem(auth, item, transfers)" class="check" @click.stop>
+              <input type="checkbox" :checked="isSelected(item)" :aria-label="`Выбрать ${item.name}`" @change="toggle(item)" />
+            </label>
+            <div class="cards__body">
+              <div class="cards__title">
+                <ConditionBadge v-if="!isCard" compact :condition="item.condition" />
+                <strong class="clip" :data-tip="assetDisplayName(item)"><span>{{ assetDisplayName(item) }}</span></strong>
+              </div>
+              <div class="cards__meta">
+                <span>{{ equipmentTypeLabel(item) }}</span>
+                <span
+                  class="mono clip"
+                  :data-tip="item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)"
+                ><span>{{ item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item) }}</span></span>
+                <span v-if="showOwner" class="clip" :data-tip="store.labelForOwner(item)"><span>{{ store.labelForOwner(item) }}</span></span>
+              </div>
+              <div v-if="item.fillStatus !== 'OK' || isPendingAccept(item, transfers) || item.hasDocuments" class="cards__flags">
+                <span v-if="item.fillStatus !== 'OK'" class="chip ui-badge" :class="item.fillStatus === 'NEEDS_FIX' ? 'ui-badge--bad' : 'ui-badge--info'">
+                  {{ FILL_STATUS_LABEL[item.fillStatus] }}
+                </span>
+                <span v-if="isPendingAccept(item, transfers)" class="chip ui-badge ui-badge--warn">
+                  {{ pendingOfferLabel(item, transfers) }}
+                </span>
+                <span v-if="item.hasDocuments" class="chip ui-badge ui-badge--neutral" title="Есть документы">Док.</span>
+              </div>
+              <small v-if="showRepairSender && origin(item)" class="note">
+                Отправил: {{ origin(item)?.by }} ({{ origin(item)?.from }})
+              </small>
             </div>
-            <div class="cards__meta">
-              <span>{{ equipmentTypeLabel(item) }}</span>
-              <span
-                class="mono clip"
-                :data-tip="item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)"
-              ><span>{{ item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item) }}</span></span>
-              <span v-if="showOwner">{{ store.labelForOwner(item) }}</span>
-            </div>
-            <div v-if="item.fillStatus !== 'OK' || isPendingAccept(item, transfers)" class="name">
-              <span v-if="item.fillStatus !== 'OK'" class="chip ui-badge" :class="item.fillStatus === 'NEEDS_FIX' ? 'ui-badge--bad' : 'ui-badge--info'" :data-tone="item.fillStatus">
-                {{ FILL_STATUS_LABEL[item.fillStatus] }}
-              </span>
-              <span v-if="isPendingAccept(item, transfers)" class="chip ui-badge ui-badge--warn" data-tone="pending">
-                {{ pendingOfferLabel(item, transfers) }}
-              </span>
-            </div>
-            <small v-if="showRepairSender && origin(item)" class="note">
-              Отправил: {{ origin(item)?.by }} ({{ origin(item)?.from }})
-            </small>
             <div class="cards__actions" @click.stop>
               <UiButton
                 v-if="canAcceptTransfer(auth, item, transfers)"
@@ -366,6 +369,8 @@ function origin(item: EquipmentItem) {
   display: grid;
   gap: var(--space-3);
   min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 .board__sticky {
@@ -373,22 +378,24 @@ function origin(item: EquipmentItem) {
   top: 0;
   z-index: var(--z-sticky);
   display: grid;
-  gap: var(--space-3);
-  padding: var(--space-2) 0 var(--space-3);
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
   margin: calc(-1 * var(--space-2)) 0 0;
   background: var(--surface-card);
 }
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(160px, 0.8fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 10rem) auto;
   gap: var(--space-2);
   align-items: center;
+  min-width: 0;
 }
 
 .toolbar__search,
 .toolbar__select {
   width: 100%;
+  min-width: 0;
 }
 
 .toolbar__count {
@@ -407,7 +414,7 @@ function origin(item: EquipmentItem) {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2) var(--space-3);
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius);
   background: var(--surface-inverse);
   color: var(--text-on-inverse);
@@ -419,7 +426,9 @@ function origin(item: EquipmentItem) {
 
 .selection__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
+  max-width: 100%;
 }
 
 .selection__actions :deep(.btn--ghost) {
@@ -428,13 +437,27 @@ function origin(item: EquipmentItem) {
   color: var(--text-on-inverse);
 }
 
+.list {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .table-wrap {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 .ui-table {
   table-layout: fixed;
+  width: 100%;
+}
+
+.ui-table th,
+.ui-table td {
+  overflow: hidden;
+  vertical-align: middle;
 }
 
 .ui-table td {
@@ -443,7 +466,7 @@ function origin(item: EquipmentItem) {
 }
 
 .col-name {
-  width: 34%;
+  width: 38%;
 }
 
 .col-type {
@@ -455,12 +478,23 @@ function origin(item: EquipmentItem) {
 }
 
 .col-condition {
-  width: 12%;
+  width: 2.5rem;
+  text-align: center;
 }
 
 .col-owner,
 .col-origin {
-  width: 16%;
+  width: 14%;
+}
+
+.col-check {
+  width: 2.5rem;
+  padding-right: 0;
+}
+
+.col-actions {
+  width: 5.5rem;
+  text-align: right;
 }
 
 tbody tr {
@@ -497,11 +531,6 @@ tr[data-state='review'] td:first-child,
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
-.col-check {
-  width: 44px;
-  padding-right: 0;
-}
-
 .col-check input,
 .check input {
   width: 20px;
@@ -509,12 +538,6 @@ tr[data-state='review'] td:first-child,
   margin: 0;
   accent-color: var(--accent-strong);
   cursor: pointer;
-}
-
-.col-actions {
-  width: 1%;
-  white-space: nowrap;
-  text-align: right;
 }
 
 .name {
@@ -526,7 +549,7 @@ tr[data-state='review'] td:first-child,
 }
 
 .name strong {
-  flex: 1 1 8rem;
+  flex: 1 1 6rem;
   min-width: 0;
   font-weight: 600;
 }
@@ -546,6 +569,7 @@ tr[data-state='review'] td:first-child,
   display: block;
   position: relative;
   min-width: 0;
+  max-width: 100%;
 }
 
 .clip > span {
@@ -555,16 +579,23 @@ tr[data-state='review'] td:first-child,
   white-space: nowrap;
 }
 
+/* Tip overlays the cell — no layout shift, stays inside the clipped board. */
 @media (hover: hover) and (pointer: fine) {
+  .clip[data-tip]:hover {
+    z-index: 2;
+  }
+
   .clip[data-tip]:hover::after {
     content: attr(data-tip);
     position: absolute;
     left: 0;
-    top: calc(100% + 4px);
-    z-index: calc(var(--z-sticky) + 1);
-    display: block;
-    max-width: min(20rem, 70vw);
-    padding: var(--space-2) var(--space-3);
+    right: 0;
+    top: 100%;
+    z-index: 5;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    padding: var(--space-1) var(--space-2);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius);
     background: var(--surface-raised);
@@ -581,7 +612,8 @@ tr[data-state='review'] td:first-child,
 }
 
 .link {
-  min-height: 36px;
+  max-width: 100%;
+  min-height: var(--control-height);
   padding: 0 var(--space-2);
   border: 0;
   border-radius: var(--radius);
@@ -627,13 +659,16 @@ tr[data-state='review'] td:first-child,
   padding: 0;
   list-style: none;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .cards__item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--space-1) var(--space-2);
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
@@ -641,20 +676,27 @@ tr[data-state='review'] td:first-child,
   cursor: pointer;
 }
 
-.cards__item > * {
-  grid-column: 1 / -1;
+.cards__item:not(:has(.check)) {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
-.cards__head {
+.cards__body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cards__title {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 32px;
+  min-width: 0;
 }
 
-.cards__head strong {
+.cards__title strong {
   flex: 1;
   min-width: 0;
+  font-size: var(--font-size-sm);
   font-weight: 600;
 }
 
@@ -664,35 +706,47 @@ tr[data-state='review'] td:first-child,
   place-items: center;
   width: var(--tap-size);
   height: var(--tap-size);
-  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-1)) calc(-1 * var(--space-2)) calc(-1 * var(--space-3));
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2)) calc(-1 * var(--space-1)) calc(-1 * var(--space-3));
   cursor: pointer;
 }
 
-.check input {
-  width: 20px;
-  height: 20px;
-}
-
 .cards__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px var(--space-3);
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 0 var(--space-2);
   font-size: var(--font-size-xs);
   color: var(--text-secondary);
+  min-width: 0;
 }
 
-.cards__item > .cards__meta {
-  grid-column: 1;
+.cards__meta > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.cards__item > .cards__actions {
-  grid-column: 2;
-  grid-row: 2;
+.cards__flags {
   display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cards__actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  max-width: 100%;
 }
 
 .cards__actions:empty {
   display: none;
+}
+
+.cards__actions :deep(.btn) {
+  flex: none;
+  max-width: 100%;
 }
 
 .sr-only {
@@ -709,7 +763,7 @@ tr[data-state='review'] td:first-child,
   }
 
   .toolbar {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .toolbar__search {
@@ -717,7 +771,6 @@ tr[data-state='review'] td:first-child,
   }
 
   .toolbar__count {
-    justify-self: end;
     font-size: var(--font-size-xs);
   }
 
@@ -731,12 +784,8 @@ tr[data-state='review'] td:first-child,
 }
 
 @media (max-width: 560px) {
-  .toolbar {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
   .selection {
-    padding: var(--space-3);
+    padding: var(--space-2) var(--space-3);
   }
 
   .selection__actions {
@@ -746,6 +795,10 @@ tr[data-state='review'] td:first-child,
   .selection__actions :deep(.btn) {
     flex: 1 1 auto;
     min-height: var(--tap-size);
+  }
+
+  .cards__item {
+    padding: var(--space-2);
   }
 }
 

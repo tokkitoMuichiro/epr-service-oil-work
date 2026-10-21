@@ -5,7 +5,6 @@ import { IconClose, PageHeader, UiButton, UiState } from '@/shared/ui'
 import { ROLE_SUMMARY } from '../model/roles'
 import AccessMatrix from './AccessMatrix.vue'
 import BitrixCheck from './BitrixCheck.vue'
-import EquipmentPeople from './EquipmentPeople.vue'
 import UsersPanel from './UsersPanel.vue'
 
 const access = useAccessStore()
@@ -70,12 +69,6 @@ const isEditable = computed(() => access.can('settings_manage'))
           сервера.
         </p>
         <BitrixCheck />
-      </section>
-
-      <section v-if="access.canView('equipment')" class="panel">
-        <h2 class="panel__title">Сотрудники модуля оборудования</h2>
-        <p class="panel__text">Активные пользователи: роль, закреплённые базы и число позиций за каждым.</p>
-        <EquipmentPeople />
       </section>
     </template>
   </section>

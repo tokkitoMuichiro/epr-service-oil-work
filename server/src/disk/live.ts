@@ -234,6 +234,11 @@ export function createLiveDisk(options: LiveDiskOptions): Disk {
       return children.filter(isAlive).map((f) => toFile(f, `${folder.path}/${f.NAME}`))
     },
 
+    async listFolders(folder) {
+      const children = await all<BitrixObject>('disk.folder.getchildren', { id: folder.folderId, filter: { TYPE: 'folder' } })
+      return children.filter(isAlive).map((f) => ({ folderId: String(f.ID), path: `${folder.path}/${f.NAME}` }))
+    },
+
     async resolveLink(url, within) {
       const id = bitrixObjectId(url)
       if (!id) throw new HttpError(400, 'Не удалось распознать ссылку на файл Битрикс. Скопируйте ссылку на файл из Битрикс Диска')
