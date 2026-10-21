@@ -8,14 +8,12 @@ interface PaginationOptions {
   resetOn?: WatchSource[]
 }
 
-/** Paginates the list on mobile only; on wider screens every item stays visible. */
-export function useMobilePagination<T>(items: MaybeRefOrGetter<readonly T[]>, options: PaginationOptions = {}) {
+function createPager<T>(items: MaybeRefOrGetter<readonly T[]>, options: PaginationOptions, enabled: () => boolean) {
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE
-  const isMobile = useIsMobile()
   const page = ref(1)
 
   const total = computed(() => toValue(items).length)
-  const isPaged = computed(() => isMobile.value && total.value > pageSize)
+  const isPaged = computed(() => enabled() && total.value > pageSize)
   const pageItems = computed<readonly T[]>(() =>
     isPaged.value ? pageSlice(toValue(items), page.value, pageSize) : toValue(items),
   )
@@ -31,4 +29,15 @@ export function useMobilePagination<T>(items: MaybeRefOrGetter<readonly T[]>, op
   }
 
   return reactive({ page, pageSize, total, isPaged, pageItems })
+}
+
+/** Paginates the list on mobile only; on wider screens every item stays visible. */
+export function useMobilePagination<T>(items: MaybeRefOrGetter<readonly T[]>, options: PaginationOptions = {}) {
+  const isMobile = useIsMobile()
+  return createPager(items, options, () => isMobile.value)
+}
+
+/** Paginates on every viewport when the list is longer than the page size. */
+export function useListPagination<T>(items: MaybeRefOrGetter<readonly T[]>, options: PaginationOptions = {}) {
+  return createPager(items, options, () => true)
 }

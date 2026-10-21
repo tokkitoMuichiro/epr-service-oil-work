@@ -356,6 +356,17 @@ export function isPendingAccept(item: EquipmentItem, transfers: Transfer[]) {
   return pendingTransfer(item, transfers)?.status === 'PENDING'
 }
 
+/** Stock on the base plus positions waiting to be accepted there. */
+export function isOnOrIncomingToWarehouse(item: EquipmentItem, warehouseId: string, transfers: Transfer[]) {
+  if (item.ownerType === 'WAREHOUSE' && item.ownerWarehouseId === warehouseId) return true
+  const pending = pendingTransfer(item, transfers)
+  return (
+    pending?.status === 'PENDING' &&
+    pending.toOwnerType === 'WAREHOUSE' &&
+    pending.toWarehouseId === warehouseId
+  )
+}
+
 export function isFillBlocked(item: EquipmentItem) {
   return item.fillStatus === 'NEEDS_FIX' || item.fillStatus === 'PENDING_REVIEW'
 }

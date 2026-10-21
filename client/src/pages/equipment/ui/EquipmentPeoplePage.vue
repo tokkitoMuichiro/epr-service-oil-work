@@ -76,9 +76,14 @@ function personLabel(id: string, fullName: string) {
         <UiButton v-if="canAddHere" variant="primary" @click="isCreateOpen = true">{{ addLabel(category) }}</UiButton>
       </div>
       <div class="panel">
-        <h2 class="panel__title ui-hide-mobile">{{ person.fullName }}</h2>
-        <p class="panel__text ui-hide-mobile">Позиции, которые числятся за сотрудником.</p>
-        <EquipmentBoard :items="items" :category="category" :show-owner="false" empty-text="За сотрудником ничего не числится." />
+        <EquipmentBoard :items="items" :category="category" :show-owner="false" empty-text="За сотрудником ничего не числится.">
+          <template #sticky>
+            <div class="person-head">
+              <h2 class="panel__title">{{ person.fullName }}</h2>
+              <p class="panel__text">Позиции, которые числятся за сотрудником.</p>
+            </div>
+          </template>
+        </EquipmentBoard>
       </div>
     </div>
 
@@ -152,6 +157,14 @@ function personLabel(id: string, fullName: string) {
   display: none;
 }
 
+.person-head .panel__title {
+  margin-bottom: 0;
+}
+
+.person-head .panel__text {
+  margin: var(--space-1) 0 0;
+}
+
 @media (max-width: 860px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);
@@ -164,6 +177,10 @@ function personLabel(id: string, fullName: string) {
   }
 
   .people {
+    display: none;
+  }
+
+  .person-head .panel__text {
     display: none;
   }
 }

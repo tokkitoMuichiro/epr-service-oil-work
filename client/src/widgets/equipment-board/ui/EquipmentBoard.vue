@@ -27,7 +27,7 @@ import { EquipmentFormDialog } from '@/features/equipment-form'
 import { FillRemarkDialog } from '@/features/equipment-fill-review'
 import { TransferDialog } from '@/features/equipment-transfer'
 import { formatDateTimeRu } from '@/shared/lib/date'
-import { useMobilePagination } from '@/shared/lib/pagination'
+import { useListPagination } from '@/shared/lib/pagination'
 import { IconClose, UiButton, UiPagination, UiState } from '@/shared/ui'
 import EquipmentCardDialog from './EquipmentCardDialog.vue'
 
@@ -95,7 +95,7 @@ const visible = computed(() =>
   ),
 )
 
-const pager = useMobilePagination(visible, { resetOn: [query, kindFilter, () => props.category] })
+const pager = useListPagination(visible, { pageSize: 20, resetOn: [query, kindFilter, () => props.category] })
 
 const selectable = computed(() => visible.value.filter((i) => canTransferItem(auth.value, i, transfers.value)))
 const selectedItems = computed(() => store.items.filter((i) => selectedIds.value.includes(i.id)))
@@ -158,13 +158,16 @@ function origin(item: EquipmentItem) {
 
 <template>
   <div class="board">
-    <div class="toolbar">
-      <input v-model="query" class="toolbar__search ui-control" type="search" :placeholder="searchPlaceholder" aria-label="Поиск" />
-      <select v-model="kindFilter" class="toolbar__select ui-control" :aria-label="kindPlaceholder">
-        <option value="">{{ kindPlaceholder }}</option>
-        <option v-for="opt in kindOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-      </select>
-      <span class="toolbar__count">{{ positionsLabel(visible.length) }}</span>
+    <div class="board__sticky">
+      <slot name="sticky" />
+      <div class="toolbar">
+        <input v-model="query" class="toolbar__search ui-control" type="search" :placeholder="searchPlaceholder" aria-label="Поиск" />
+        <select v-model="kindFilter" class="toolbar__select ui-control" :aria-label="kindPlaceholder">
+          <option value="">{{ kindPlaceholder }}</option>
+          <option v-for="opt in kindOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
+        <span class="toolbar__count">{{ positionsLabel(visible.length) }}</span>
+      </div>
     </div>
 
     <p v-if="store.actionError && !isAnyDialogOpen" class="alert" role="alert">
@@ -201,12 +204,12 @@ function origin(item: EquipmentItem) {
                     @change="toggleAll"
                   />
                 </th>
-                <th>Наименование</th>
-                <th>{{ category === 'EQUIPMENT' ? 'Тип' : category === 'VEHICLE' ? 'Вид' : 'Тип карты' }}</th>
-                <th>{{ category === 'EQUIPMENT' ? '№ / кол-во' : identityTitle(category) }}</th>
-                <th v-if="!isCard">Состояние</th>
-                <th v-if="showOwner">Владелец</th>
-                <th v-if="showRepairSender">Отправил в ремонт</th>
+                <th class="col-name">Наименование</th>
+                <th class="col-type">{{ category === 'EQUIPMENT' ? 'Тип' : category === 'VEHICLE' ? 'Вид' : 'Тип карты' }}</th>
+                <th class="col-id">{{ category === 'EQUIPMENT' ? '№ / кол-во' : identityTitle(category) }}</th>
+                <th v-if="!isCard" class="col-condition">Состояние</th>
+                <th v-if="showOwner" class="col-owner">Владелец</th>
+                <th v-if="showRepairSender" class="col-origin">Отправил в ремонт</th>
                 <th class="col-actions"><span class="sr-only">Действия</span></th>
               </tr>
             </thead>
@@ -221,9 +224,9 @@ function origin(item: EquipmentItem) {
                     @change="toggle(item)"
                   />
                 </td>
-                <td>
+                <td class="col-name">
                   <div class="name">
-                    <strong>{{ item.name }}</strong>
+                    <strong class="clip" :data-tip="item.name"><span>{{ item.name }}</span></strong>
                     <span v-if="item.fillStatus !== 'OK'" class="chip ui-badge" :class="item.fillStatus === 'NEEDS_FIX' ? 'ui-badge--bad' : 'ui-badge--info'" :data-tone="item.fillStatus">
                       {{ FILL_STATUS_LABEL[item.fillStatus] }}
                     </span>
@@ -232,12 +235,21 @@ function origin(item: EquipmentItem) {
                     </span>
                     <span v-if="item.hasDocuments" class="chip ui-badge ui-badge--neutral" data-tone="docs" title="Есть документы">Док.</span>
                   </div>
-                  <small v-if="item.conditionNote" class="note">{{ item.conditionNote }}</small>
+                  <small v-if="item.conditionNote" class="note clip" :data-tip="item.conditionNote"><span>{{ item.conditionNote }}</span></small>
                 </td>
-                <td>{{ equipmentTypeLabel(item) }}</td>
-                <td class="mono">{{ item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item) }}</td>
-                <td v-if="!isCard"><ConditionBadge :condition="item.condition" /></td>
-                <td v-if="showOwner">{{ store.labelForOwner(item) }}</td>
+                <td class="col-type">
+                  <span class="clip" :data-tip="equipmentTypeLabel(item)"><span>{{ equipmentTypeLabel(item) }}</span></span>
+                </td>
+                <td class="col-id">
+                  <span
+                    class="mono clip"
+                    :data-tip="item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)"
+                  ><span>{{ item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item) }}</span></span>
+                </td>
+                <td v-if="!isCard" class="col-condition"><ConditionBadge :condition="item.condition" /></td>
+                <td v-if="showOwner" class="col-owner">
+                  <span class="clip" :data-tip="store.labelForOwner(item)"><span>{{ store.labelForOwner(item) }}</span></span>
+                </td>
                 <td v-if="showRepairSender">
                   <template v-if="origin(item)">
                     <div>{{ origin(item)?.by }}</div>
@@ -284,12 +296,15 @@ function origin(item: EquipmentItem) {
               <label v-if="canTransferItem(auth, item, transfers)" class="check" @click.stop>
                 <input type="checkbox" :checked="isSelected(item)" :aria-label="`Выбрать ${item.name}`" @change="toggle(item)" />
               </label>
-              <strong>{{ assetDisplayName(item) }}</strong>
+              <strong class="clip" :data-tip="assetDisplayName(item)"><span>{{ assetDisplayName(item) }}</span></strong>
               <ConditionBadge v-if="!isCard" :condition="item.condition" />
             </div>
             <div class="cards__meta">
               <span>{{ equipmentTypeLabel(item) }}</span>
-              <span class="mono">{{ item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item) }}</span>
+              <span
+                class="mono clip"
+                :data-tip="item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)"
+              ><span>{{ item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item) }}</span></span>
               <span v-if="showOwner">{{ store.labelForOwner(item) }}</span>
             </div>
             <div v-if="item.fillStatus !== 'OK' || isPendingAccept(item, transfers)" class="name">
@@ -353,6 +368,17 @@ function origin(item: EquipmentItem) {
   min-width: 0;
 }
 
+.board__sticky {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-2) 0 var(--space-3);
+  margin: calc(-1 * var(--space-2)) 0 0;
+  background: var(--surface-card);
+}
+
 .toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(160px, 0.8fr) auto;
@@ -407,9 +433,34 @@ function origin(item: EquipmentItem) {
   border-radius: var(--radius);
 }
 
+.ui-table {
+  table-layout: fixed;
+}
+
 .ui-table td {
   font-size: var(--font-size-sm);
   background-color: var(--surface-card);
+}
+
+.col-name {
+  width: 34%;
+}
+
+.col-type {
+  width: 12%;
+}
+
+.col-id {
+  width: 16%;
+}
+
+.col-condition {
+  width: 12%;
+}
+
+.col-owner,
+.col-origin {
+  width: 16%;
 }
 
 tbody tr {
@@ -471,9 +522,12 @@ tr[data-state='review'] td:first-child,
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .name strong {
+  flex: 1 1 8rem;
+  min-width: 0;
   font-weight: 600;
 }
 
@@ -486,7 +540,44 @@ tr[data-state='review'] td:first-child,
 
 .mono {
   font-variant-numeric: tabular-nums;
+}
+
+.clip {
+  display: block;
+  position: relative;
+  min-width: 0;
+}
+
+.clip > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .clip[data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: 0;
+    top: calc(100% + 4px);
+    z-index: calc(var(--z-sticky) + 1);
+    display: block;
+    max-width: min(20rem, 70vw);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+    background: var(--surface-raised);
+    color: var(--text-primary);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    line-height: var(--line-height-base);
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    box-shadow: var(--shadow-raised);
+    pointer-events: none;
+  }
 }
 
 .link {
@@ -613,6 +704,10 @@ tr[data-state='review'] td:first-child,
 }
 
 @media (max-width: 860px) {
+  .board__sticky {
+    background: var(--surface-app);
+  }
+
   .toolbar {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
