@@ -8,6 +8,7 @@ import {
   authFor,
   canConfirmFill,
   isIncomingFor,
+  isOnOrIncomingToWarehouse,
   ownerLabel,
   ownsItem,
   type BitrixExportResult,
@@ -128,7 +129,7 @@ export const useEquipmentStore = defineStore('equipment', () => {
   }
 
   function itemsOnWarehouse(warehouseId: string) {
-    return items.value.filter((i) => i.ownerType === 'WAREHOUSE' && i.ownerWarehouseId === warehouseId)
+    return items.value.filter((i) => isOnOrIncomingToWarehouse(i, warehouseId, transfers.value))
   }
 
   function fetchHistory(id: string) {

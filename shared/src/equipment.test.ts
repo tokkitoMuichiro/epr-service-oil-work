@@ -20,6 +20,7 @@ import {
   canTransferItem,
   canViewAllList,
   identityLabel,
+  isOnOrIncomingToWarehouse,
   isValidPlate,
   matchesEquipmentQuery,
   mergeEquipmentPatch,
@@ -136,6 +137,13 @@ describe('equipment permissions', () => {
     assert.equal(canAcceptTransfer(master, inTransit, [pending]), false)
     assert.equal(canCancelPendingTransfer(master, inTransit, [pending]), true)
     assert.equal(canCancelPendingTransfer(office, inTransit, [pending]), false)
+  })
+
+  it('lists pending inbound transfers on the destination warehouse', () => {
+    const inTransit = item({ pendingTransferId: 'tr-1' })
+    assert.equal(isOnOrIncomingToWarehouse(inTransit, 'wh-north', [pending]), true)
+    assert.equal(isOnOrIncomingToWarehouse(inTransit, 'wh-south', [pending]), false)
+    assert.equal(isOnOrIncomingToWarehouse(item({ ownerType: 'WAREHOUSE', ownerWarehouseId: 'wh-north' }), 'wh-north', []), true)
   })
 
   it('restricts transfers from a base to its keeper', () => {
