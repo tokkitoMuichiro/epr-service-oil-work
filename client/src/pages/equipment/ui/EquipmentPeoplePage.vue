@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { canCreateFor, positionsLabel, useEquipmentStore } from '@/entities/equipment'
 import { EquipmentFormDialog } from '@/features/equipment-form'
-import { IconPersonnel, UiButton, UiState } from '@/shared/ui'
+import { IconChevronsLeft, IconPersonnel, UiButton, UiState } from '@/shared/ui'
 import { EquipmentBoard } from '@/widgets/equipment-board'
 import { addLabel, useRouteCategory } from '../model/category'
 import CategoryTabs from './CategoryTabs.vue'
+
+const PEOPLE_COLLAPSED_KEY = 'erp-equipment-people-collapsed'
 
 const store = useEquipmentStore()
 const route = useRoute()
@@ -14,6 +16,7 @@ const router = useRouter()
 const category = useRouteCategory()
 const isCreateOpen = ref(false)
 const search = ref('')
+const isPeopleCollapsed = ref(localStorage.getItem(PEOPLE_COLLAPSED_KEY) === '1')
 
 const people = computed(() => {
   const q = search.value.trim().toLowerCase()
@@ -33,6 +36,10 @@ const canAddHere = computed(() =>
   canCreateFor(store.auth, { condition: 'OK', ownerType: 'USER', ownerUserId: userId.value, ownerWarehouseId: '' }),
 )
 
+watch(isPeopleCollapsed, (collapsed) => {
+  localStorage.setItem(PEOPLE_COLLAPSED_KEY, collapsed ? '1' : '0')
+})
+
 function select(id: string) {
   void router.replace({ query: { ...route.query, userId: id } })
 }
@@ -40,10 +47,19 @@ function select(id: string) {
 function personLabel(id: string, fullName: string) {
   return `${fullName}${id === store.persona.id ? ' (вы)' : ''}`
 }
+
+function initials(fullName: string) {
+  return fullName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
+}
 </script>
 
 <template>
-  <div class="layout">
+  <div class="layout" :class="{ 'layout--collapsed': isPeopleCollapsed }">
     <label class="picker">
       <span class="ui-overline">Сотрудник</span>
       <select class="ui-control" :value="userId" @change="select(($event.target as HTMLSelectElement).value)">
@@ -53,20 +69,56 @@ function personLabel(id: string, fullName: string) {
       </select>
     </label>
 
-    <aside class="people">
-      <input v-model="search" class="people__search ui-control" type="search" placeholder="Поиск сотрудника" aria-label="Поиск сотрудника" />
+    <aside class="people" :class="{ 'people--collapsed': isPeopleCollapsed }" aria-label="Сотрудники">
       <button
-        v-for="p in people"
-        :key="p.id"
         type="button"
-        class="people__item"
-        :class="{ 'people__item--active': p.id === userId }"
-        @click="select(p.id)"
+        class="people__toggle"
+        :aria-label="isPeopleCollapsed ? 'Развернуть список сотрудников' : 'Свернуть список сотрудников'"
+        :title="isPeopleCollapsed ? 'Развернуть список' : 'Свернуть список'"
+        :aria-pressed="!isPeopleCollapsed"
+        @click="isPeopleCollapsed = !isPeopleCollapsed"
       >
-        <strong>{{ personLabel(p.id, p.fullName) }}</strong>
-        <span class="num">{{ positionsLabel(store.itemsOfUser(p.id).length) }}</span>
+        <IconChevronsLeft class="people__toggle-icon" :size="18" />
+        <span v-if="!isPeopleCollapsed" class="people__toggle-label">Свернуть</span>
       </button>
-      <p v-if="!people.length" class="muted">Никого не найдено</p>
+
+      <template v-if="!isPeopleCollapsed">
+        <input
+          v-model="search"
+          class="people__search ui-control"
+          type="search"
+          placeholder="Поиск сотрудника"
+          aria-label="Поиск сотрудника"
+        />
+        <button
+          v-for="p in people"
+          :key="p.id"
+          type="button"
+          class="people__item"
+          :class="{ 'people__item--active': p.id === userId }"
+          @click="select(p.id)"
+        >
+          <strong>{{ personLabel(p.id, p.fullName) }}</strong>
+          <span class="num">{{ positionsLabel(store.itemsOfUser(p.id).length) }}</span>
+        </button>
+        <p v-if="!people.length" class="muted">Никого не найдено</p>
+      </template>
+
+      <template v-else>
+        <button
+          v-for="p in people"
+          :key="p.id"
+          type="button"
+          class="people__rail"
+          :class="{ 'people__rail--active': p.id === userId }"
+          :title="personLabel(p.id, p.fullName)"
+          :aria-label="`${personLabel(p.id, p.fullName)}, ${positionsLabel(store.itemsOfUser(p.id).length)}`"
+          @click="select(p.id)"
+        >
+          {{ initials(p.fullName) }}
+        </button>
+        <p v-if="!people.length" class="muted muted--rail">—</p>
+      </template>
     </aside>
 
     <UiState v-if="!person" title="Выберите сотрудника" :icon="IconPersonnel" text="Слева список сотрудников с числом позиций." />
@@ -104,6 +156,12 @@ function personLabel(id: string, fullName: string) {
   grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
+  min-width: 0;
+}
+
+.layout--collapsed {
+  grid-template-columns: var(--tap-size) minmax(0, 1fr);
+  gap: var(--space-3);
 }
 
 .people {
@@ -111,10 +169,50 @@ function personLabel(id: string, fullName: string) {
   top: 0;
   display: grid;
   gap: var(--space-2);
+  align-content: start;
   max-height: calc(100vh - 8rem);
   max-height: calc(100dvh - 8rem);
   overflow: auto;
   padding: 2px;
+  min-width: 0;
+}
+
+.people--collapsed {
+  justify-items: center;
+  gap: var(--space-1);
+  padding: 0;
+}
+
+.people__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.people--collapsed .people__toggle {
+  width: var(--tap-size);
+  height: var(--tap-size);
+  padding: 0;
+}
+
+.people--collapsed .people__toggle-icon {
+  transform: rotate(180deg);
+}
+
+.people__toggle-label {
+  flex: 1;
+  text-align: left;
 }
 
 .people__item {
@@ -141,16 +239,40 @@ function personLabel(id: string, fullName: string) {
   color: var(--text-secondary);
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .people__item:not(.people__item--active):hover {
-    border-color: var(--border-strong);
-  }
+.people__rail {
+  display: inline-grid;
+  place-items: center;
+  width: var(--tap-size);
+  height: var(--tap-size);
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
 }
 
+.people__rail--active,
 .people__item--active {
   border-color: var(--accent);
   background: var(--accent-subtle);
+  color: var(--text-primary);
   box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.people__rail--active {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .people__toggle:hover,
+  .people__item:not(.people__item--active):hover,
+  .people__rail:not(.people__rail--active):hover {
+    border-color: var(--border-strong);
+  }
 }
 
 .picker {
@@ -165,8 +287,14 @@ function personLabel(id: string, fullName: string) {
   margin: var(--space-1) 0 0;
 }
 
+.muted--rail {
+  margin: 0;
+  font-size: var(--font-size-xs);
+}
+
 @media (max-width: 860px) {
-  .layout {
+  .layout,
+  .layout--collapsed {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-3);
   }
