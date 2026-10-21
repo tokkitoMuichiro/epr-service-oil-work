@@ -400,8 +400,8 @@ onUnmounted(() => {
           v-if="isRail"
           type="button"
           class="rail__avatar"
-          :title="`Роль: ${roleStore.currentRoleLabel}`"
-          :aria-label="`Роль: ${roleStore.currentRoleLabel}. Развернуть меню`"
+          :title="`${displayName} · ${roleStore.currentRoleLabel}`"
+          :aria-label="`${displayName}, роль ${roleStore.currentRoleLabel}. Развернуть меню`"
           @click="toggleCollapsed"
         >
           <UiAvatar :name="displayName" size="md" inverse />

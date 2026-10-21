@@ -9,7 +9,7 @@ import { diskRouter } from './disk/router.js'
 import { createDiskSync, scheduleDiskSync } from './disk/sync.js'
 import { errorHandler, notFound } from './http.js'
 import { log } from './log.js'
-import { securityHeaders, spaContentSecurityPolicy } from './security.js'
+import { bitrixFrameAncestors, securityHeaders, spaContentSecurityPolicy } from './security.js'
 import { accessRouter } from './modules/access/router.js'
 import { createAccessStore } from './modules/access/store.js'
 import { bitrixDirectoryFromConfig, bitrixSsoFromConfig, portalOrigin } from './modules/auth/bitrix.js'
@@ -203,7 +203,7 @@ export function createApp(options: AppOptions = {}) {
     const indexFile = path.join(clientDist, 'index.html')
     const indexHtml = existsSync(indexFile) ? readFileSync(indexFile, 'utf8') : ''
     const csp = spaContentSecurityPolicy(indexHtml)
-    const embedAncestors = bitrixPortal ? `'self' ${bitrixPortal}` : "'self'"
+    const embedAncestors = bitrixFrameAncestors(bitrixPortal)
     const embedCsp = spaContentSecurityPolicy(indexHtml, embedAncestors)
     const precompressed = precompressedFiles(clientDist)
     app.use((req, res, next) => {
