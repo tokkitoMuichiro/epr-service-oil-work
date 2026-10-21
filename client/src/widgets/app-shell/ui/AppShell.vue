@@ -5,7 +5,7 @@ import { authFor, canViewAllList, useEquipmentStore } from '@/entities/equipment
 import { equipmentPermissionsOf, useAccessStore, useRoleStore, type AccessBlock } from '@/entities/role'
 import { ThemeSwitch } from '@/features/theme-switch'
 import { APP_NAME } from '@/shared/config'
-import { useIsMobile, useMediaQuery } from '@/shared/lib/media'
+import { useIsMobile } from '@/shared/lib/media'
 import { useEscape, useScrollLock } from '@/shared/lib/scroll-lock'
 import {
   AppLogo,
@@ -51,8 +51,6 @@ const access = useAccessStore()
 const roleStore = useRoleStore()
 const mobileOpen = ref(false)
 const isMobile = useIsMobile()
-const isDesktop = useMediaQuery('(min-width: 1280px)')
-const isTablet = computed(() => !isMobile.value && !isDesktop.value)
 const isCollapsed = ref(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) !== '0')
 const openGroups = ref<string[]>([])
 const railPopover = ref<{ id: string; top: number } | null>(null)
@@ -113,7 +111,8 @@ const navGroups = computed(() => [trainingGroup.value, equipmentGroup.value].fil
 
 const hasNavBadge = computed(() => navGroups.value.some((group) => Boolean(group.badge)))
 
-const isRail = computed(() => isTablet.value && isCollapsed.value)
+/** Icon rail on any viewport wider than the phone drawer — frees space for the main column. */
+const isRail = computed(() => !isMobile.value && isCollapsed.value)
 const displayName = computed(() => roleStore.user?.fullName || roleStore.currentRoleLabel)
 
 watch(
@@ -413,7 +412,7 @@ onUnmounted(() => {
       </div>
 
       <button
-        v-if="isTablet"
+        v-if="!isMobile"
         type="button"
         class="rail__toggle"
         :aria-label="isCollapsed ? 'Развернуть меню' : 'Свернуть меню'"
@@ -422,7 +421,7 @@ onUnmounted(() => {
         @click="toggleCollapsed"
       >
         <IconPanelLeft />
-        <span class="nav__label">Свернуть меню</span>
+        <span class="nav__label">{{ isCollapsed ? 'Развернуть меню' : 'Свернуть меню' }}</span>
       </button>
     </aside>
 

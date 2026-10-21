@@ -36,27 +36,37 @@ withDefaults(
 
 <style scoped>
 .dot {
-  display: inline-block;
+  display: inline-grid;
   flex: none;
-  width: 10px;
-  height: 10px;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+}
+
+.dot::after {
+  content: '';
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--status-neutral-solid);
 }
 
-.dot[data-tone='ok'] {
+.dot[data-tone='ok']::after {
   background: var(--status-ok-solid);
 }
 
-.dot[data-tone='warn'] {
+.dot[data-tone='warn']::after {
   background: var(--status-warn-solid);
 }
 
-.dot[data-tone='repair'] {
+.dot[data-tone='repair']::after {
   background: var(--status-neutral-solid);
 }
 
-.dot[data-tone='bad'] {
+.dot[data-tone='bad']::after {
   background: var(--status-bad-solid);
 }
 </style>

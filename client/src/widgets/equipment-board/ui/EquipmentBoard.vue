@@ -207,7 +207,7 @@ function origin(item: EquipmentItem) {
                 <th class="col-name">Наименование</th>
                 <th class="col-type">{{ category === 'EQUIPMENT' ? 'Тип' : category === 'VEHICLE' ? 'Вид' : 'Тип карты' }}</th>
                 <th class="col-id">{{ category === 'EQUIPMENT' ? '№ / кол-во' : identityTitle(category) }}</th>
-                <th v-if="!isCard" class="col-condition"><span class="sr-only">Состояние</span></th>
+                <th v-if="!isCard" class="col-condition">Сост.</th>
                 <th v-if="showOwner" class="col-owner">Владелец</th>
                 <th v-if="showRepairSender" class="col-origin">Отправил в ремонт</th>
                 <th class="col-actions"><span class="sr-only">Действия</span></th>
@@ -445,13 +445,14 @@ function origin(item: EquipmentItem) {
 .table-wrap {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  overflow-x: clip;
-  overflow-y: visible;
+  overflow: visible;
 }
 
 .ui-table {
   table-layout: fixed;
   width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .ui-table th,
@@ -466,7 +467,7 @@ function origin(item: EquipmentItem) {
 }
 
 .col-name {
-  width: 38%;
+  width: 36%;
 }
 
 .col-type {
@@ -474,11 +475,11 @@ function origin(item: EquipmentItem) {
 }
 
 .col-id {
-  width: 16%;
+  width: 15%;
 }
 
 .col-condition {
-  width: 2.5rem;
+  width: 3.5rem;
   text-align: center;
 }
 
@@ -498,6 +499,7 @@ function origin(item: EquipmentItem) {
 }
 
 tbody tr {
+  position: relative;
   cursor: pointer;
 }
 
@@ -529,6 +531,37 @@ tr[data-state='fix'] td:first-child,
 tr[data-state='review'] td:first-child,
 .cards__item[data-state='review'] {
   box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* Keep row tint; highlight with outline only (no layout shift). */
+@media (hover: hover) and (pointer: fine) {
+  .table-wrap :deep(tbody tr:hover > td) {
+    background-color: var(--surface-card);
+  }
+
+  .table-wrap :deep(tr[data-state='pending']:hover > td) {
+    background-color: var(--status-warn-bg);
+  }
+
+  .table-wrap :deep(tr[data-state='fix']:hover > td) {
+    background-color: var(--status-bad-bg);
+  }
+
+  .table-wrap :deep(tr[data-state='review']:hover > td) {
+    background-color: var(--status-info-bg);
+  }
+
+  .table-wrap :deep(tbody tr:hover) {
+    z-index: 4;
+    outline: 1px solid var(--border-strong);
+    outline-offset: -1px;
+  }
+
+  .cards__item:hover {
+    z-index: 4;
+    outline: 1px solid var(--border-strong);
+    outline-offset: -1px;
+  }
 }
 
 .col-check input,
@@ -579,23 +612,27 @@ tr[data-state='review'] td:first-child,
   white-space: nowrap;
 }
 
-/* Tip overlays the cell — no layout shift, stays inside the clipped board. */
+/* Tip above the cell; hovered row is raised so siblings do not cover it. */
 @media (hover: hover) and (pointer: fine) {
   .clip[data-tip]:hover {
-    z-index: 2;
+    z-index: 6;
+    overflow: visible;
+  }
+
+  .clip[data-tip]:hover > span {
+    overflow: visible;
   }
 
   .clip[data-tip]:hover::after {
     content: attr(data-tip);
     position: absolute;
     left: 0;
-    right: 0;
-    top: 100%;
-    z-index: 5;
+    bottom: calc(100% + 4px);
+    z-index: 8;
     box-sizing: border-box;
-    width: 100%;
-    max-width: 100%;
-    padding: var(--space-1) var(--space-2);
+    width: max-content;
+    max-width: min(18rem, 70vw);
+    padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius);
     background: var(--surface-raised);
@@ -663,6 +700,7 @@ tr[data-state='review'] td:first-child,
 }
 
 .cards__item {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
