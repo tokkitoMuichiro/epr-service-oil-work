@@ -174,6 +174,12 @@ export function createMockDisk(storage: Storage): MockDisk {
       return disk.files.filter((f) => f.folderId === folder.folderId && !f.isTrashed).map(info)
     },
 
+    async listFolders(folder) {
+      return disk.folders
+        .filter((f) => f.parentId === folder.folderId)
+        .map((f) => ({ folderId: f.id, path: folderPath(f.id) }))
+    },
+
     async resolveLink(url, within) {
       const value = url.trim()
       if (value.startsWith(MOCK_URL)) {

@@ -5,6 +5,8 @@
  * Imported files stay reachable by Bitrix file id even outside ERP/; this script
  * physically places copies under the ERP Disk tree and removes the old file.
  *
+ * Stop the ERP container before running so it cannot overwrite the snapshot.
+ *
  * Usage (on the VDS, with BITRIX_MODE=live and BITRIX_WEBHOOK_URL):
  *   npx tsx server/src/scripts/migrate-equipment-docs.ts --db /data/erp.sqlite
  *   npx tsx server/src/scripts/migrate-equipment-docs.ts --db /data/erp.sqlite --dry-run

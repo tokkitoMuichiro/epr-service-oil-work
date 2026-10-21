@@ -41,6 +41,8 @@ export interface Disk {
   /** Ids that are definitely deleted or in the trash; any other failure throws so nothing is dropped by mistake. */
   missing(fileIds: readonly string[]): Promise<Set<string>>
   list(folder: DiskFolder): Promise<DiskFile[]>
+  /** Direct child folders (not recursive). */
+  listFolders(folder: DiskFolder): Promise<DiskFolder[]>
   /** Resolves a link pasted by a user; null when the file lies outside `within`. */
   resolveLink(url: string, within: DiskFolder): Promise<DiskFile | null>
 }
