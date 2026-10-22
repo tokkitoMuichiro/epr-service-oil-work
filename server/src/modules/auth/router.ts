@@ -233,8 +233,34 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
     res.type('html').send(BITRIX_FRAME_PAGE)
   })
 
-  // Embed modules (equipment / reports): AUTH_ID → session + bootstrap HTML that stores a bearer for the SPA.
-  router.post('/bitrix/embed', express.urlencoded({ extended: false }), async (req, res) => {
+  function embedSetupPage(to: string): string {
+    const href = escapeHtml(`/auth/bitrix?to=${encodeURIComponent(to)}`)
+    return `<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ERP АММИР</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: Montserrat, Arial, sans-serif; color: #242d3d; background: #eef0f3; }
+  main { display: grid; gap: 16px; max-width: 460px; padding: 24px; text-align: center; }
+  h1 { margin: 0; font-size: 20px; }
+  p { margin: 0; color: #5b6576; font-size: 14px; line-height: 1.5; }
+  a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 20px; border-radius: 2px; background: #1e90ff; color: #fff; font-weight: 600; text-decoration: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Нужен вход через приложение Битрикс24</h1>
+  <p>Адрес обработчика открыт как обычная ссылка (GET). Пункт левого меню должен быть привязан к <strong>локальному приложению</strong> — тогда Битрикс отправит AUTH_ID методом POST и модуль откроется в iframe.</p>
+  <p>Пока можно открыть ERP во вкладке:</p>
+  <a href="${href}" target="_blank" rel="noopener">Открыть в новой вкладке</a>
+</main>
+</body>
+</html>`
+  }
+
+  async function handleEmbed(req: Request, res: Response) {
     allowBitrixFrame(res)
     const toRaw = safeRedirectPath(typeof req.query.to === 'string' ? req.query.to : req.body?.to)
     const to = isEmbedPath(toRaw) ? toRaw : '/e/equipment'
@@ -244,7 +270,11 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
     if (!options.bitrix) return fail('disabled')
     const authId = trimmed(req.body?.AUTH_ID || req.body?.auth_id || req.query.AUTH_ID)
     const domain = trimmed(req.body?.DOMAIN || req.body?.domain || req.query.DOMAIN)
-    if (!authId) return fail('failed')
+    // Menu «Ссылка» opens GET without AUTH_ID → previously fell through to 401 + X-Frame-Options and Chrome showed ERR_BLOCKED_BY_RESPONSE.
+    if (!authId) {
+      res.status(200).type('html').send(embedSetupPage(to))
+      return
+    }
 
     let portalUserId: string
     try {
@@ -260,6 +290,15 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
     if (!user.active) return fail('blocked')
     const token = startSession(req, res, user.id, true)
     res.type('html').send(embedBootstrapPage(token, to))
+  }
+
+  // Embed modules (equipment / reports): AUTH_ID → session + bootstrap HTML that stores a bearer for the SPA.
+  // GET is handled too: a plain menu link must not return 401/X-Frame-Options (ERR_BLOCKED_BY_RESPONSE).
+  router.get('/bitrix/embed', (req, res) => {
+    void handleEmbed(req, res)
+  })
+  router.post('/bitrix/embed', express.urlencoded({ extended: false }), (req, res) => {
+    void handleEmbed(req, res)
   })
 
   router.get('/bitrix/callback', async (req, res) => {
