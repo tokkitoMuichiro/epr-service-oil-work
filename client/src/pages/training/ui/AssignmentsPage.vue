@@ -20,7 +20,8 @@ import { reloadStatus } from '@/shared/lib/load-status'
 import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { useMobilePagination } from '@/shared/lib/pagination'
 import { todayIso } from '@shared/dates'
-import { IconTraining, UiButton, UiDialog, UiPagination, UiState, askConfirm } from '@/shared/ui'
+import { shortFullName } from '@shared/person-name'
+import { IconTraining, UiButton, UiClipText, UiDialog, UiPagination, UiState, askConfirm } from '@/shared/ui'
 
 const store = useTrainingStore()
 const access = useAccessStore()
@@ -168,39 +169,41 @@ function onAssigned() {
     <UiState v-else-if="!visible.length" title="Назначений нет" :icon="IconTraining" text="Измените фильтры или назначьте проверку." />
     <div v-else class="assignments__list ui-fill-panel">
       <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack ui-fill-scroll">
-        <table class="ui-table">
+        <table class="ui-table assignments__table">
           <thead>
             <tr>
-              <th>Сотрудник</th>
-              <th>Тест</th>
-              <th class="hide-md">Тип</th>
-              <th>Срок</th>
-              <th>Статус</th>
-              <th>Попытки</th>
-              <th v-if="canAssign" />
+              <th class="col-worker">Сотрудник</th>
+              <th class="col-test">Тест</th>
+              <th class="col-kind hide-md">Тип</th>
+              <th class="col-due">Срок</th>
+              <th class="col-status">Статус</th>
+              <th class="col-attempts">Попытки</th>
+              <th v-if="canAssign" class="col-actions" />
             </tr>
           </thead>
           <tbody>
             <tr v-for="a in pager.pageItems" :key="a.id">
-              <td class="ui-cell--main">
-                <strong>{{ a.workerName }}</strong>
-                <small class="assignments__sub">{{ a.programLabel }}</small>
+              <td class="col-worker ui-cell--main" :title="a.workerName">
+                <strong>{{ shortFullName(a.workerName) }}</strong>
+                <small class="assignments__sub"><UiClipText :text="a.programLabel" /></small>
               </td>
-              <td>
-                {{ a.testTitle }}
-                <small class="assignments__sub ui-hide-mobile">Назначил {{ a.assignedBy }}, {{ formatDateTimeRu(a.assignedAt) }}</small>
+              <td class="col-test" :title="a.testTitle">
+                <UiClipText :text="a.testTitle" />
+                <small class="assignments__sub ui-hide-mobile">
+                  Назначил {{ shortFullName(a.assignedBy) }}, {{ formatDateTimeRu(a.assignedAt) }}
+                </small>
               </td>
-              <td class="hide-md">
+              <td class="col-kind hide-md">
                 {{ ASSIGNMENT_KIND_LABEL[a.kind] }}
                 <small v-if="a.reason" class="assignments__sub" :title="a.reasonNote">{{ EXTRAORDINARY_REASON_LABEL[a.reason] }}</small>
               </td>
-              <td class="assignments__due" data-label="Срок">{{ formatDateRu(a.dueDate) }}</td>
-              <td class="ui-cell--aside">
+              <td class="col-due assignments__due" data-label="Срок">{{ formatDateRu(a.dueDate) }}</td>
+              <td class="col-status ui-cell--aside">
                 <AssignmentStatusBadge :status="a.status" />
                 <small v-if="a.cancelReason" class="assignments__sub ui-hide-mobile">{{ a.cancelReason }}</small>
               </td>
-              <td class="assignments__attempts" data-label="Попытки">{{ a.attemptsUsed }} из {{ a.attemptsAllowed }}</td>
-              <td v-if="canAssign" class="assignments__actions ui-cell--actions">
+              <td class="col-attempts assignments__attempts" data-label="Попытки">{{ a.attemptsUsed }} из {{ a.attemptsAllowed }}</td>
+              <td v-if="canAssign" class="col-actions assignments__actions ui-cell--actions">
                 <template v-if="isActiveAssignment(a, today)">
                   <UiButton variant="ghost" size="sm" :disabled="busyId === a.id" @click="copyLink(a, false)">Ссылка</UiButton>
                   <UiButton variant="ghost" size="sm" :disabled="busyId === a.id" @click="copyLink(a, true)">С текстом</UiButton>
@@ -253,6 +256,29 @@ function onAssigned() {
 
 .assignments__list {
   gap: var(--space-3);
+}
+
+.assignments__table {
+  table-layout: auto;
+  width: 100%;
+}
+
+.col-test {
+  width: 100%;
+}
+
+.col-worker,
+.col-kind,
+.col-due,
+.col-status,
+.col-attempts,
+.col-actions {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.col-worker {
+  max-width: 10rem;
 }
 
 .assignments__toolbar,

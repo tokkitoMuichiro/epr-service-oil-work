@@ -173,27 +173,27 @@ function archiveProgram(program: TrainingProgram) {
         </div>
       </header>
 
-      <div v-if="programsOf(d).length" class="ui-table-wrap">
-        <table class="ui-table">
+      <div v-if="programsOf(d).length" class="ui-table-wrap direction__table-wrap">
+        <table class="ui-table direction__table">
           <thead>
             <tr>
-              <th>Программа</th>
-              <th>Периодичность</th>
-              <th><span class="visually-hidden">Действия</span></th>
+              <th class="col-program">Программа</th>
+              <th class="col-period">Периодичность</th>
+              <th class="col-actions"><span class="visually-hidden">Действия</span></th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="p in programsOf(d)" :key="p.id" :class="{ 'is-archived': p.isArchived }">
-              <td>
-                <strong>{{ store.labelOf(p.id) }}</strong>
+              <td class="col-program" :title="`${store.labelOf(p.id)} · ${p.name}`">
+                <strong class="direction__label">{{ store.labelOf(p.id) }}</strong>
                 <small class="direction__sub">{{ p.name }}</small>
-                <small v-if="p.storagePath" class="direction__sub direction__path">{{ p.storagePath }}</small>
+                <small v-if="p.storagePath" class="direction__sub direction__path" :title="p.storagePath">{{ p.storagePath }}</small>
               </td>
-              <td>
+              <td class="col-period">
                 {{ p.periodMonths }} мес.
                 <small class="direction__sub">предупреждать за {{ p.expiringDays }} дн.</small>
               </td>
-              <td class="direction__cell-actions">
+              <td class="col-actions direction__cell-actions">
                 <div class="direction__row-actions">
                   <UiButton variant="ghost" size="sm" @click="editProgram(d, p)">Изменить</UiButton>
                   <UiButton variant="ghost" size="sm" @click="archiveProgram(p)">{{ p.isArchived ? 'Вернуть' : 'В архив' }}</UiButton>
@@ -293,6 +293,7 @@ function archiveProgram(program: TrainingProgram) {
 .directions {
   display: grid;
   gap: var(--space-4);
+  min-width: 0;
 }
 
 .directions__toolbar {
@@ -316,11 +317,46 @@ function archiveProgram(program: TrainingProgram) {
 .direction {
   display: grid;
   gap: var(--space-3);
+  min-width: 0;
   padding: var(--space-4);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--surface-card);
   box-shadow: var(--shadow-card);
+}
+
+.direction__table-wrap {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.direction__table {
+  table-layout: auto;
+  width: 100%;
+}
+
+.col-program {
+  width: 100%;
+  min-width: 0;
+  max-width: 0;
+  overflow: hidden;
+}
+
+.col-period,
+.col-actions {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.direction__label,
+.direction__sub {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .direction__head {
@@ -347,6 +383,11 @@ function archiveProgram(program: TrainingProgram) {
 
 .direction__kind {
   margin: var(--space-1) 0 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
 }
@@ -364,7 +405,6 @@ function archiveProgram(program: TrainingProgram) {
 }
 
 .direction__cell-actions {
-  width: 1%;
   white-space: nowrap;
 }
 
@@ -378,13 +418,14 @@ function archiveProgram(program: TrainingProgram) {
 }
 
 .direction__sub {
-  display: block;
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
 }
 
 .direction__path {
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .direction__empty {
@@ -420,16 +461,22 @@ function archiveProgram(program: TrainingProgram) {
   }
 
   .direction .ui-table-wrap {
-    overflow: visible;
+    overflow-x: clip;
+    overflow-y: visible;
     border: 0;
   }
 
   .direction .ui-table,
   .direction .ui-table tbody,
   .direction .ui-table tr,
-  .direction .ui-table td {
+  .direction .ui-table td,
+  .direction .col-program,
+  .direction .col-period,
+  .direction .col-actions {
     display: block;
-    width: auto;
+    width: auto !important;
+    max-width: 100%;
+    min-width: 0;
   }
 
   .direction .ui-table thead {
@@ -439,6 +486,8 @@ function archiveProgram(program: TrainingProgram) {
   .direction .ui-table tr {
     display: grid;
     gap: 2px;
+    min-width: 0;
+    max-width: 100%;
     padding: var(--space-2) 0;
     border-bottom: 1px solid var(--border-subtle);
   }
@@ -452,6 +501,11 @@ function archiveProgram(program: TrainingProgram) {
     height: auto;
     padding: 0;
     border: 0;
+    overflow: hidden;
+  }
+
+  .direction .col-program {
+    max-width: 100% !important;
   }
 
   .direction .ui-table td.hide-md {

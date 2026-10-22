@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { useEquipmentRouteName } from '@/shared/lib/equipment-routes'
 import { canStockWarehouse, useEquipmentStore } from '@/entities/equipment'
 import { EquipmentFormDialog } from '@/features/equipment-form'
+import { shortFullName } from '@shared/person-name'
 import { IconChevron, IconEquipment, UiButton, UiState } from '@/shared/ui'
 import { EquipmentBoard } from '@/widgets/equipment-board'
 import { useRouteCategory } from '../model/category'
@@ -20,7 +21,10 @@ const warehouseId = computed(() => String(route.params.id ?? ''))
 const warehouse = computed(() => store.warehouses.find((w) => w.id === warehouseId.value) ?? null)
 const isRepair = computed(() => warehouse.value?.id === store.repairWarehouse?.id)
 const items = computed(() => store.itemsOnWarehouse(warehouseId.value))
-const keepers = computed(() => warehouse.value?.keeperIds.map((id) => store.personName(id)).join(', ') || 'не назначены')
+const keepers = computed(() => {
+  const names = warehouse.value?.keeperIds.map((id) => shortFullName(store.personName(id))) ?? []
+  return names.length ? names.join(', ') : 'не назначены'
+})
 const canStock = computed(() => !isRepair.value && canStockWarehouse(store.auth, warehouseId.value))
 </script>
 

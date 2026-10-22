@@ -13,8 +13,9 @@ import { errorMessage } from '@/shared/api'
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
 import { useDialogDirty } from '@/shared/lib/dialog-dirty'
+import { shortFullName } from '@shared/person-name'
 import { useMobilePagination } from '@/shared/lib/pagination'
-import { IconTraining, UiButton, UiDialog, UiFileDrop, UiPagination, UiState, askConfirm } from '@/shared/ui'
+import { IconTraining, UiButton, UiClipText, UiDialog, UiFileDrop, UiPagination, UiState, askConfirm } from '@/shared/ui'
 
 interface MaterialForm {
   id: string | null
@@ -174,31 +175,33 @@ function openHref(material: TrainingMaterial) {
     <UiState v-if="!visible.length" title="Материалов нет" :icon="IconTraining" text="Загрузите файл или добавьте ссылку на файл в Битрикс." />
     <div v-else class="materials__list ui-fill-panel">
       <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack ui-fill-scroll">
-        <table class="ui-table">
+        <table class="ui-table materials__table">
           <thead>
             <tr>
-              <th>Материал</th>
-              <th>Программы</th>
-              <th class="hide-md">Изменён</th>
-              <th />
+              <th class="col-title">Материал</th>
+              <th class="col-programs">Программы</th>
+              <th class="col-updated hide-md">Изменён</th>
+              <th class="col-actions" />
             </tr>
           </thead>
           <tbody>
             <tr v-for="m in pager.pageItems" :key="m.id" :class="{ 'is-archived': m.isArchived }">
-              <td class="ui-cell--main">
-                <a :href="openHref(m)" target="_blank" rel="noopener" class="materials__title">{{ m.title }}</a>
+              <td class="col-title ui-cell--main" :title="m.title">
+                <a :href="openHref(m)" target="_blank" rel="noopener" class="materials__title"><UiClipText :text="m.title" /></a>
                 <small class="materials__sub">
-                  {{ m.fileName }} · {{ formatFileSize(m.size) }} · {{ m.source === 'upload' ? 'загружен' : 'ссылка на Битрикс' }}
+                  <UiClipText :text="`${m.fileName} · ${formatFileSize(m.size)} · ${m.source === 'upload' ? 'загружен' : 'ссылка на Битрикс'}`" />
                 </small>
                 <span v-if="m.isUnavailable" class="ui-badge ui-badge--bad">Файл недоступен в Битрикс</span>
                 <span v-if="m.isArchived" class="ui-badge">В архиве</span>
               </td>
-              <td data-label="Программы">{{ m.programIds.map((id) => store.labelOf(id)).join(', ') }}</td>
-              <td class="hide-md">
-                {{ formatDateTimeRu(m.updatedAt) }}
-                <small class="materials__sub">{{ m.updatedBy }}</small>
+              <td class="col-programs" data-label="Программы" :title="m.programIds.map((id) => store.labelOf(id)).join(', ')">
+                <UiClipText :text="m.programIds.map((id) => store.labelOf(id)).join(', ') || '—'" />
               </td>
-              <td class="materials__actions ui-cell--actions">
+              <td class="col-updated hide-md">
+                {{ formatDateTimeRu(m.updatedAt) }}
+                <small class="materials__sub">{{ shortFullName(m.updatedBy) }}</small>
+              </td>
+              <td class="col-actions materials__actions ui-cell--actions">
                 <UiButton variant="ghost" size="sm" @click="openEdit(m)">Изменить</UiButton>
                 <UiButton variant="ghost" size="sm" @click="toggleArchive(m)">{{ m.isArchived ? 'Вернуть' : 'В архив' }}</UiButton>
                 <UiButton variant="ghost" size="sm" @click="remove(m)">Удалить</UiButton>
@@ -280,6 +283,26 @@ function openHref(material: TrainingMaterial) {
   gap: var(--space-3);
 }
 
+.materials__table {
+  table-layout: auto;
+  width: 100%;
+}
+
+.col-title {
+  width: 100%;
+}
+
+.col-programs,
+.col-updated,
+.col-actions {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.col-programs {
+  max-width: 14rem;
+}
+
 .materials__toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -319,7 +342,7 @@ function openHref(material: TrainingMaterial) {
 
 .materials__actions {
   text-align: right;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .materials__actions :deep(.btn) {

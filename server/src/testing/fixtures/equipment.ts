@@ -1,4 +1,5 @@
 import type { SeedFile } from '../../db.js'
+import { DEMO_STAFF_USERS } from '../../modules/auth/demo-staff.js'
 import { demoUserOf } from '../../modules/auth/repository.js'
 import { EQUIPMENT_FILES_BUCKET, repairWarehouse, type EquipmentData } from '../../modules/equipment/model.js'
 import type { EquipmentDocument, EquipmentItem } from '../../shared.js'
@@ -6,6 +7,26 @@ import type { EquipmentDocument, EquipmentItem } from '../../shared.js'
 const ADMIN = demoUserOf('admin')
 const MASTER = demoUserOf('master')
 const KEEPER = demoUserOf('storekeeper')
+
+const EQUIPMENT_NAMES = [
+  'Насос центробежный',
+  'Сварочный инвертор',
+  'Шлифмашина угловая',
+  'Генератор дизельный',
+  'Компрессор винтовой',
+  'Лебёдка ручная',
+  'Домкрат гидравлический',
+  'Болгарка 230',
+  'Перфоратор SDS',
+  'Отвертка аккумуляторная',
+  'Уровень лазерный',
+  'Таль электрическая',
+  'Вентилятор промышленный',
+  'Насос грязевой',
+  'Газоанализатор',
+]
+
+const WAREHOUSE_SLOTS = ['wh-north', 'wh-south', 'wh-east', 'wh-west', 'wh-central'] as const
 
 function item(
   partial: Omit<EquipmentItem, 'documents' | 'category' | 'hasDocuments' | 'fillStatus'> & Partial<EquipmentItem>,
@@ -32,28 +53,56 @@ function doc(id: string, itemId: string, fileName: string, addedAt: string, adde
   }
 }
 
+function extraItems(): EquipmentItem[] {
+  const holders = DEMO_STAFF_USERS.slice(0, 20)
+  const result: EquipmentItem[] = []
+  let n = 100
+
+  for (const person of holders) {
+    const name = EQUIPMENT_NAMES[n % EQUIPMENT_NAMES.length]
+    const id = `eq-${n}`
+    result.push(
+      item({
+        id,
+        name: `${name} №${n - 99}`,
+        factoryNumber: `FN-${1000 + n}`,
+        quantity: 1,
+        type: 'SERIAL',
+        condition: n % 7 === 0 ? 'NEEDS_REPAIR' : 'OK',
+        ownerType: 'USER',
+        ownerUserId: person.id,
+        createdAt: '2026-04-01T10:00:00.000Z',
+        updatedAt: '2026-04-15T10:00:00.000Z',
+      }),
+    )
+    n += 1
+  }
+
+  while (result.length + 14 < 40) {
+    const id = `eq-${n}`
+    const warehouseId = WAREHOUSE_SLOTS[n % WAREHOUSE_SLOTS.length]
+    result.push(
+      item({
+        id,
+        name: `${EQUIPMENT_NAMES[n % EQUIPMENT_NAMES.length]} складской ${n}`,
+        factoryNumber: n % 3 === 0 ? null : `WH-${2000 + n}`,
+        quantity: n % 3 === 0 ? 5 + (n % 10) : 1,
+        type: n % 3 === 0 ? 'CONSUMABLE' : 'SERIAL',
+        condition: 'OK',
+        ownerType: 'WAREHOUSE',
+        ownerWarehouseId: warehouseId,
+        createdAt: '2026-04-02T10:00:00.000Z',
+        updatedAt: '2026-04-16T10:00:00.000Z',
+      }),
+    )
+    n += 1
+  }
+
+  return result
+}
+
 export function demoEquipment(): EquipmentData {
-  return {
-    warehouses: [
-      { ...repairWarehouse(), keeperIds: [KEEPER.id] },
-      {
-        id: 'wh-north',
-        name: 'База Север',
-        slug: 'demo-north',
-        isSystem: false,
-        address: 'НПС «Северная», площадка А',
-        keeperIds: [KEEPER.id],
-      },
-      {
-        id: 'wh-south',
-        name: 'База Юг',
-        slug: 'demo-south',
-        isSystem: false,
-        address: 'НПС «Южная», площадка Б',
-        keeperIds: [],
-      },
-    ],
-    items: [
+  const coreItems: EquipmentItem[] = [
       item({
         id: 'eq-1',
         name: 'Насос центробежный НЦ-80',
@@ -249,7 +298,69 @@ export function demoEquipment(): EquipmentData {
         createdAt: '2026-02-07T09:00:00.000Z',
         updatedAt: '2026-02-07T09:00:00.000Z',
       }),
+  ]
+
+  return {
+    warehouses: [
+      { ...repairWarehouse(), keeperIds: [KEEPER.id] },
+      {
+        id: 'wh-north',
+        name: 'База Север',
+        slug: 'demo-north',
+        isSystem: false,
+        address: 'НПС «Северная», площадка А',
+        keeperIds: [KEEPER.id],
+      },
+      {
+        id: 'wh-south',
+        name: 'База Юг',
+        slug: 'demo-south',
+        isSystem: false,
+        address: 'НПС «Южная», площадка Б',
+        keeperIds: [],
+      },
+      {
+        id: 'wh-east',
+        name: 'База Восток',
+        slug: 'demo-east',
+        isSystem: false,
+        address: 'НПС «Восточная», склад 1',
+        keeperIds: [DEMO_STAFF_USERS[0].id],
+      },
+      {
+        id: 'wh-west',
+        name: 'База Запад',
+        slug: 'demo-west',
+        isSystem: false,
+        address: 'ЛПДС «Западная», площадка В',
+        keeperIds: [DEMO_STAFF_USERS[1].id],
+      },
+      {
+        id: 'wh-central',
+        name: 'База Центральная',
+        slug: 'demo-central',
+        isSystem: false,
+        address: 'г. Самара, промзона',
+        keeperIds: [KEEPER.id, DEMO_STAFF_USERS[2].id],
+      },
+      {
+        id: 'wh-field',
+        name: 'Полевой склад',
+        slug: 'demo-field',
+        isSystem: false,
+        address: 'Временная площадка на объекте',
+        keeperIds: [],
+      },
+      {
+        id: 'wh-tools',
+        name: 'Инструментальная',
+        slug: 'demo-tools',
+        isSystem: false,
+        address: 'База Север, корпус Б',
+        keeperIds: [DEMO_STAFF_USERS[4].id],
+      },
     ],
+    items: [...coreItems, ...extraItems()],
     transfers: [
       {
         id: 'tr-pending-1',

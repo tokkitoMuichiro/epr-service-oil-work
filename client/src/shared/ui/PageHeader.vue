@@ -57,11 +57,17 @@ defineSlots<{ actions?(): unknown; tabs?(): unknown }>()
   /* Название страницы на телефоне уже в верхней панели — оставляем его только для экранных читалок. */
   .page-header__text {
     position: absolute;
+    inset: 0 auto auto 0;
     width: 1px;
     height: 1px;
+    margin: -1px;
+    padding: 0;
     overflow: hidden;
+    clip: rect(0, 0, 0, 0);
     clip-path: inset(50%);
+    border: 0;
     white-space: nowrap;
+    pointer-events: none;
   }
 
   .page-header__tabs {

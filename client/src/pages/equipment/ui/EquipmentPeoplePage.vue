@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { canCreateFor, positionsLabel, useEquipmentStore } from '@/entities/equipment'
 import { EquipmentFormDialog } from '@/features/equipment-form'
+import { shortFullName } from '@shared/person-name'
 import { IconChevronsLeft, IconPersonnel, UiButton, UiState } from '@/shared/ui'
 import { EquipmentBoard } from '@/widgets/equipment-board'
 import { addLabel, useRouteCategory } from '../model/category'
@@ -57,8 +58,9 @@ function select(id: string) {
   void router.replace({ query: { ...route.query, userId: id } })
 }
 
-function personLabel(id: string, fullName: string) {
-  return `${fullName}${id === store.persona.id ? ' (вы)' : ''}`
+function personLabel(id: string, fullName: string, short = false) {
+  const name = short ? shortFullName(fullName) : fullName
+  return `${name}${id === store.persona.id ? ' (вы)' : ''}`
 }
 </script>
 
@@ -68,7 +70,7 @@ function personLabel(id: string, fullName: string) {
       <span class="ui-overline">Сотрудник</span>
       <select class="ui-control" :value="userId" @change="select(($event.target as HTMLSelectElement).value)">
         <option v-for="p in people" :key="p.id" :value="p.id">
-          {{ personLabel(p.id, p.fullName) }} — {{ positionsLabel(store.itemsOfUser(p.id).length) }}
+          {{ personLabel(p.id, p.fullName, true) }} — {{ positionsLabel(store.itemsOfUser(p.id).length) }}
         </option>
       </select>
     </label>
@@ -112,7 +114,7 @@ function personLabel(id: string, fullName: string) {
             :title="personLabel(p.id, p.fullName)"
             @click="select(p.id)"
           >
-            <strong>{{ personLabel(p.id, p.fullName) }}</strong>
+            <strong>{{ personLabel(p.id, p.fullName, true) }}</strong>
             <span class="num">{{ positionsLabel(store.itemsOfUser(p.id).length) }}</span>
           </button>
           <p v-if="!people.length" class="muted">Никого не найдено</p>
@@ -150,8 +152,17 @@ function personLabel(id: string, fullName: string) {
 
 <style scoped>
 .layout {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
+  width: 100%;
   min-width: 0;
+}
+
+.layout :deep(.page__bar),
+.page__bar {
+  width: 100%;
+  flex: 0 0 auto;
 }
 
 .layout__body {
@@ -159,6 +170,7 @@ function personLabel(id: string, fullName: string) {
   grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
   gap: var(--space-4);
   flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
   min-height: 0;
   align-items: stretch;
@@ -234,11 +246,14 @@ function personLabel(id: string, fullName: string) {
 }
 
 .people__item {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   gap: 2px;
+  box-sizing: border-box;
   min-width: 0;
   max-width: 100%;
-  min-height: var(--tap-size);
+  min-height: calc(var(--control-height) + var(--space-3));
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
@@ -247,20 +262,23 @@ function personLabel(id: string, fullName: string) {
   text-align: left;
   cursor: pointer;
   transition: border-color 0.15s ease;
-  overflow: hidden;
 }
 
 .people__item strong,
 .people__item .num {
+  display: block;
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: var(--line-height-base);
 }
 
 .people__item strong {
   font-size: var(--font-size-sm);
   font-weight: 600;
+  color: var(--text-primary);
 }
 
 .people__item .num {

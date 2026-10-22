@@ -10,9 +10,10 @@ import {
   type TrainingCounters,
 } from '@/entities/training'
 import { AssignTestDialog } from '@/features/training-assign'
+import { shortFullName } from '@shared/person-name'
 import { formatDateRu } from '@/shared/lib/date'
 import { useMobilePagination } from '@/shared/lib/pagination'
-import { IconSearch, UiAvatar, UiButton, UiPagination, UiState } from '@/shared/ui'
+import { IconSearch, UiAvatar, UiButton, UiClipText, UiPagination, UiState } from '@/shared/ui'
 
 /** One row per worker × programme; a worker without trainings gets a single row with `status: null`. */
 interface SummaryItem {
@@ -159,17 +160,17 @@ function onAssigned() {
       <UiState v-if="!visible.length" title="Никого нет" :icon="IconSearch" text="По выбранным фильтрам сотрудников нет." />
       <div v-else class="summary__list ui-fill-panel">
         <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack ui-fill-scroll">
-          <table class="ui-table">
+          <table class="ui-table summary__table">
             <thead>
               <tr>
                 <th v-if="canAssign" class="summary__check">
                   <input type="checkbox" aria-label="Выбрать все" :checked="isAllSelected" @change="toggleAll" />
                 </th>
-                <th>Сотрудник</th>
-                <th>Программа</th>
-                <th>Статус</th>
-                <th>Срок</th>
-                <th v-if="canAssign" />
+                <th class="col-worker">Сотрудник</th>
+                <th class="col-program">Программа</th>
+                <th class="col-status">Статус</th>
+                <th class="col-due">Срок</th>
+                <th v-if="canAssign" class="col-action" />
               </tr>
             </thead>
             <tbody>
@@ -183,23 +184,23 @@ function onAssigned() {
                     @change="toggle(item.key)"
                   />
                 </td>
-                <td class="summary__worker ui-cell--main">
+                <td class="col-worker summary__worker ui-cell--main" :title="item.row.fullName">
                   <span class="summary__person">
                     <UiAvatar :name="item.row.fullName" />
                     <span class="summary__name">
-                      <strong>{{ item.row.fullName }}</strong>
-                      <small class="summary__position">{{ item.row.position }}</small>
+                      <strong>{{ shortFullName(item.row.fullName) }}</strong>
+                      <small class="summary__position"><UiClipText :text="item.row.position" /></small>
                     </span>
                   </span>
                 </td>
-                <td class="summary__program" :class="{ 'ui-hide-mobile': !item.status }">
-                  {{ item.status ? store.labelOf(item.status.programId) : '—' }}
+                <td class="col-program summary__program" :class="{ 'ui-hide-mobile': !item.status }">
+                  <UiClipText :text="item.status ? store.labelOf(item.status.programId) : '—'" />
                 </td>
-                <td class="ui-cell--aside"><ProgramStateBadge :state="item.status?.state ?? null" /></td>
-                <td class="summary__due nowrap" :class="{ 'ui-hide-mobile': !dueLabel(item.status) }">
+                <td class="col-status ui-cell--aside"><ProgramStateBadge :state="item.status?.state ?? null" /></td>
+                <td class="col-due summary__due nowrap" :class="{ 'ui-hide-mobile': !dueLabel(item.status) }">
                   {{ dueLabel(item.status) || '—' }}
                 </td>
-                <td v-if="canAssign" class="summary__action">
+                <td v-if="canAssign" class="col-action summary__action ui-cell--actions">
                   <UiButton v-if="!item.status?.activeAssignment" variant="ghost" size="sm" @click="openOne(item)">Назначить</UiButton>
                 </td>
               </tr>
@@ -233,6 +234,38 @@ function onAssigned() {
 
 .summary__list {
   gap: var(--space-3);
+}
+
+.summary__table {
+  table-layout: auto;
+  width: 100%;
+}
+
+.summary__check {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.col-worker {
+  width: 100%;
+}
+
+.col-program,
+.col-status,
+.col-action {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.col-due {
+  width: 1%;
+  min-width: 12rem;
+  white-space: nowrap;
+}
+
+.summary__program {
+  max-width: 14rem;
+  overflow: hidden;
 }
 
 .summary__counters {
@@ -300,10 +333,6 @@ function onAssigned() {
 
 .summary__toolbar :deep(.btn) {
   margin-left: auto;
-}
-
-.summary__check {
-  width: 44px;
 }
 
 .summary__check input,

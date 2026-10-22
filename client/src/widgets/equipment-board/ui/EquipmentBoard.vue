@@ -26,6 +26,7 @@ import {
 import { EquipmentFormDialog } from '@/features/equipment-form'
 import { FillRemarkDialog } from '@/features/equipment-fill-review'
 import { TransferDialog } from '@/features/equipment-transfer'
+import { shortFullName } from '@shared/person-name'
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { useFitPagination } from '@/shared/lib/pagination'
 import { IconClose, UiButton, UiClipText, UiPagination, UiState } from '@/shared/ui'
@@ -154,6 +155,11 @@ function onTransferred() {
 function origin(item: EquipmentItem) {
   return repairOrigin(item, transfers.value)
 }
+
+function ownerText(item: EquipmentItem) {
+  const label = store.labelForOwner(item)
+  return item.ownerType === 'USER' ? shortFullName(label) : label
+}
 </script>
 
 <template>
@@ -256,8 +262,8 @@ function origin(item: EquipmentItem) {
                   />
                 </td>
                 <td v-if="!isCard" class="col-condition"><ConditionBadge compact :condition="item.condition" /></td>
-                <td v-if="showOwner" class="col-owner">
-                  <UiClipText :text="store.labelForOwner(item)" />
+                <td v-if="showOwner" class="col-owner" :title="store.labelForOwner(item)">
+                  <UiClipText :text="ownerText(item)" />
                 </td>
                 <td v-if="showRepairSender">
                   <template v-if="origin(item)">
@@ -315,7 +321,7 @@ function origin(item: EquipmentItem) {
                   class="mono"
                   :text="item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)"
                 />
-                <UiClipText v-if="showOwner" :text="store.labelForOwner(item)" />
+                <UiClipText v-if="showOwner" :text="ownerText(item)" :tip="store.labelForOwner(item)" />
               </div>
               <div class="cards__flags">
                 <span v-if="item.fillStatus !== 'OK'" class="chip ui-badge" :class="item.fillStatus === 'NEEDS_FIX' ? 'ui-badge--bad' : 'ui-badge--info'">
@@ -462,7 +468,7 @@ function origin(item: EquipmentItem) {
 }
 
 .ui-table {
-  table-layout: fixed;
+  table-layout: auto;
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
@@ -480,34 +486,39 @@ function origin(item: EquipmentItem) {
 }
 
 .col-name {
-  width: 36%;
+  width: 100%;
 }
 
-.col-type {
-  width: 12%;
-}
-
-.col-id {
-  width: 15%;
+.col-type,
+.col-id,
+.col-condition,
+.col-owner,
+.col-origin,
+.col-check,
+.col-actions {
+  width: 1%;
+  white-space: nowrap;
 }
 
 .col-condition {
-  width: 3.5rem;
   text-align: center;
 }
 
-.col-owner,
-.col-origin {
-  width: 14%;
-}
-
 .col-check {
-  width: 2.5rem;
   padding-right: 0;
 }
 
+.col-type,
+.col-owner,
+.col-origin {
+  max-width: 10rem;
+}
+
+.col-id {
+  max-width: 9rem;
+}
+
 .col-actions {
-  width: 5.5rem;
   text-align: right;
 }
 

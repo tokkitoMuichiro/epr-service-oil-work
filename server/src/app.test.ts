@@ -145,7 +145,7 @@ describe('api', () => {
     const workers = (await call('GET', '/api/personnel')).json.items as Worker[]
     const contracts = (await call('GET', '/api/contracts')).json.items as Contract[]
     const brigades = (await call('GET', '/api/brigades')).json.items as Brigade[]
-    assert.equal(workers.length, 30)
+    assert.equal(workers.length, 40)
     assert.equal(contracts.length, 5)
     assert.equal(contracts.flatMap((c) => c.objects).length, 11)
 
@@ -504,8 +504,8 @@ describe('api', () => {
     assert.equal((await call('GET', `/api/equipment/${item.id}/documents/${doc.id}/file`)).text, '%PDF-eq')
     assert.equal((await call('DELETE', `/api/equipment/${item.id}/documents/${doc.id}`)).status, 200)
 
-    assert.equal((await call('POST', '/api/equipment/warehouses', 'master', { name: 'База Восток' })).status, 403)
-    const wh = await call('POST', '/api/equipment/warehouses', 'storekeeper', { name: 'База Восток', keeperIds: [DEMO_KEEPER] })
+    assert.equal((await call('POST', '/api/equipment/warehouses', 'master', { name: 'База Резерв' })).status, 403)
+    const wh = await call('POST', '/api/equipment/warehouses', 'storekeeper', { name: 'База Резерв', keeperIds: [DEMO_KEEPER] })
     assert.equal(wh.status, 201)
     assert.equal((await call('DELETE', '/api/equipment/warehouses/wh-repair')).status, 400)
     assert.equal((await call('DELETE', '/api/equipment/warehouses/wh-north')).status, 409)
@@ -1351,7 +1351,7 @@ describe('storage', () => {
       const second = await startApp({ db: secondDb })
       try {
         const workers = (await second.call('GET', '/api/personnel')).json.items as Worker[]
-        assert.equal(workers.length, 31)
+        assert.equal(workers.length, 41)
         assert.equal(workers.filter((w) => w.id === id).length, 1)
         assert.equal((await second.call('GET', `/api/personnel/${id}/documents/${docId}/file`)).text, '%PDF-keep')
       } finally {
