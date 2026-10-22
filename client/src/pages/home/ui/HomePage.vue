@@ -232,7 +232,7 @@ const description = computed(() =>
             <p v-if="lagging.length > LIST_LIMIT" class="more">И ещё {{ lagging.length - LIST_LIMIT }} — в разделе «Контракты».</p>
           </OverviewPanel>
 
-          <OverviewPanel title="График на две недели" :icon="IconContracts" to="/contracts" link-text="Сводный график">
+          <OverviewPanel title="График на неделю" :icon="IconContracts" to="/contracts" link-text="Сводный график">
             <MiniSchedule :objects="objects" :window="data.window" :today="data.today" />
           </OverviewPanel>
         </div>

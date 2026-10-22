@@ -5,7 +5,7 @@ test('обзор показывает сводку и ведёт к объект
   await expect(page.getByRole('heading', { level: 1, name: 'Обзор' })).toBeAttached()
   await expect(page.getByRole('navigation', { name: 'Ключевые показатели' })).toContainText('Объектов в работе')
 
-  const schedule = page.locator('section', { has: page.getByRole('heading', { name: 'График на две недели' }) })
+  const schedule = page.locator('section', { has: page.getByRole('heading', { name: 'График на неделю' }) })
   const row = schedule.locator('a[href*="object="]').first()
   await expect(row).toBeVisible()
   const name = (await row.locator('strong').textContent())?.trim() ?? ''
