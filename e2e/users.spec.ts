@@ -14,7 +14,7 @@ test('администратор создаёт пользователя, и т�
   const dialog = page.getByRole('dialog', { name: 'Новый пользователь' })
   await dialog.getByLabel('ФИО').fill(fullName)
   await dialog.getByLabel('Логин').fill(login)
-  await dialog.getByLabel('Роль').selectOption({ label: 'Кладовщик' })
+  await dialog.getByLabel('Роль', { exact: true }).selectOption({ label: 'Кладовщик' })
   await dialog.getByLabel(/^Пароль/).fill(password)
   await dialog.getByRole('button', { name: 'Сохранить' }).click()
   await expect(dialog).toBeHidden()
