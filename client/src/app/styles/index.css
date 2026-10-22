@@ -651,6 +651,13 @@ textarea::placeholder {
   background: var(--badge-dot);
 }
 
+.ui-badge--neutral {
+  --badge-fg: var(--status-neutral-fg);
+  --badge-bg: var(--status-neutral-bg);
+  --badge-border: var(--status-neutral-border);
+  --badge-dot: var(--status-neutral-solid);
+}
+
 .ui-badge--ok {
   --badge-fg: var(--status-ok-fg);
   --badge-bg: var(--status-ok-bg);
