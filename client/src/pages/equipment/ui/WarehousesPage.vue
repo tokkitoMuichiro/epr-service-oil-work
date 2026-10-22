@@ -14,6 +14,7 @@ import {
 import { WarehouseFormDialog } from '@/features/warehouse-form'
 import { useMobilePagination } from '@/shared/lib/pagination'
 import { IconClose, IconEquipment, UiButton, UiPagination, UiState, askConfirm } from '@/shared/ui'
+import EquipmentExportMenu from './EquipmentExportMenu.vue'
 
 const store = useEquipmentStore()
 const { nameOf } = useEquipmentRouteName()
@@ -66,7 +67,10 @@ async function remove(w: Warehouse) {
         Кладовщик принимает передачи на свою базу и передаёт с неё оборудование. База «Ремонт» — системная: сюда
         попадает всё со статусом «В ремонте».
       </p>
-      <UiButton v-if="canManage" variant="primary" @click="openForm(null)">Новая база</UiButton>
+      <div class="page__actions">
+        <EquipmentExportMenu />
+        <UiButton v-if="canManage" variant="primary" @click="openForm(null)">Новая база</UiButton>
+      </div>
     </div>
 
     <p v-if="store.actionError && !isFormOpen" class="alert ui-fill-chrome" role="alert">

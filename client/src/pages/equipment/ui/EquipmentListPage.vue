@@ -7,6 +7,7 @@ import { UiButton, UiState } from '@/shared/ui'
 import { EquipmentBoard } from '@/widgets/equipment-board'
 import { addLabel, useRouteCategory } from '../model/category'
 import CategoryTabs from './CategoryTabs.vue'
+import EquipmentExportMenu from './EquipmentExportMenu.vue'
 
 const store = useEquipmentStore()
 const route = useRoute()
@@ -23,9 +24,12 @@ const items = computed(() => (isAll.value ? store.items : store.myItems))
   <div v-else class="page ui-fill-page">
     <div class="page__bar ui-fill-chrome">
       <CategoryTabs :active="category" :items="items" />
-      <UiButton v-if="canCreate(store.auth)" variant="primary" @click="isCreateOpen = true">
-        {{ addLabel(category) }}
-      </UiButton>
+      <div class="page__actions">
+        <EquipmentExportMenu />
+        <UiButton v-if="canCreate(store.auth)" variant="primary" @click="isCreateOpen = true">
+          {{ addLabel(category) }}
+        </UiButton>
+      </div>
     </div>
     <div class="panel ui-fill-panel">
       <EquipmentBoard
