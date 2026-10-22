@@ -20,16 +20,19 @@ const isPeopleCollapsed = ref(localStorage.getItem(PEOPLE_COLLAPSED_KEY) === '1'
 
 const people = computed(() => {
   const q = search.value.trim().toLowerCase()
-  return store.people.filter((p) => !q || p.fullName.toLowerCase().includes(q))
+  return store.people.filter((p) => {
+    if (store.itemsOfUser(p.id).length === 0) return false
+    return !q || p.fullName.toLowerCase().includes(q)
+  })
 })
 
 const userId = computed(() => {
   const fromQuery = typeof route.query.userId === 'string' ? route.query.userId : ''
-  if (store.people.some((p) => p.id === fromQuery)) return fromQuery
-  return store.people.find((p) => p.id !== store.persona.id)?.id ?? store.people[0]?.id ?? ''
+  if (people.value.some((p) => p.id === fromQuery)) return fromQuery
+  return people.value.find((p) => p.id !== store.persona.id)?.id ?? people.value[0]?.id ?? ''
 })
 
-const person = computed(() => store.people.find((p) => p.id === userId.value) ?? null)
+const person = computed(() => people.value.find((p) => p.id === userId.value) ?? null)
 const items = computed(() => (userId.value ? store.itemsOfUser(userId.value) : []))
 
 const canAddHere = computed(() =>
@@ -54,7 +57,7 @@ function personLabel(id: string, fullName: string) {
     <label class="picker">
       <span class="ui-overline">Сотрудник</span>
       <select class="ui-control" :value="userId" @change="select(($event.target as HTMLSelectElement).value)">
-        <option v-for="p in store.people" :key="p.id" :value="p.id">
+        <option v-for="p in people" :key="p.id" :value="p.id">
           {{ personLabel(p.id, p.fullName) }} — {{ positionsLabel(store.itemsOfUser(p.id).length) }}
         </option>
       </select>
@@ -201,6 +204,8 @@ function personLabel(id: string, fullName: string) {
 .people__item {
   display: grid;
   gap: 2px;
+  min-width: 0;
+  max-width: 100%;
   min-height: var(--tap-size);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-subtle);
@@ -210,6 +215,15 @@ function personLabel(id: string, fullName: string) {
   text-align: left;
   cursor: pointer;
   transition: border-color 0.15s ease;
+  overflow: hidden;
+}
+
+.people__item strong,
+.people__item .num {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .people__item strong {
@@ -217,7 +231,7 @@ function personLabel(id: string, fullName: string) {
   font-weight: 600;
 }
 
-.people__item span {
+.people__item .num {
   font-size: var(--font-size-xs);
   color: var(--text-secondary);
 }

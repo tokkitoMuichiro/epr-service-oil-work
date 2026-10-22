@@ -206,22 +206,39 @@ export function createApp(options: AppOptions = {}) {
     const embedAncestors = bitrixFrameAncestors(bitrixPortal)
     const embedCsp = spaContentSecurityPolicy(indexHtml, embedAncestors)
     const precompressed = precompressedFiles(clientDist)
+    // PWA navigateFallback caches `/index.html`. If that response has X-Frame-Options, Bitrix
+    // iframes (esp. Yandex) get ERR_BLOCKED_BY_RESPONSE even for `/e/*`. When Bitrix is configured,
+    // the shell must always be frameable by the portal.
+    function applyEmbedFrameHeaders(res: express.Response) {
+      res.removeHeader('X-Frame-Options')
+      res.removeHeader('Cross-Origin-Opener-Policy')
+      res.setHeader('Content-Security-Policy', embedCsp)
+    }
+
     app.use((req, res, next) => {
       const relative = req.path.slice(1)
       const isGet = req.method === 'GET' || req.method === 'HEAD'
+      if (relative === 'index.html' && bitrixPortal) applyEmbedFrameHeaders(res)
       if (!isGet || !precompressed.send(res, relative, req.headers['accept-encoding'], staticCacheControl(relative))) next()
     })
     app.use(
       express.static(clientDist, {
         index: false,
         maxAge: '1h',
-        setHeaders: (res, file) => res.setHeader('Cache-Control', staticCacheControl(path.relative(clientDist, file))),
+        setHeaders: (res, file) => {
+          const relative = path.relative(clientDist, file).split(path.sep).join('/')
+          if (relative === 'index.html' && bitrixPortal) {
+            applyEmbedFrameHeaders(res)
+            res.setHeader('Cache-Control', 'no-cache')
+            return
+          }
+          res.setHeader('Cache-Control', staticCacheControl(relative))
+        },
       }),
     )
     app.get(/^(?!\/api\/|\/health$).*/, (req, res) => {
       const isEmbed = req.path === '/e' || req.path.startsWith('/e/')
-      // Bitrix (or a soft-nav reload) sometimes loads `/` in the iframe. Serving the SPA there
-      // sends X-Frame-Options: SAMEORIGIN → ERR_BLOCKED_BY_RESPONSE. Offer a frameable gate instead.
+      // Non-embed path opened as iframe: short gate (open in tab) instead of full ERP chrome.
       const isIframe = req.get('sec-fetch-dest') === 'iframe'
       if (isIframe && !isEmbed && bitrixPortal) {
         res.removeHeader('X-Frame-Options')
@@ -235,11 +252,8 @@ export function createApp(options: AppOptions = {}) {
         return
       }
       res.setHeader('Cache-Control', 'no-cache')
-      res.setHeader('Content-Security-Policy', isEmbed ? embedCsp : csp)
-      if (isEmbed) {
-        res.removeHeader('X-Frame-Options')
-        res.removeHeader('Cross-Origin-Opener-Policy')
-      }
+      if (isEmbed || bitrixPortal) applyEmbedFrameHeaders(res)
+      else res.setHeader('Content-Security-Policy', csp)
       if (!precompressed.send(res, 'index.html', req.headers['accept-encoding'], 'no-cache')) res.sendFile(indexFile)
     })
   }

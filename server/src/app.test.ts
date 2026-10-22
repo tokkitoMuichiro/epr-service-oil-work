@@ -693,7 +693,7 @@ describe('authentication', () => {
     }
   })
 
-  it('does not send X-Frame-Options when Bitrix loads `/` in an iframe', async () => {
+  it('does not send X-Frame-Options on the SPA shell when Bitrix is configured (PWA + iframe)', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'erp-dist-'))
     writeFileSync(path.join(dir, 'index.html'), '<html><body>spa</body></html>')
     const spa = await startApp({
@@ -708,9 +708,14 @@ describe('authentication', () => {
       assert.match(framed.headers.get('content-security-policy') ?? '', /frame-ancestors/)
       assert.match(await framed.text(), /Модуль открывается отдельно/)
 
-      const top = await fetch(`${spa.base}/`)
-      assert.equal(top.headers.get('x-frame-options'), 'SAMEORIGIN')
-      assert.match(await top.text(), /spa/)
+      // PWA caches `/index.html` — it must also be frameable or Yandex Bitrix iframe stays blocked.
+      const shell = await fetch(`${spa.base}/index.html`)
+      assert.equal(shell.headers.get('x-frame-options'), null)
+      assert.match(shell.headers.get('content-security-policy') ?? '', new RegExp(FAKE_PORTAL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+
+      const embed = await fetch(`${spa.base}/e/equipment`)
+      assert.equal(embed.headers.get('x-frame-options'), null)
+      assert.match(await embed.text(), /spa/)
     } finally {
       await spa.close()
       rmSync(dir, { recursive: true, force: true })
