@@ -875,6 +875,16 @@ describe('bitrix sign-in', () => {
     assert.equal((await session.json()).item.user.id, created.json.item.id)
   })
 
+  it('opens embed GET without AUTH_ID as a framed setup page (not 401/X-Frame-Options)', async () => {
+    const response = await fetch(`${sso.base}/api/auth/bitrix/embed?to=%2Fe%2Fequipment`)
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('x-frame-options'), null)
+    assert.match(response.headers.get('content-security-policy') ?? '', /frame-ancestors/)
+    const html = await response.text()
+    assert.match(html, /локальному приложению/)
+    assert.doesNotMatch(html, /sessionStorage\.setItem/)
+  })
+
   it('links a Bitrix24 user without a password and signs in straight into the module', async () => {
     const created = await createUser({ login: 'sidorova', fullName: 'Сидорова Мария', bitrixUserId: '36' })
     assert.equal(created.status, 201)
