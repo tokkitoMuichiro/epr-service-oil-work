@@ -230,17 +230,21 @@ function origin(item: EquipmentItem) {
                     <span v-if="item.fillStatus !== 'OK'" class="chip ui-badge" :class="item.fillStatus === 'NEEDS_FIX' ? 'ui-badge--bad' : 'ui-badge--info'" :data-tone="item.fillStatus">
                       {{ FILL_STATUS_LABEL[item.fillStatus] }}
                     </span>
-                    <span v-if="isPendingAccept(item, transfers)" class="chip ui-badge ui-badge--warn" data-tone="pending">
+                    <span
+                      v-if="pendingOfferLabel(item, transfers)"
+                      class="chip ui-badge ui-badge--warn"
+                      data-tone="pending"
+                    >
                       {{ pendingOfferLabel(item, transfers) }}
                     </span>
                     <span
+                      v-else
                       class="chip ui-badge"
                       :class="item.hasDocuments ? 'ui-badge--ok' : 'ui-badge--neutral'"
                       data-tone="docs"
                       :title="item.hasDocuments ? 'Есть документы' : 'Нет документов'"
                     >Док.</span>
                   </div>
-                  <UiClipText v-if="item.conditionNote" tag="small" class="note" :text="item.conditionNote" />
                 </td>
                 <td class="col-type">
                   <UiClipText :text="equipmentTypeLabel(item)" />
@@ -317,10 +321,11 @@ function origin(item: EquipmentItem) {
                 <span v-if="item.fillStatus !== 'OK'" class="chip ui-badge" :class="item.fillStatus === 'NEEDS_FIX' ? 'ui-badge--bad' : 'ui-badge--info'">
                   {{ FILL_STATUS_LABEL[item.fillStatus] }}
                 </span>
-                <span v-if="isPendingAccept(item, transfers)" class="chip ui-badge ui-badge--warn">
+                <span v-if="pendingOfferLabel(item, transfers)" class="chip ui-badge ui-badge--warn">
                   {{ pendingOfferLabel(item, transfers) }}
                 </span>
                 <span
+                  v-else
                   class="chip ui-badge"
                   :class="item.hasDocuments ? 'ui-badge--ok' : 'ui-badge--neutral'"
                   :title="item.hasDocuments ? 'Есть документы' : 'Нет документов'"
