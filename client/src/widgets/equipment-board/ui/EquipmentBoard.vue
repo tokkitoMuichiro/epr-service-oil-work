@@ -27,7 +27,7 @@ import { EquipmentFormDialog } from '@/features/equipment-form'
 import { FillRemarkDialog } from '@/features/equipment-fill-review'
 import { TransferDialog } from '@/features/equipment-transfer'
 import { formatDateTimeRu } from '@/shared/lib/date'
-import { useListPagination } from '@/shared/lib/pagination'
+import { useFitPagination } from '@/shared/lib/pagination'
 import { IconClose, UiButton, UiClipText, UiPagination, UiState } from '@/shared/ui'
 import EquipmentCardDialog from './EquipmentCardDialog.vue'
 
@@ -95,7 +95,7 @@ const visible = computed(() =>
   ),
 )
 
-const pager = useListPagination(visible, { pageSize: 20, resetOn: [query, kindFilter, () => props.category] })
+const pager = useFitPagination(visible, { resetOn: [query, kindFilter, () => props.category] })
 
 const selectable = computed(() => visible.value.filter((i) => canTransferItem(auth.value, i, transfers.value)))
 const selectedItems = computed(() => store.items.filter((i) => selectedIds.value.includes(i.id)))
@@ -190,7 +190,7 @@ function origin(item: EquipmentItem) {
     />
 
     <template v-else>
-      <div class="list">
+      <div :ref="pager.bindFit" class="list">
         <div class="table-wrap ui-table-wrap">
           <table class="ui-table">
             <thead>

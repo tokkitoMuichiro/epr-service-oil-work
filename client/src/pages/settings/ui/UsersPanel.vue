@@ -67,7 +67,7 @@ onMounted(load)
       <UiButton size="sm" variant="ghost" @click="load">Повторить</UiButton>
     </p>
     <template v-else>
-      <div class="users__table ui-table-wrap ui-table-wrap--stack">
+      <div :ref="pager.bindFit" class="users__table ui-table-wrap ui-table-wrap--stack">
         <table class="ui-table">
           <thead>
             <tr>

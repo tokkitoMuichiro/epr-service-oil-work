@@ -78,6 +78,7 @@ function copyAll() {
 .links {
   display: grid;
   gap: var(--space-3);
+  min-width: 0;
 }
 
 .links__lead {
@@ -109,6 +110,7 @@ function copyAll() {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  min-width: 0;
   padding: var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);

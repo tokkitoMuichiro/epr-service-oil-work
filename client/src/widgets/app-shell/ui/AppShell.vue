@@ -736,7 +736,8 @@ onUnmounted(() => {
 .shell__main {
   min-width: 0;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   scrollbar-gutter: stable;
   padding: var(--space-8) var(--space-8) 48px;
   padding-right: calc(var(--space-8) + var(--safe-right));

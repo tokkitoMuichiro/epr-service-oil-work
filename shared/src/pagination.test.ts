@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { clampPage, pageCountOf, pageSlice, pageWindow } from './pagination.js'
+import { clampPage, pageCountOf, pageNumbers, pageSlice, pageWindow } from './pagination.js'
 
 const items = Array.from({ length: 23 }, (_, i) => i + 1)
 
@@ -34,5 +34,14 @@ describe('pagination', () => {
     assert.deepEqual(pageSlice(items, 3), [21, 22, 23])
     assert.deepEqual(pageSlice(items, 99), [21, 22, 23])
     assert.deepEqual(pageSlice([], 1), [])
+  })
+
+  it('builds a numbered window with ellipsis', () => {
+    assert.deepEqual(pageNumbers(1, 1), [1])
+    assert.deepEqual(pageNumbers(1, 5), [1, 2, 3, 4, 5])
+    assert.deepEqual(pageNumbers(1, 10), [1, 2, 3, 'ellipsis', 10])
+    assert.deepEqual(pageNumbers(5, 10), [1, 'ellipsis', 4, 5, 6, 'ellipsis', 10])
+    assert.deepEqual(pageNumbers(10, 10), [1, 'ellipsis', 8, 9, 10])
+    assert.deepEqual(pageNumbers(1, 10, 2), [1, 2, 3, 4, 'ellipsis', 10])
   })
 })

@@ -161,13 +161,14 @@ function changeObject() {
             @update:model-value="onSearch"
           />
         </div>
-        <div class="objects__list" :aria-busy="searching">
+        <div :ref="objectPager.bindFit" class="objects__list" :aria-busy="searching">
           <p v-if="searchError" class="alert" role="alert">{{ searchError }}</p>
           <p v-else-if="objects.length === 0" class="objects__empty" role="status">
             Ничего не найдено
           </p>
           <button
             v-for="obj in objectPager.pageItems"
+            data-fit-row
             :key="obj.id"
             type="button"
             class="objects__item"
@@ -245,7 +246,7 @@ function changeObject() {
 
             <p v-if="archiveError" class="alert" role="alert">{{ archiveError }}</p>
 
-            <div v-if="!viewingReport" class="archive__dates">
+            <div v-if="!viewingReport" :ref="datePager.bindFit" class="archive__dates">
               <h2 class="ui-overline">Даты отчётов</h2>
               <UiState
                 v-if="archiveDates.length === 0"
@@ -259,6 +260,7 @@ function changeObject() {
                 :key="date"
                 type="button"
                 class="date-item"
+                data-fit-row
                 :class="{ 'date-item--active': date === selectedDate }"
                 @click="store.openArchiveDate(date)"
               >

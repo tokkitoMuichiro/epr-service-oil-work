@@ -76,7 +76,7 @@ async function remove(w: Warehouse) {
 
     <UiState v-if="!bases.length" title="Баз пока нет" :icon="IconEquipment" text="Создайте первую производственную базу." />
 
-    <ul v-else class="bases">
+    <ul v-else :ref="pager.bindFit" class="bases">
       <li v-for="w in pager.pageItems" :key="w.id" class="base" :class="{ 'base--system': w.isSystem }">
         <RouterLink class="base__link" :to="{ name: nameOf('equipment-warehouse'), params: { id: w.id } }">
           <div class="base__head">

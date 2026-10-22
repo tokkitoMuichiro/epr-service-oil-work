@@ -158,7 +158,7 @@ function onAssigned() {
 
       <UiState v-if="!visible.length" title="Никого нет" :icon="IconSearch" text="По выбранным фильтрам сотрудников нет." />
       <template v-else>
-        <div class="ui-table-wrap ui-table-wrap--stack">
+        <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack">
           <table class="ui-table">
             <thead>
               <tr>

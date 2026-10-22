@@ -165,7 +165,7 @@ function onAssigned() {
     </UiState>
     <UiState v-else-if="!visible.length" title="Назначений нет" :icon="IconTraining" text="Измените фильтры или назначьте проверку." />
     <template v-else>
-      <div class="ui-table-wrap ui-table-wrap--stack">
+      <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack">
         <table class="ui-table">
           <thead>
             <tr>

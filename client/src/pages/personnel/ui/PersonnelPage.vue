@@ -249,7 +249,7 @@ function openCreateBrigade() {
 
         <UiState v-if="!rows.length" title="Ничего не найдено" :icon="IconSearch" text="Измените поиск или фильтры." />
 
-        <div v-else class="table-wrap ui-table-wrap">
+        <div v-else :ref="workerPager.bindFit" class="table-wrap ui-table-wrap">
           <table class="table--workers">
             <thead>
               <tr>
@@ -334,7 +334,7 @@ function openCreateBrigade() {
             :options="BRIGADE_COLUMNS"
           />
         </div>
-        <div class="table-wrap ui-table-wrap">
+        <div :ref="brigadePager.bindFit" class="table-wrap ui-table-wrap">
           <table class="table--brigades">
             <thead>
               <tr>
