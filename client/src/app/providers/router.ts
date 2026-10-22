@@ -242,9 +242,22 @@ export const router = createRouter({
   ],
 })
 
+function isFramedWindow() {
+  try {
+    return typeof window !== 'undefined' && window.self !== window.top
+  } catch {
+    return true
+  }
+}
+
 router.beforeEach(async (to) => {
   prefetchRoute(to)
   if (to.meta.isSessionless) return true
+  // Soft-nav to `/` inside Bitrix iframe → later reload hits X-Frame-Options. Stay on embed routes.
+  if (isFramedWindow() && !to.meta.isEmbed && !isEmbedPath(to.path) && to.name !== 'embed-signin') {
+    if (to.name === 'login') return { name: 'embed-signin' }
+    return { path: '/e/equipment' }
+  }
   const session = useRoleStore()
   await session.ensureSession()
   if (to.meta.isPublic) {
@@ -267,7 +280,12 @@ router.beforeEach(async (to) => {
   const access = useAccessStore()
   await access.ensureLoaded()
   if (!access.isReady) return true
-  if (!access.canView(block)) return { name: 'home' }
+  if (!access.canView(block)) {
+    if (to.meta.isEmbed || isEmbedPath(to.path) || isFramedWindow()) {
+      return { name: 'embed-signin', query: { to: to.fullPath } }
+    }
+    return { name: 'home' }
+  }
   const permission = to.meta.permission
-  return !permission || access.can(permission) ? true : { path: to.matched[0]?.path ?? '/' }
+  return !permission || access.can(permission) ? true : { path: to.matched[0]?.path ?? (isFramedWindow() ? '/e/equipment' : '/') }
 })

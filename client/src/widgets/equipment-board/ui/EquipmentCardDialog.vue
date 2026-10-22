@@ -26,7 +26,7 @@ import {
 import { ConditionSelect } from '@/features/equipment-condition'
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
-import { IconClose, UiButton, UiDialog, UiFileDrop, askConfirm } from '@/shared/ui'
+import { IconClose, IconPencil, IconTrash, UiButton, UiDialog, UiFileDrop, askConfirm } from '@/shared/ui'
 
 const props = defineProps<{ itemId: string | null }>()
 const emit = defineEmits<{
@@ -91,6 +91,30 @@ async function remove() {
 
 <template>
   <UiDialog :open="Boolean(item)" :title="item ? assetDisplayName(item) : ''" wide @close="emit('close')">
+    <template v-if="item" #header-actions>
+      <button
+        v-if="canEditItem(auth, item)"
+        type="button"
+        class="ui-icon-button"
+        aria-label="Редактировать"
+        title="Редактировать"
+        @click="emit('edit', item)"
+      >
+        <IconPencil />
+      </button>
+      <button
+        v-if="canDeleteItem(auth, item, transfers)"
+        type="button"
+        class="ui-icon-button head-danger"
+        aria-label="Удалить"
+        title="Удалить"
+        :disabled="store.busy"
+        @click="remove"
+      >
+        <IconTrash />
+      </button>
+    </template>
+
     <div v-if="item" class="card">
       <p v-if="item.fillStatus !== 'OK'" class="fill" :data-status="item.fillStatus" role="status">
         <strong>{{ FILL_STATUS_LABEL[item.fillStatus] }}.</strong>
@@ -137,18 +161,12 @@ async function remove() {
         <UiButton v-if="canCancelPendingTransfer(auth, item, transfers)" size="sm" variant="ghost" :disabled="store.busy" @click="store.cancelTransfer(item.id)">
           Отменить передачу
         </UiButton>
-        <UiButton v-if="canEditItem(auth, item)" size="sm" variant="ghost" @click="emit('edit', item)">
-          Редактировать
-        </UiButton>
         <UiButton v-if="canFlagFill(auth, item, transfers)" size="sm" variant="ghost" @click="emit('remark', item)">
           Замечание
         </UiButton>
         <UiButton v-if="canConfirmFill(auth, item)" size="sm" variant="ghost" :disabled="store.busy" @click="store.confirmFill(item.id)">
           Подтвердить заполнение
         </UiButton>
-        <template v-if="canDeleteItem(auth, item, transfers)">
-          <UiButton size="sm" variant="ghost" :disabled="store.busy" @click="remove">Удалить</UiButton>
-        </template>
       </div>
 
       <p v-if="store.actionError" class="alert" role="alert">
@@ -269,6 +287,22 @@ async function remove() {
   gap: var(--space-2);
 }
 
+.actions:empty {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .head-danger:hover:not(:disabled) {
+    background: var(--status-bad-bg);
+    color: var(--status-bad-fg);
+  }
+}
+
+.head-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .section {
   display: grid;
   gap: var(--space-3);
@@ -359,14 +393,18 @@ async function remove() {
 }
 
 .history {
-  max-height: 280px;
-  overflow: auto;
+  /* ~5 entries visible, then scroll — keeps the dialog compact */
+  max-height: calc(5 * 3.5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .history li {
   display: grid;
   gap: 2px;
-  padding-left: var(--space-3);
+  min-height: 3.5rem;
+  box-sizing: border-box;
+  padding: var(--space-1) 0 var(--space-1) var(--space-3);
   border-left: 2px solid var(--border-subtle);
 }
 
@@ -404,10 +442,6 @@ async function remove() {
   .actions :deep(.btn) {
     flex: 1 1 40%;
     min-height: var(--tap-size);
-  }
-
-  .history {
-    max-height: none;
   }
 }
 </style>

@@ -55,9 +55,12 @@ onBeforeUnmount(restoreFocus)
       >
         <header class="ui-sheet__head">
           <h2 class="ui-sheet__title">{{ title }}</h2>
-          <button class="ui-icon-button" type="button" aria-label="Закрыть" title="Закрыть" @click="$emit('close')">
-            <IconClose />
-          </button>
+          <div class="ui-sheet__head-actions">
+            <slot name="header-actions" />
+            <button class="ui-icon-button" type="button" aria-label="Закрыть" title="Закрыть" @click="$emit('close')">
+              <IconClose />
+            </button>
+          </div>
         </header>
         <div class="ui-sheet__body">
           <slot />

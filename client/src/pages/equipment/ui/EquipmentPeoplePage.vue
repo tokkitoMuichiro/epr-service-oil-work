@@ -47,15 +47,6 @@ function select(id: string) {
 function personLabel(id: string, fullName: string) {
   return `${fullName}${id === store.persona.id ? ' (вы)' : ''}`
 }
-
-function initials(fullName: string) {
-  return fullName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('')
-}
 </script>
 
 <template>
@@ -75,14 +66,14 @@ function initials(fullName: string) {
         class="people__toggle"
         :aria-label="isPeopleCollapsed ? 'Развернуть список сотрудников' : 'Свернуть список сотрудников'"
         :title="isPeopleCollapsed ? 'Развернуть список' : 'Свернуть список'"
-        :aria-pressed="!isPeopleCollapsed"
+        :aria-expanded="!isPeopleCollapsed"
         @click="isPeopleCollapsed = !isPeopleCollapsed"
       >
         <IconChevronsLeft class="people__toggle-icon" :size="18" />
         <span v-if="!isPeopleCollapsed" class="people__toggle-label">Свернуть</span>
       </button>
 
-      <template v-if="!isPeopleCollapsed">
+      <div v-show="!isPeopleCollapsed" class="people__list">
         <input
           v-model="search"
           class="people__search ui-control"
@@ -102,23 +93,7 @@ function initials(fullName: string) {
           <span class="num">{{ positionsLabel(store.itemsOfUser(p.id).length) }}</span>
         </button>
         <p v-if="!people.length" class="muted">Никого не найдено</p>
-      </template>
-
-      <template v-else>
-        <button
-          v-for="p in people"
-          :key="p.id"
-          type="button"
-          class="people__rail"
-          :class="{ 'people__rail--active': p.id === userId }"
-          :title="personLabel(p.id, p.fullName)"
-          :aria-label="`${personLabel(p.id, p.fullName)}, ${positionsLabel(store.itemsOfUser(p.id).length)}`"
-          @click="select(p.id)"
-        >
-          {{ initials(p.fullName) }}
-        </button>
-        <p v-if="!people.length" class="muted muted--rail">—</p>
-      </template>
+      </div>
     </aside>
 
     <UiState v-if="!person" title="Выберите сотрудника" :icon="IconPersonnel" text="Слева список сотрудников с числом позиций." />
@@ -160,27 +135,34 @@ function initials(fullName: string) {
 }
 
 .layout--collapsed {
-  grid-template-columns: var(--tap-size) minmax(0, 1fr);
+  grid-template-columns: var(--control-height) minmax(0, 1fr);
   gap: var(--space-3);
 }
 
 .people {
   position: sticky;
   top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: stretch;
+  max-height: calc(100vh - 8rem);
+  max-height: calc(100dvh - 8rem);
+  min-width: 0;
+  padding: 2px;
+  overflow: hidden;
+}
+
+.people__list {
   display: grid;
   gap: var(--space-2);
   align-content: start;
-  max-height: calc(100vh - 8rem);
-  max-height: calc(100dvh - 8rem);
+  min-height: 0;
   overflow: auto;
-  padding: 2px;
-  min-width: 0;
 }
 
 .people--collapsed {
-  justify-items: center;
-  gap: var(--space-1);
-  padding: 0;
+  overflow: visible;
 }
 
 .people__toggle {
@@ -188,6 +170,7 @@ function initials(fullName: string) {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
+  flex: 0 0 auto;
   width: 100%;
   min-height: var(--control-height);
   padding: 0 var(--space-2);
@@ -201,8 +184,8 @@ function initials(fullName: string) {
 }
 
 .people--collapsed .people__toggle {
-  width: var(--tap-size);
-  height: var(--tap-size);
+  width: var(--control-height);
+  height: var(--control-height);
   padding: 0;
 }
 
@@ -239,23 +222,6 @@ function initials(fullName: string) {
   color: var(--text-secondary);
 }
 
-.people__rail {
-  display: inline-grid;
-  place-items: center;
-  width: var(--tap-size);
-  height: var(--tap-size);
-  padding: 0;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
-  background: var(--surface-card);
-  color: var(--text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-}
-
-.people__rail--active,
 .people__item--active {
   border-color: var(--accent);
   background: var(--accent-subtle);
@@ -263,14 +229,9 @@ function initials(fullName: string) {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
-.people__rail--active {
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-
 @media (hover: hover) and (pointer: fine) {
   .people__toggle:hover,
-  .people__item:not(.people__item--active):hover,
-  .people__rail:not(.people__rail--active):hover {
+  .people__item:not(.people__item--active):hover {
     border-color: var(--border-strong);
   }
 }
@@ -285,11 +246,6 @@ function initials(fullName: string) {
 
 .person-head .panel__text {
   margin: var(--space-1) 0 0;
-}
-
-.muted--rail {
-  margin: 0;
-  font-size: var(--font-size-xs);
 }
 
 @media (max-width: 860px) {

@@ -28,7 +28,7 @@ import { FillRemarkDialog } from '@/features/equipment-fill-review'
 import { TransferDialog } from '@/features/equipment-transfer'
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { useListPagination } from '@/shared/lib/pagination'
-import { IconClose, UiButton, UiPagination, UiState } from '@/shared/ui'
+import { IconClose, UiButton, UiClipText, UiPagination, UiState } from '@/shared/ui'
 import EquipmentCardDialog from './EquipmentCardDialog.vue'
 
 const props = withDefaults(
@@ -226,29 +226,38 @@ function origin(item: EquipmentItem) {
                 </td>
                 <td class="col-name">
                   <div class="name">
-                    <strong class="clip" :data-tip="item.name"><span>{{ item.name }}</span></strong>
+                    <UiClipText tag="strong" class="name__title" :text="item.name" />
                     <span v-if="item.fillStatus !== 'OK'" class="chip ui-badge" :class="item.fillStatus === 'NEEDS_FIX' ? 'ui-badge--bad' : 'ui-badge--info'" :data-tone="item.fillStatus">
                       {{ FILL_STATUS_LABEL[item.fillStatus] }}
                     </span>
-                    <span v-if="isPendingAccept(item, transfers)" class="chip ui-badge ui-badge--warn" data-tone="pending">
+                    <span
+                      v-if="pendingOfferLabel(item, transfers)"
+                      class="chip ui-badge ui-badge--warn"
+                      data-tone="pending"
+                    >
                       {{ pendingOfferLabel(item, transfers) }}
                     </span>
-                    <span v-if="item.hasDocuments" class="chip ui-badge ui-badge--neutral" data-tone="docs" title="Есть документы">Док.</span>
+                    <span
+                      v-else
+                      class="chip ui-badge"
+                      :class="item.hasDocuments ? 'ui-badge--ok' : 'ui-badge--neutral'"
+                      data-tone="docs"
+                      :title="item.hasDocuments ? 'Есть документы' : 'Нет документов'"
+                    >Док.</span>
                   </div>
-                  <small v-if="item.conditionNote" class="note clip" :data-tip="item.conditionNote"><span>{{ item.conditionNote }}</span></small>
                 </td>
                 <td class="col-type">
-                  <span class="clip" :data-tip="equipmentTypeLabel(item)"><span>{{ equipmentTypeLabel(item) }}</span></span>
+                  <UiClipText :text="equipmentTypeLabel(item)" />
                 </td>
                 <td class="col-id">
-                  <span
-                    class="mono clip"
-                    :data-tip="item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)"
-                  ><span>{{ item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item) }}</span></span>
+                  <UiClipText
+                    class="mono"
+                    :text="item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)"
+                  />
                 </td>
                 <td v-if="!isCard" class="col-condition"><ConditionBadge compact :condition="item.condition" /></td>
                 <td v-if="showOwner" class="col-owner">
-                  <span class="clip" :data-tip="store.labelForOwner(item)"><span>{{ store.labelForOwner(item) }}</span></span>
+                  <UiClipText :text="store.labelForOwner(item)" />
                 </td>
                 <td v-if="showRepairSender">
                   <template v-if="origin(item)">
@@ -298,24 +307,29 @@ function origin(item: EquipmentItem) {
             <div class="cards__body">
               <div class="cards__title">
                 <ConditionBadge v-if="!isCard" compact :condition="item.condition" />
-                <strong class="clip" :data-tip="assetDisplayName(item)"><span>{{ assetDisplayName(item) }}</span></strong>
+                <UiClipText tag="strong" class="cards__name" :text="assetDisplayName(item)" />
               </div>
               <div class="cards__meta">
                 <span>{{ equipmentTypeLabel(item) }}</span>
-                <span
-                  class="mono clip"
-                  :data-tip="item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)"
-                ><span>{{ item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item) }}</span></span>
-                <span v-if="showOwner" class="clip" :data-tip="store.labelForOwner(item)"><span>{{ store.labelForOwner(item) }}</span></span>
+                <UiClipText
+                  class="mono"
+                  :text="item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)"
+                />
+                <UiClipText v-if="showOwner" :text="store.labelForOwner(item)" />
               </div>
-              <div v-if="item.fillStatus !== 'OK' || isPendingAccept(item, transfers) || item.hasDocuments" class="cards__flags">
+              <div class="cards__flags">
                 <span v-if="item.fillStatus !== 'OK'" class="chip ui-badge" :class="item.fillStatus === 'NEEDS_FIX' ? 'ui-badge--bad' : 'ui-badge--info'">
                   {{ FILL_STATUS_LABEL[item.fillStatus] }}
                 </span>
-                <span v-if="isPendingAccept(item, transfers)" class="chip ui-badge ui-badge--warn">
+                <span v-if="pendingOfferLabel(item, transfers)" class="chip ui-badge ui-badge--warn">
                   {{ pendingOfferLabel(item, transfers) }}
                 </span>
-                <span v-if="item.hasDocuments" class="chip ui-badge ui-badge--neutral" title="Есть документы">Док.</span>
+                <span
+                  v-else
+                  class="chip ui-badge"
+                  :class="item.hasDocuments ? 'ui-badge--ok' : 'ui-badge--neutral'"
+                  :title="item.hasDocuments ? 'Есть документы' : 'Нет документов'"
+                >Док.</span>
               </div>
               <small v-if="showRepairSender && origin(item)" class="note">
                 Отправил: {{ origin(item)?.by }} ({{ origin(item)?.from }})
@@ -581,7 +595,7 @@ tr[data-state='review'] td:first-child,
   min-width: 0;
 }
 
-.name strong {
+.name__title {
   flex: 1 1 6rem;
   min-width: 0;
   font-weight: 600;
@@ -596,56 +610,6 @@ tr[data-state='review'] td:first-child,
 
 .mono {
   font-variant-numeric: tabular-nums;
-}
-
-.clip {
-  display: block;
-  position: relative;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.clip > span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Tip above the cell; hovered row is raised so siblings do not cover it. */
-@media (hover: hover) and (pointer: fine) {
-  .clip[data-tip]:hover {
-    z-index: 6;
-    overflow: visible;
-  }
-
-  .clip[data-tip]:hover > span {
-    overflow: visible;
-  }
-
-  .clip[data-tip]:hover::after {
-    content: attr(data-tip);
-    position: absolute;
-    left: 0;
-    bottom: calc(100% + 4px);
-    z-index: 8;
-    box-sizing: border-box;
-    width: max-content;
-    max-width: min(18rem, 70vw);
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius);
-    background: var(--surface-raised);
-    color: var(--text-primary);
-    font-size: var(--font-size-xs);
-    font-weight: 500;
-    line-height: var(--line-height-base);
-    white-space: normal;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-    box-shadow: var(--shadow-raised);
-    pointer-events: none;
-  }
 }
 
 .link {
@@ -731,7 +695,7 @@ tr[data-state='review'] td:first-child,
   min-width: 0;
 }
 
-.cards__title strong {
+.cards__name {
   flex: 1;
   min-width: 0;
   font-size: var(--font-size-sm);

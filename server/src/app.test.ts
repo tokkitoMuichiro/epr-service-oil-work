@@ -693,6 +693,30 @@ describe('authentication', () => {
     }
   })
 
+  it('does not send X-Frame-Options when Bitrix loads `/` in an iframe', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'erp-dist-'))
+    writeFileSync(path.join(dir, 'index.html'), '<html><body>spa</body></html>')
+    const spa = await startApp({
+      clientDist: dir,
+      bitrix: { mode: 'live', webhookUrl: FAKE_WEBHOOK, clientId: FAKE_CLIENT_ID, clientSecret: FAKE_CLIENT_SECRET, portal: FAKE_PORTAL },
+      bitrixFetch: createFakeBitrix().fetchImpl,
+    })
+    try {
+      const framed = await fetch(`${spa.base}/`, { headers: { 'Sec-Fetch-Dest': 'iframe' } })
+      assert.equal(framed.status, 200)
+      assert.equal(framed.headers.get('x-frame-options'), null)
+      assert.match(framed.headers.get('content-security-policy') ?? '', /frame-ancestors/)
+      assert.match(await framed.text(), /Модуль открывается отдельно/)
+
+      const top = await fetch(`${spa.base}/`)
+      assert.equal(top.headers.get('x-frame-options'), 'SAMEORIGIN')
+      assert.match(await top.text(), /spa/)
+    } finally {
+      await spa.close()
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('locks out an address that guesses passwords across many logins', async () => {
     const isolated = await startApp({ devLogin: false, admin: { login: 'root', password: 'корневой-пароль' } })
     try {

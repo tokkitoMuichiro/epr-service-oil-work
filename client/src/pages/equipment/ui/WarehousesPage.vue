@@ -175,9 +175,8 @@ async function remove(w: Warehouse) {
 }
 
 .base__counts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
+  display: grid;
+  gap: var(--space-1);
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
