@@ -16,6 +16,7 @@ import {
   BITRIX_LOGIN_ERRORS,
   EMBED_TOKEN_HEADER,
   EMBED_TOKEN_STORAGE_KEY,
+  embedLandingUrl,
   isEmbedPath,
   isRoleId,
   normalizeLogin,
@@ -108,7 +109,8 @@ function escapeHtml(value: string): string {
 }
 
 function embedBootstrapPage(token: string, to: string): string {
-  const safeTo = JSON.stringify(to)
+  // Hash carries the bearer when third-party sessionStorage is blocked (Yandex iframe).
+  const safeTarget = JSON.stringify(embedLandingUrl(to, token))
   const safeToken = JSON.stringify(token)
   const safeKey = JSON.stringify(EMBED_TOKEN_STORAGE_KEY)
   return `<!doctype html>
@@ -122,7 +124,7 @@ function embedBootstrapPage(token: string, to: string): string {
 <p style="font-family:Montserrat,Arial,sans-serif;color:#5b6576;text-align:center;margin-top:40vh">Вход…</p>
 <script>
 try { sessionStorage.setItem(${safeKey}, ${safeToken}); } catch (e) {}
-location.replace(${safeTo});
+location.replace(${safeTarget});
 </script>
 </body>
 </html>`

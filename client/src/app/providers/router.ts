@@ -9,8 +9,10 @@ import {
   type AccessBlock,
   type Permission,
 } from '@/entities/role'
+import { EmbedSignInPage } from '@/pages/embed-signin'
 import { HomePage } from '@/pages/home'
 import { LoginPage } from '@/pages/login'
+import { isEmbedPath } from '@shared/auth'
 
 const loadContracts = () => import('@/pages/contracts')
 const loadReports = () => import('@/pages/daily-reports')
@@ -59,6 +61,13 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', name: 'login', component: LoginPage, meta: { isPublic: true } },
+    {
+      // Framed under /e/* so Bitrix iframe is not blocked by X-Frame-Options on /login.
+      path: '/e/signin',
+      name: 'embed-signin',
+      component: EmbedSignInPage,
+      meta: { isPublic: true, isEmbed: true },
+    },
     {
       // Link for Bitrix24 menu items: /auth/bitrix?to=/equipment. Served by the SPA because the PWA service worker owns navigations.
       path: '/auth/bitrix',
@@ -238,8 +247,19 @@ router.beforeEach(async (to) => {
   if (to.meta.isSessionless) return true
   const session = useRoleStore()
   await session.ensureSession()
-  if (to.meta.isPublic) return session.isAuthenticated && to.name === 'login' ? { name: 'home' } : true
+  if (to.meta.isPublic) {
+    if (session.isAuthenticated && to.name === 'login') return { name: 'home' }
+    if (session.isAuthenticated && to.name === 'embed-signin') {
+      const back = safeRedirectPath(to.query.to)
+      return isEmbedPath(back) ? back : '/e/equipment'
+    }
+    return true
+  }
   if (session.status === 'anonymous') {
+    // /login has X-Frame-Options: SAMEORIGIN — redirecting there from Bitrix iframe → ERR_BLOCKED_BY_RESPONSE (Yandex/Chrome).
+    if (to.meta.isEmbed || isEmbedPath(to.path)) {
+      return { name: 'embed-signin', query: { to: to.fullPath } }
+    }
     return { name: 'login', query: to.fullPath === '/' ? {} : { redirect: to.fullPath } }
   }
   const block = to.meta.block
