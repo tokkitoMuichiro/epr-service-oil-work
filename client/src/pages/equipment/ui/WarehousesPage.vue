@@ -12,8 +12,9 @@ import {
   type Warehouse,
 } from '@/entities/equipment'
 import { WarehouseFormDialog } from '@/features/warehouse-form'
+import { shortFullName } from '@shared/person-name'
 import { useMobilePagination } from '@/shared/lib/pagination'
-import { IconClose, IconEquipment, UiButton, UiPagination, UiState, askConfirm } from '@/shared/ui'
+import { IconClose, IconEquipment, UiButton, UiClipText, UiPagination, UiState, askConfirm } from '@/shared/ui'
 import EquipmentExportMenu from './EquipmentExportMenu.vue'
 
 const store = useEquipmentStore()
@@ -42,7 +43,8 @@ function incomingTo(id: string) {
 }
 
 function keepersOf(w: Warehouse) {
-  return w.keeperIds.map((id) => store.personName(id)).join(', ') || 'не назначены'
+  const names = w.keeperIds.map((id) => shortFullName(store.personName(id))).filter((n) => n && n !== '—')
+  return names.join(', ') || 'не назначены'
 }
 
 function isMine(w: Warehouse) {
@@ -80,39 +82,59 @@ async function remove(w: Warehouse) {
 
     <UiState v-if="!bases.length" title="Баз пока нет" :icon="IconEquipment" text="Создайте первую производственную базу." />
 
-    <ul v-else :ref="pager.bindFit" class="bases ui-fill-scroll">
-      <li v-for="w in pager.pageItems" :key="w.id" class="base" :class="{ 'base--system': w.isSystem }">
-        <RouterLink class="base__link" :to="{ name: nameOf('equipment-warehouse'), params: { id: w.id } }">
-          <div class="base__head">
-            <strong>{{ w.name }}</strong>
-            <span v-if="w.isSystem" class="tag ui-badge ui-badge--info">Системная</span>
-            <span v-if="isMine(w)" class="tag ui-badge ui-badge--ok">Ваша база</span>
-          </div>
-          <span v-if="w.address" class="muted">{{ w.address }}</span>
-          <span class="base__keepers">Кладовщики: {{ keepersOf(w) }}</span>
-          <div class="base__counts">
-            <span v-for="c in categories" :key="c">
-              {{ CATEGORY_LABEL[c] }}: <strong>{{ countOn(w.id, c) }}</strong>
-            </span>
-          </div>
-          <span class="base__total num">{{ positionsLabel(store.itemsOnWarehouse(w.id).length) }}</span>
-          <span v-if="incomingTo(w.id)" class="tag ui-badge ui-badge--warn">Входящих передач: {{ incomingTo(w.id) }}</span>
-        </RouterLink>
-        <div v-if="canManage" class="base__actions">
-          <UiButton size="sm" variant="ghost" @click="openForm(w)">Изменить</UiButton>
-          <template v-if="!w.isSystem">
-            <UiButton size="sm" variant="ghost" :disabled="store.busy" @click="remove(w)">Удалить</UiButton>
-          </template>
-        </div>
-      </li>
-    </ul>
-    <UiPagination
-      v-if="pager.isPaged"
-      v-model:page="pager.page"
-      class="ui-fill-chrome"
-      :total="pager.total"
-      :page-size="pager.pageSize"
-    />
+    <div v-else class="panel ui-fill-panel">
+      <div :ref="pager.bindFit" class="table-wrap ui-table-wrap ui-table-wrap--stack ui-fill-scroll">
+        <table class="ui-table bases-table">
+          <thead>
+            <tr>
+              <th class="col-name">Название</th>
+              <th class="col-address ui-hide-mobile">Адрес</th>
+              <th class="col-keepers">Кладовщики</th>
+              <th v-for="c in categories" :key="c" class="col-count num ui-hide-mobile">{{ CATEGORY_LABEL[c] }}</th>
+              <th class="col-total num">Всего</th>
+              <th v-if="canManage" class="col-actions"><span class="sr-only">Действия</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="w in pager.pageItems" :key="w.id" :class="{ 'row--system': w.isSystem }">
+              <td class="col-name ui-cell--main">
+                <RouterLink class="base-link" :to="{ name: nameOf('equipment-warehouse'), params: { id: w.id } }">
+                  <UiClipText tag="strong" :text="w.name" />
+                </RouterLink>
+                <span v-if="w.isSystem" class="tag ui-badge ui-badge--info">Системная</span>
+                <span v-if="isMine(w)" class="tag ui-badge ui-badge--ok">Ваша база</span>
+                <span v-if="incomingTo(w.id)" class="tag ui-badge ui-badge--warn">Входящих: {{ incomingTo(w.id) }}</span>
+              </td>
+              <td class="col-address ui-hide-mobile">
+                <UiClipText :text="w.address || '—'" />
+              </td>
+              <td class="col-keepers" data-label="Кладовщики">
+                <UiClipText :text="keepersOf(w)" />
+              </td>
+              <td v-for="c in categories" :key="c" class="col-count num ui-hide-mobile" :data-label="CATEGORY_LABEL[c]">
+                {{ countOn(w.id, c) }}
+              </td>
+              <td class="col-total num ui-cell--aside" data-label="Всего">
+                {{ positionsLabel(store.itemsOnWarehouse(w.id).length) }}
+              </td>
+              <td v-if="canManage" class="col-actions ui-cell--actions">
+                <UiButton size="sm" variant="ghost" @click="openForm(w)">Изменить</UiButton>
+                <UiButton v-if="!w.isSystem" size="sm" variant="ghost" :disabled="store.busy" @click="remove(w)">
+                  Удалить
+                </UiButton>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <UiPagination
+        v-if="pager.isPaged"
+        v-model:page="pager.page"
+        class="ui-fill-chrome"
+        :total="pager.total"
+        :page-size="pager.pageSize"
+      />
+    </div>
 
     <WarehouseFormDialog :open="isFormOpen" :warehouse="editing" @close="isFormOpen = false" />
   </div>
@@ -128,113 +150,77 @@ async function remove(w: Warehouse) {
   line-height: var(--line-height-base);
 }
 
-.bases {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+.panel {
   gap: var(--space-3);
-  margin: 0;
-  padding: 0;
-  list-style: none;
 }
 
-.base {
-  display: grid;
-  grid-template-rows: 1fr auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
-  background: var(--surface-card);
-  box-shadow: var(--shadow-card);
-  transition: border-color 0.15s ease;
+.bases-table {
+  table-layout: auto;
+  width: 100%;
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .base:hover {
-    border-color: var(--border-strong);
-  }
+.col-name {
+  width: 100%;
 }
 
-.base--system {
-  box-shadow: inset 3px 0 0 var(--accent), var(--shadow-card);
+.col-address,
+.col-keepers,
+.col-count,
+.col-total,
+.col-actions {
+  width: 1%;
+  white-space: nowrap;
 }
 
-.base__link {
-  display: grid;
-  align-content: start;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-5);
+.col-address {
+  max-width: 14rem;
+}
+
+.col-keepers {
+  max-width: 12rem;
+}
+
+.base-link {
+  display: block;
+  min-width: 0;
   color: inherit;
-  font-size: var(--font-size-sm);
   text-decoration: none;
 }
 
-.base__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
+.col-name .tag {
+  margin-left: var(--space-2);
+  vertical-align: middle;
 }
 
-.base__head strong {
-  font-size: var(--font-size-md);
-  font-weight: 600;
-  color: var(--text-primary);
+.row--system td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
-.base__keepers {
-  color: var(--text-primary);
-}
-
-.base__counts {
-  display: grid;
-  gap: var(--space-1);
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.base__counts strong {
-  color: var(--text-primary);
-}
-
-.base__total {
+.col-total {
   font-weight: 600;
   color: var(--text-link);
 }
 
-.base__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  border-top: 1px solid var(--border-subtle);
-}
-
-.tag {
-  justify-self: start;
-}
-
 @media (max-width: 860px) {
-  .bases {
-    gap: var(--space-2);
+  .bases-table {
+    table-layout: auto;
   }
 
-  .base__link {
-    gap: var(--space-1);
-    padding: var(--space-3);
-    font-size: var(--font-size-xs);
+  .col-name,
+  .col-address,
+  .col-keepers,
+  .col-count,
+  .col-total,
+  .col-actions {
+    width: auto;
   }
 
-  .base__actions {
-    gap: var(--space-1);
-    padding: var(--space-2) var(--space-3);
-  }
-}
-
-@media (max-width: 560px) {
-  .bases {
-    grid-template-columns: minmax(0, 1fr);
+  .col-name .tag {
+    margin-left: 0;
+    margin-right: var(--space-1);
   }
 
-  .base__actions :deep(.btn) {
+  .col-actions :deep(.btn) {
     flex: 1 1 auto;
   }
 }

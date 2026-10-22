@@ -15,6 +15,7 @@ import {
 import { useAccessStore, useRoleStore } from '@/entities/role'
 import { TestingMarkIcon, testingMark, useTrainingStore, type TestingMark } from '@/entities/training'
 import { WorkerFormDialog } from '@/features/worker-form'
+import { shortFullName } from '@shared/person-name'
 import { useMobilePagination } from '@/shared/lib/pagination'
 import {
   IconClose,
@@ -23,6 +24,7 @@ import {
   PageHeader,
   UiAvatar,
   UiButton,
+  UiClipText,
   UiPagination,
   UiState,
 } from '@/shared/ui'
@@ -283,17 +285,25 @@ function openCreateBrigade() {
                 @click="personnel.openProfile(w.id)"
                 @keydown.enter="personnel.openProfile(w.id)"
               >
-                <td data-label="ФИО" :title="w.fullName">
+                <td class="col--fullName" data-label="ФИО" :title="w.fullName">
                   <span class="person">
                     <UiAvatar :name="w.fullName" />
-                    <strong>{{ w.fullName }}</strong>
+                    <strong>{{ shortFullName(w.fullName) }}</strong>
                   </span>
                 </td>
-                <td data-label="Должность" :title="w.position">{{ w.position }}</td>
-                <td data-label="Бригада" :title="brigadeName(w.brigadeId)">{{ brigadeName(w.brigadeId) }}</td>
+                <td class="col--position" data-label="Должность" :title="w.position">
+                  <UiClipText :text="w.position" />
+                </td>
+                <td class="col--brigade" data-label="Бригада" :title="brigadeName(w.brigadeId)">
+                  <UiClipText :text="brigadeName(w.brigadeId)" />
+                </td>
                 <td class="nowrap col--phone" data-label="Телефон">{{ w.phone || '—' }}</td>
-                <td data-label="Занятость"><WorkerStatusBadge :status="w.status" /></td>
-                <td class="nowrap" :class="{ 'ui-hide-mobile': w.employment === 'active' }" data-label="В компании">
+                <td class="col--status" data-label="Занятость"><WorkerStatusBadge :status="w.status" /></td>
+                <td
+                  class="nowrap col--employment"
+                  :class="{ 'ui-hide-mobile': w.employment === 'active' }"
+                  data-label="В компании"
+                >
                   {{ EMPLOYMENT_STATUS_LABEL[w.employment] }}
                 </td>
                 <td v-if="showTraining" class="col--testing" data-label="Проверка знаний">
@@ -338,7 +348,12 @@ function openCreateBrigade() {
           <table class="table--brigades">
             <thead>
               <tr>
-                <th v-for="column in BRIGADE_COLUMNS" :key="column.key" :aria-sort="brigadeAriaSort(column.key)">
+                <th
+                  v-for="column in BRIGADE_COLUMNS"
+                  :key="column.key"
+                  :class="`col--${column.key}`"
+                  :aria-sort="brigadeAriaSort(column.key)"
+                >
                   <button
                     type="button"
                     class="sort"
@@ -362,15 +377,18 @@ function openCreateBrigade() {
                 @click="openBrigadeId = row.brigade.id"
                 @keydown.enter="openBrigadeId = row.brigade.id"
               >
-                <td data-label="Наименование"><strong>{{ row.brigade.name }}</strong></td>
-                <td data-label="Статус">
+                <td class="col--name" data-label="Наименование" :title="row.brigade.name">
+                  <UiClipText tag="strong" :text="row.brigade.name" />
+                </td>
+                <td class="col--status" data-label="Статус">
                   <span v-if="row.brigade.archived" class="ui-badge ui-badge--neutral">Архив</span>
                   <BrigadeStatusBadge v-else :status="row.status" />
                 </td>
-                <td class="num" data-label="Кол-во людей">{{ row.size }}</td>
-                <td data-label="Руководитель">
+                <td class="num col--size" data-label="Кол-во людей">{{ row.size }}</td>
+                <td class="col--leader" data-label="Руководитель" :title="row.leader || undefined">
                   <template v-if="row.leader">
-                    {{ row.leader }} <span class="chip">{{ row.leaderRole }}</span>
+                    <UiClipText :text="row.leader.split(', ').map(shortFullName).join(', ')" />
+                    <span class="chip">{{ row.leaderRole }}</span>
                   </template>
                   <span v-else class="muted">не назначен</span>
                 </td>
@@ -554,9 +572,40 @@ function openCreateBrigade() {
 }
 
 table {
+  table-layout: auto;
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
+}
+
+.table--workers .col--fullName,
+.table--brigades .col--name {
+  width: 100%;
+}
+
+.table--workers .col--position,
+.table--workers .col--brigade,
+.table--workers .col--phone,
+.table--workers .col--status,
+.table--workers .col--employment,
+.table--workers .col--testing,
+.table--brigades .col--status,
+.table--brigades .col--size,
+.table--brigades .col--leader {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.table--workers .col--position {
+  max-width: 11rem;
+}
+
+.table--workers .col--brigade {
+  max-width: 9rem;
+}
+
+.table--brigades .col--leader {
+  max-width: 14rem;
 }
 
 th,
@@ -570,7 +619,6 @@ td {
 
 td {
   height: calc(var(--control-height) + 4px);
-  max-width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -732,21 +780,6 @@ tbody tr.row--expired td:first-child {
 }
 
 @media (max-width: 860px) {
-  th:first-child,
-  td:first-child {
-    position: sticky;
-    left: 0;
-    z-index: 1;
-  }
-
-  th:first-child {
-    z-index: 3;
-  }
-
-  td:first-child {
-    box-shadow: 1px 0 0 var(--border-subtle);
-  }
-
   .page {
     gap: var(--space-3);
   }
@@ -803,7 +836,8 @@ tbody tr.row--expired td:first-child {
   .table-wrap {
     border: 0;
     background: none;
-    overflow: visible;
+    overflow-x: clip;
+    overflow-y: auto;
   }
 
   table,
@@ -840,14 +874,21 @@ tbody tr.row--expired td:first-child {
     box-shadow: inset 4px 0 0 var(--status-bad-solid);
   }
 
+  .table--workers [class^='col--'],
+  .table--brigades [class^='col--'] {
+    width: auto !important;
+  }
+
   td,
   td:first-child,
   tbody tr td,
   tbody tr.row--expiring td,
   tbody tr.row--expired td {
     position: static;
+    width: auto !important;
     height: auto;
     max-width: none;
+    min-width: 0;
     white-space: normal;
     padding: 0;
     border: 0;

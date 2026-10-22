@@ -12,6 +12,7 @@ import {
   type User,
   type UserDraft,
 } from '../../shared.js'
+import { DEMO_STAFF_USERS } from './demo-staff.js'
 
 export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const SESSION_REFRESH_MS = 24 * 60 * 60 * 1000
@@ -238,13 +239,27 @@ export function createUserRepository(db: Database, now: () => number = Date.now)
     },
 
     ensureDemoUsers(): User[] {
-      return ROLES.map((role) => {
+      const roles = ROLES.map((role) => {
         const { id, login, fullName } = demoUserOf(role.id)
         return ensure(
           { login, fullName, role: role.id, workerId: null, active: true, password: randomBytes(24).toString('base64url') },
           id,
         )
       })
+      const staff = DEMO_STAFF_USERS.map((person) =>
+        ensure(
+          {
+            login: person.login,
+            fullName: person.fullName,
+            role: person.role,
+            workerId: null,
+            active: true,
+            password: randomBytes(24).toString('base64url'),
+          },
+          person.id,
+        ),
+      )
+      return [...roles, ...staff]
     },
 
     demoUser(role: RoleId): User | null {

@@ -86,13 +86,31 @@ watch(
 
 <style scoped>
 .shell {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
+  width: 100%;
+  min-width: 0;
+}
+
+.shell :deep(.page-header) {
+  flex: 0 0 auto;
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.shell :deep(.page-header__text) {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .shell__view {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
+  width: 100%;
   min-width: 0;
   min-height: 0;
   overflow: auto;

@@ -1057,9 +1057,11 @@ textarea::placeholder {
     font-size: 16px !important;
   }
 
-  /* Таблица-список на телефоне превращается в карточки без горизонтальной прокрутки. */
+  /* Таблица-список на телефоне превращается в карточки без горизонтальной прокрутки.
+   * overflow-y оставляем auto, иначе карточки рисуются поверх пагинации. */
   .ui-table-wrap.ui-table-wrap--stack {
-    overflow: visible;
+    overflow-x: clip;
+    overflow-y: auto;
     border: 0;
     background: none;
   }
@@ -1079,10 +1081,20 @@ textarea::placeholder {
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     row-gap: 2px;
+    min-width: 0;
+    max-width: 100%;
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius);
     background: var(--surface-card);
+  }
+
+  .ui-table-wrap--stack .ui-table th,
+  .ui-table-wrap--stack .ui-table td {
+    width: auto !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    white-space: normal !important;
   }
 
   .ui-table-wrap--stack .ui-table td {
@@ -1094,8 +1106,8 @@ textarea::placeholder {
     background: none;
     font-size: var(--font-size-sm);
     text-align: left;
-    white-space: normal;
     overflow-wrap: anywhere;
+    overflow-x: clip;
   }
 
   .ui-table-wrap--stack .ui-table td:empty {
