@@ -39,9 +39,10 @@ describe('pagination', () => {
   it('builds a numbered window with ellipsis', () => {
     assert.deepEqual(pageNumbers(1, 1), [1])
     assert.deepEqual(pageNumbers(1, 5), [1, 2, 3, 4, 5])
-    assert.deepEqual(pageNumbers(1, 10), [1, 2, 3, 'ellipsis', 10])
+    assert.deepEqual(pageNumbers(1, 10), [1, 2, 3, 4, 'ellipsis', 10])
+    assert.deepEqual(pageNumbers(3, 10), [1, 2, 3, 4, 'ellipsis', 10])
     assert.deepEqual(pageNumbers(5, 10), [1, 'ellipsis', 4, 5, 6, 'ellipsis', 10])
-    assert.deepEqual(pageNumbers(10, 10), [1, 'ellipsis', 8, 9, 10])
-    assert.deepEqual(pageNumbers(1, 10, 2), [1, 2, 3, 4, 'ellipsis', 10])
+    assert.deepEqual(pageNumbers(10, 10), [1, 'ellipsis', 7, 8, 9, 10])
+    assert.deepEqual(pageNumbers(1, 10, 2), [1, 2, 3, 4, 5, 6, 'ellipsis', 10])
   })
 })

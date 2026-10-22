@@ -4,6 +4,7 @@ import { TRANSFER_STATUS_LABEL, pluralRu, useEquipmentStore, type TransferStatus
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { useMobilePagination } from '@/shared/lib/pagination'
 import { IconEquipment, UiPagination, UiState } from '@/shared/ui'
+import EquipmentExportMenu from './EquipmentExportMenu.vue'
 
 const store = useEquipmentStore()
 
@@ -52,6 +53,9 @@ function tone(value: TransferStatus) {
           <option value="desc">Сначала новые</option>
           <option value="asc">Сначала старые</option>
         </select>
+        <div class="filters__export">
+          <EquipmentExportMenu />
+        </div>
       </div>
 
       <p class="count muted ui-fill-chrome">{{ rows.length }} {{ pluralRu(rows.length, 'передача', 'передачи', 'передач') }}</p>
@@ -105,13 +109,18 @@ function tone(value: TransferStatus) {
 <style scoped>
 .filters {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(140px, 0.7fr));
+  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(140px, 0.7fr)) auto;
   gap: var(--space-2);
+  align-items: center;
 }
 
 .filters input,
 .filters select {
   width: 100%;
+}
+
+.filters__export {
+  justify-self: end;
 }
 
 .count {
@@ -145,6 +154,11 @@ function tone(value: TransferStatus) {
 
   .filters input {
     grid-column: 1 / -1;
+  }
+
+  .filters__export {
+    grid-column: 1 / -1;
+    justify-self: end;
   }
 
   .count {

@@ -43,19 +43,21 @@ export function pageNumbers(page: number, pageCount: number, siblingCount = 1): 
   const last = Math.max(1, Math.trunc(pageCount) || 1)
   const current = Math.min(Math.max(1, Math.trunc(page) || 1), last)
   const siblings = Math.max(0, Math.trunc(siblingCount))
+  // Near the edges keep enough buttons that the next/prev page is always clickable by number.
+  const edgeSpan = siblings * 2 + 2
 
-  if (last <= siblings * 2 + 5) {
+  if (last <= edgeSpan + 2) {
     return Array.from({ length: last }, (_, i) => i + 1)
   }
 
   let left = Math.max(1, current - siblings)
   let right = Math.min(last, current + siblings)
 
-  if (current <= siblings + 2) {
+  if (current <= edgeSpan - siblings) {
     left = 1
-    right = Math.min(last, siblings + 2)
-  } else if (current >= last - (siblings + 1)) {
-    left = Math.max(1, last - (siblings + 1))
+    right = Math.min(last, edgeSpan)
+  } else if (current >= last - (edgeSpan - siblings - 1)) {
+    left = Math.max(1, last - edgeSpan + 1)
     right = last
   }
 

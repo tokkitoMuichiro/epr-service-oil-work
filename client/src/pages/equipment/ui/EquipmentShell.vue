@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
-import { authFor, canExport, canViewAllList, useEquipmentStore } from '@/entities/equipment'
+import { authFor, canViewAllList, useEquipmentStore } from '@/entities/equipment'
 import { equipmentPermissionsOf, useAccessStore, useRoleStore } from '@/entities/role'
-import { IconClose, IconDownload, PageHeader, UiButton, UiMenu, UiState, type UiMenuSection } from '@/shared/ui'
+import { IconClose, PageHeader, UiButton, UiState } from '@/shared/ui'
 import { EquipmentAlerts } from '@/widgets/equipment-board'
 import { useEquipmentRouteName } from '@/shared/lib/equipment-routes'
 
@@ -32,20 +32,6 @@ const embedLinks = computed(() => {
   return links
 })
 
-const exportSections = computed<UiMenuSection[]>(() => [
-  {
-    items: [
-      { id: 'excel', label: 'Скачать Excel', disabled: store.busy },
-      { id: 'bitrix', label: 'Выгрузить в Битрикс', disabled: store.busy },
-    ],
-  },
-])
-
-function onExport(id: string) {
-  if (id === 'excel') void store.exportExcel()
-  else if (id === 'bitrix') void store.exportToBitrix()
-}
-
 onMounted(() => {
   if (store.status === 'idle' || store.status === 'error') void store.load()
 })
@@ -61,13 +47,7 @@ watch(
 
 <template>
   <section class="shell ui-fill-page">
-    <PageHeader class="ui-fill-chrome" :title="title" :description="isEmbed ? undefined : route.meta.description">
-      <template v-if="store.isReady && canExport(store.auth)" #actions>
-        <UiMenu label="Экспорт оборудования" text="Экспорт" :sections="exportSections" @select="onExport">
-          <template #icon><IconDownload :size="16" /></template>
-        </UiMenu>
-      </template>
-    </PageHeader>
+    <PageHeader class="ui-fill-chrome" :title="title" :description="isEmbed ? undefined : route.meta.description" />
 
     <nav v-if="isEmbed" class="embed-nav ui-fill-chrome" aria-label="Разделы оборудования">
       <RouterLink

@@ -8,6 +8,7 @@ import { IconChevron, IconEquipment, UiButton, UiState } from '@/shared/ui'
 import { EquipmentBoard } from '@/widgets/equipment-board'
 import { useRouteCategory } from '../model/category'
 import CategoryTabs from './CategoryTabs.vue'
+import EquipmentExportMenu from './EquipmentExportMenu.vue'
 
 const store = useEquipmentStore()
 const route = useRoute()
@@ -46,7 +47,10 @@ const canStock = computed(() => !isRepair.value && canStockWarehouse(store.auth,
 
     <div class="page__bar ui-fill-chrome">
       <CategoryTabs :active="category" :items="items" />
-      <UiButton v-if="canStock" variant="primary" @click="isCreateOpen = true">Внести на базу</UiButton>
+      <div class="page__actions">
+        <EquipmentExportMenu />
+        <UiButton v-if="canStock" variant="primary" @click="isCreateOpen = true">Внести на базу</UiButton>
+      </div>
     </div>
 
     <div class="panel">
