@@ -80,3 +80,34 @@ export function spaContentSecurityPolicy(indexHtml: string, frameAncestors = "'s
     `frame-ancestors ${frameAncestors}`,
   ].join('; ')
 }
+
+/**
+ * Shown when Bitrix (or a reload) loads `/` or another non-embed SPA path in an iframe.
+ * Those routes send X-Frame-Options: SAMEORIGIN — this page is frameable and points to the embed module / new tab.
+ */
+export function bitrixFramedRootPage(): string {
+  return `<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ERP АММИР</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: Montserrat, Arial, sans-serif; color: #242d3d; background: #eef0f3; }
+  main { display: grid; gap: 16px; max-width: 460px; padding: 24px; text-align: center; }
+  h1 { margin: 0; font-size: 20px; }
+  p { margin: 0; color: #5b6576; font-size: 14px; line-height: 1.5; }
+  a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 20px; border-radius: 2px; background: #1e90ff; color: #fff; font-weight: 600; text-decoration: none; }
+  .secondary { background: transparent; color: #1e90ff; border: 1px solid #1e90ff; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Модуль открывается отдельно</h1>
+  <p>Полный ERP нельзя встроить в окно Битрикс24. Для оборудования и отчётов пункт меню должен вести на локальное приложение с обработчиком <code>/api/auth/bitrix/embed</code>.</p>
+  <a href="/auth/bitrix?to=%2Fe%2Fequipment" target="_blank" rel="noopener">Открыть оборудование во вкладке</a>
+  <a class="secondary" href="/auth/bitrix?to=%2F" target="_blank" rel="noopener">Открыть полный ERP</a>
+</main>
+</body>
+</html>`
+}

@@ -9,7 +9,7 @@ import { diskRouter } from './disk/router.js'
 import { createDiskSync, scheduleDiskSync } from './disk/sync.js'
 import { errorHandler, notFound } from './http.js'
 import { log } from './log.js'
-import { bitrixFrameAncestors, securityHeaders, spaContentSecurityPolicy } from './security.js'
+import { bitrixFrameAncestors, bitrixFramedRootPage, securityHeaders, spaContentSecurityPolicy } from './security.js'
 import { accessRouter } from './modules/access/router.js'
 import { createAccessStore } from './modules/access/store.js'
 import { bitrixDirectoryFromConfig, bitrixSsoFromConfig, portalOrigin } from './modules/auth/bitrix.js'
@@ -220,6 +220,20 @@ export function createApp(options: AppOptions = {}) {
     )
     app.get(/^(?!\/api\/|\/health$).*/, (req, res) => {
       const isEmbed = req.path === '/e' || req.path.startsWith('/e/')
+      // Bitrix (or a soft-nav reload) sometimes loads `/` in the iframe. Serving the SPA there
+      // sends X-Frame-Options: SAMEORIGIN → ERR_BLOCKED_BY_RESPONSE. Offer a frameable gate instead.
+      const isIframe = req.get('sec-fetch-dest') === 'iframe'
+      if (isIframe && !isEmbed && bitrixPortal) {
+        res.removeHeader('X-Frame-Options')
+        res.removeHeader('Cross-Origin-Opener-Policy')
+        res.setHeader('Cache-Control', 'no-cache')
+        res.setHeader(
+          'Content-Security-Policy',
+          `default-src 'none'; style-src 'unsafe-inline'; frame-ancestors ${embedAncestors}`,
+        )
+        res.type('html').send(bitrixFramedRootPage())
+        return
+      }
       res.setHeader('Cache-Control', 'no-cache')
       res.setHeader('Content-Security-Policy', isEmbed ? embedCsp : csp)
       if (isEmbed) {
