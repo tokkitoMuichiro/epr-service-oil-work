@@ -16,8 +16,6 @@ const FIT_MIN = 5
 const FIT_MAX = 40
 /** Fallback row height ≈ table row (`control-height + 4px`) on fine pointer. */
 const DEFAULT_ROW_PX = 40
-/** Reserve for the pager bar under the list. */
-const DEFAULT_PAGER_PX = 52
 
 interface PaginationOptions {
   pageSize?: number
@@ -30,8 +28,6 @@ interface FitPaginationOptions extends Omit<PaginationOptions, 'pageSize'> {
   maxSize?: number
   /** Used until the first row can be measured. */
   estimateRowPx?: number
-  /** Space reserved for UiPagination under the list. */
-  pagerPx?: number
 }
 
 function createPager<T>(
@@ -68,18 +64,24 @@ export function useListPagination<T>(items: MaybeRefOrGetter<readonly T[]>, opti
 }
 
 /**
- * Picks pageSize from the free viewport height under `fitRef`
- * so the list + pager fit without vertical scrolling of the page chrome.
+ * Picks pageSize from the **laid-out** height of a scrollport (`fitRef.clientHeight`).
+ * The scrollport must be height-constrained (flex child with `min-height: 0` + `overflow: auto`);
+ * measuring content/viewport offsets caused pageSize to grow and the UI to thrash.
  */
 export function useFitPagination<T>(items: MaybeRefOrGetter<readonly T[]>, options: FitPaginationOptions = {}) {
   const minSize = options.minSize ?? FIT_MIN
   const maxSize = options.maxSize ?? FIT_MAX
   const estimateRowPx = options.estimateRowPx ?? DEFAULT_ROW_PX
-  const pagerPx = options.pagerPx ?? DEFAULT_PAGER_PX
 
   const fitRef = ref<HTMLElement | null>(null) as Ref<HTMLElement | null>
   const pageSize = ref(DEFAULT_PAGE_SIZE)
   const pager = createPager(items, pageSize, options, () => true)
+
+  let lockedRowPx = 0
+  let lastPortHeight = 0
+  let raf = 0
+  let observer: ResizeObserver | null = null
+  let observed: HTMLElement | null = null
 
   function measureRowHeight(root: HTMLElement): number {
     const row =
@@ -87,62 +89,78 @@ export function useFitPagination<T>(items: MaybeRefOrGetter<readonly T[]>, optio
         'tbody tr, [data-fit-row], .objects__item, .date-item, .base, .people__item, li, article',
       ) ?? root.querySelector<HTMLElement>('tr, .ui-sheet, .card')
     const height = row?.getBoundingClientRect().height ?? 0
-    return height > 8 ? height : estimateRowPx
+    return height > 8 ? height : 0
   }
 
   function measure() {
     const root = fitRef.value
     if (!root || typeof window === 'undefined') return
 
-    const top = root.getBoundingClientRect().top
-    const viewportBottom = window.visualViewport?.height ?? window.innerHeight
-    const available = viewportBottom - top - pagerPx
-    if (available < estimateRowPx) {
-      pageSize.value = minSize
-      return
-    }
+    const port = root.clientHeight
+    if (port < 16) return
 
-    const rowHeight = measureRowHeight(root)
-    const next = Math.min(maxSize, Math.max(minSize, Math.floor(available / rowHeight)))
+    const measured = measureRowHeight(root)
+    if (measured > 0) lockedRowPx = measured
+    const rowHeight = lockedRowPx || estimateRowPx
+
+    const head = root.querySelector('thead')
+    const headH = head instanceof HTMLElement ? head.offsetHeight : 0
+    const available = Math.max(0, port - headH)
+    const next = Math.min(maxSize, Math.max(minSize, Math.floor(available / rowHeight) || minSize))
+
+    // Ignore sub-pixel / scrollbar jitter once we have a size for this port height.
+    if (Math.abs(port - lastPortHeight) < 2 && next === pageSize.value) return
+    lastPortHeight = port
     if (next !== pageSize.value) pageSize.value = next
   }
 
-  let observer: ResizeObserver | null = null
-  let observed: HTMLElement | null = null
+  function scheduleMeasure() {
+    if (typeof window === 'undefined') return
+    cancelAnimationFrame(raf)
+    raf = requestAnimationFrame(() => {
+      raf = requestAnimationFrame(measure)
+    })
+  }
 
   function bindObserver(el: HTMLElement | null) {
     if (observed === el) return
     observer?.disconnect()
     observed = el
+    lastPortHeight = 0
     if (!el) return
-    observer = new ResizeObserver(() => measure())
+    observer = new ResizeObserver(() => scheduleMeasure())
     observer.observe(el)
-    measure()
+    scheduleMeasure()
   }
 
   watch(fitRef, (el) => bindObserver(el), { flush: 'post' })
 
   onMounted(() => {
     bindObserver(fitRef.value)
-    window.addEventListener('resize', measure)
-    window.visualViewport?.addEventListener('resize', measure)
-    requestAnimationFrame(measure)
+    window.addEventListener('resize', scheduleMeasure)
+    window.visualViewport?.addEventListener('resize', scheduleMeasure)
+    scheduleMeasure()
   })
 
   onBeforeUnmount(() => {
+    cancelAnimationFrame(raf)
     observer?.disconnect()
-    window.removeEventListener('resize', measure)
-    window.visualViewport?.removeEventListener('resize', measure)
+    window.removeEventListener('resize', scheduleMeasure)
+    window.visualViewport?.removeEventListener('resize', scheduleMeasure)
   })
 
+  // First rows appearing → lock real row height once; do not remeasure on every length change.
   watch(
     () => toValue(items).length,
-    () => {
-      requestAnimationFrame(measure)
+    (count, prev) => {
+      if (prev === 0 && count > 0) {
+        lockedRowPx = 0
+        scheduleMeasure()
+      }
     },
   )
 
-  /** Template: `:ref="pager.bindFit"` — keeps the measure root off the reactive unwrap. */
+  /** Template: `:ref="pager.bindFit"` on the height-constrained scrollport. */
   function bindFit(el: unknown) {
     fitRef.value = el instanceof HTMLElement ? el : null
   }

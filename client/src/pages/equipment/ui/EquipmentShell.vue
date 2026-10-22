@@ -60,8 +60,8 @@ watch(
 </script>
 
 <template>
-  <section class="shell">
-    <PageHeader :title="title" :description="isEmbed ? undefined : route.meta.description">
+  <section class="shell ui-fill-page">
+    <PageHeader class="ui-fill-chrome" :title="title" :description="isEmbed ? undefined : route.meta.description">
       <template v-if="store.isReady && canExport(store.auth)" #actions>
         <UiMenu label="Экспорт оборудования" text="Экспорт" :sections="exportSections" @select="onExport">
           <template #icon><IconDownload :size="16" /></template>
@@ -69,7 +69,7 @@ watch(
       </template>
     </PageHeader>
 
-    <nav v-if="isEmbed" class="embed-nav" aria-label="Разделы оборудования">
+    <nav v-if="isEmbed" class="embed-nav ui-fill-chrome" aria-label="Разделы оборудования">
       <RouterLink
         v-for="link in embedLinks"
         :key="link.name"
@@ -81,7 +81,7 @@ watch(
       </RouterLink>
     </nav>
 
-    <p v-if="store.lastBitrixExport" class="notice" role="status">
+    <p v-if="store.lastBitrixExport" class="notice ui-fill-chrome" role="status">
       <span>
         Выгрузка подготовлена ({{ store.lastBitrixExport.rows }} поз.), интеграция с Битрикс пока не подключена →
         <code>{{ store.lastBitrixExport.storagePath }}</code>
@@ -96,18 +96,26 @@ watch(
       <UiButton variant="primary" @click="store.load()">Повторить</UiButton>
     </UiState>
     <template v-else-if="store.status !== 'idle'">
-      <EquipmentAlerts />
-      <RouterView />
+      <EquipmentAlerts class="ui-fill-chrome" />
+      <RouterView v-slot="{ Component }">
+        <component :is="Component" class="shell__view" />
+      </RouterView>
     </template>
   </section>
 </template>
 
 <style scoped>
 .shell {
-  display: flex;
-  flex-direction: column;
   gap: var(--space-4);
-  min-height: 100%;
+}
+
+.shell__view {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
 }
 
 .embed-nav {

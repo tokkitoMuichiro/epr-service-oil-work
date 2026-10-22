@@ -62,7 +62,7 @@ function personLabel(id: string, fullName: string) {
 </script>
 
 <template>
-  <div class="layout" :class="{ 'layout--collapsed': isPeopleCollapsed }">
+  <div class="layout ui-fill-page" :class="{ 'layout--collapsed': isPeopleCollapsed }">
     <label class="picker">
       <span class="ui-overline">Сотрудник</span>
       <select class="ui-control" :value="userId" @change="select(($event.target as HTMLSelectElement).value)">
@@ -72,7 +72,7 @@ function personLabel(id: string, fullName: string) {
       </select>
     </label>
 
-    <aside class="people" :class="{ 'people--collapsed': isPeopleCollapsed }" aria-label="Сотрудники">
+    <aside class="people ui-fill-chrome" :class="{ 'people--collapsed': isPeopleCollapsed }" aria-label="Сотрудники">
       <div class="people__toolbar">
         <button
           type="button"
@@ -121,7 +121,7 @@ function personLabel(id: string, fullName: string) {
       text="В списке — сотрудники с числом позиций."
     />
     <div v-else class="page">
-      <div class="page__bar">
+      <div class="page__bar ui-fill-chrome">
         <CategoryTabs :active="category" :items="items" />
         <UiButton v-if="canAddHere" variant="primary" @click="isCreateOpen = true">{{ addLabel(category) }}</UiButton>
       </div>
@@ -152,17 +152,17 @@ function personLabel(id: string, fullName: string) {
 .layout {
   --people-visible: 9;
   --people-gap: var(--space-2);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
-  align-items: start;
   min-width: 0;
 }
 
+.layout > .page {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .people {
-  position: sticky;
-  top: 0;
-  z-index: 2;
+  flex: 0 0 auto;
   display: grid;
   gap: var(--space-2);
   min-width: 0;

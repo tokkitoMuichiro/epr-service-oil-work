@@ -688,6 +688,42 @@ textarea::placeholder {
   --badge-dot: var(--status-info-solid);
 }
 
+/*
+ * Страница списка заполняет колонку shell и сама не скроллится:
+ * скролл только у `.ui-fill-scroll` (таблица / список).
+ */
+.ui-fill-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ui-fill-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ui-fill-chrome {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.ui-fill-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Таблицы */
 .ui-table-wrap {
   position: relative;

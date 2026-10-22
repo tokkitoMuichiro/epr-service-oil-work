@@ -157,8 +157,8 @@ function origin(item: EquipmentItem) {
 </script>
 
 <template>
-  <div class="board">
-    <div class="board__sticky">
+  <div class="board ui-fill-panel">
+    <div class="board__chrome ui-fill-chrome">
       <slot name="sticky" />
       <div class="toolbar">
         <input v-model="query" class="toolbar__search ui-control" type="search" :placeholder="searchPlaceholder" aria-label="Поиск" />
@@ -190,7 +190,7 @@ function origin(item: EquipmentItem) {
     />
 
     <template v-else>
-      <div :ref="pager.bindFit" class="list">
+      <div :ref="pager.bindFit" class="list ui-fill-scroll">
         <div class="table-wrap ui-table-wrap">
           <table class="ui-table">
             <thead>
@@ -357,7 +357,13 @@ function origin(item: EquipmentItem) {
           </li>
         </ul>
       </div>
-      <UiPagination v-if="pager.isPaged" v-model:page="pager.page" :total="pager.total" :page-size="pager.pageSize" />
+      <UiPagination
+        v-if="pager.isPaged"
+        v-model:page="pager.page"
+        class="ui-fill-chrome"
+        :total="pager.total"
+        :page-size="pager.pageSize"
+      />
     </template>
 
     <EquipmentCardDialog
@@ -380,22 +386,15 @@ function origin(item: EquipmentItem) {
 
 <style scoped>
 .board {
-  display: grid;
   gap: var(--space-3);
   min-width: 0;
   max-width: 100%;
   overflow-x: clip;
 }
 
-.board__sticky {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-sticky);
+.board__chrome {
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-2) 0;
-  margin: calc(-1 * var(--space-2)) 0 0;
-  background: var(--surface-card);
 }
 
 .toolbar {
@@ -420,9 +419,7 @@ function origin(item: EquipmentItem) {
 }
 
 .selection {
-  position: sticky;
-  top: 0;
-  z-index: 3;
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -452,7 +449,9 @@ function origin(item: EquipmentItem) {
 }
 
 .list {
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   max-width: 100%;
 }
 

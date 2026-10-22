@@ -20,14 +20,14 @@ const items = computed(() => (isAll.value ? store.items : store.myItems))
 
 <template>
   <UiState v-if="!hasAccess" title="Нет доступа" text="Полный список доступен ролям с правом «Видеть всё»." />
-  <div v-else class="page">
-    <div class="page__bar">
+  <div v-else class="page ui-fill-page">
+    <div class="page__bar ui-fill-chrome">
       <CategoryTabs :active="category" :items="items" />
       <UiButton v-if="canCreate(store.auth)" variant="primary" @click="isCreateOpen = true">
         {{ addLabel(category) }}
       </UiButton>
     </div>
-    <div class="panel">
+    <div class="panel ui-fill-panel">
       <EquipmentBoard
         :items="items"
         :category="category"

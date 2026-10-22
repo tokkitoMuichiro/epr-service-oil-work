@@ -60,8 +60,8 @@ async function remove(w: Warehouse) {
 </script>
 
 <template>
-  <div class="page">
-    <div class="page__bar">
+  <div class="page ui-fill-page">
+    <div class="page__bar ui-fill-chrome">
       <p class="muted intro ui-hide-mobile">
         Кладовщик принимает передачи на свою базу и передаёт с неё оборудование. База «Ремонт» — системная: сюда
         попадает всё со статусом «В ремонте».
@@ -69,14 +69,14 @@ async function remove(w: Warehouse) {
       <UiButton v-if="canManage" variant="primary" @click="openForm(null)">Новая база</UiButton>
     </div>
 
-    <p v-if="store.actionError && !isFormOpen" class="alert" role="alert">
+    <p v-if="store.actionError && !isFormOpen" class="alert ui-fill-chrome" role="alert">
       {{ store.actionError }}
       <button type="button" aria-label="Скрыть" @click="store.clearActionError()"><IconClose :size="16" /></button>
     </p>
 
     <UiState v-if="!bases.length" title="Баз пока нет" :icon="IconEquipment" text="Создайте первую производственную базу." />
 
-    <ul v-else :ref="pager.bindFit" class="bases">
+    <ul v-else :ref="pager.bindFit" class="bases ui-fill-scroll">
       <li v-for="w in pager.pageItems" :key="w.id" class="base" :class="{ 'base--system': w.isSystem }">
         <RouterLink class="base__link" :to="{ name: nameOf('equipment-warehouse'), params: { id: w.id } }">
           <div class="base__head">
@@ -102,7 +102,13 @@ async function remove(w: Warehouse) {
         </div>
       </li>
     </ul>
-    <UiPagination v-if="pager.isPaged" v-model:page="pager.page" :total="pager.total" :page-size="pager.pageSize" />
+    <UiPagination
+      v-if="pager.isPaged"
+      v-model:page="pager.page"
+      class="ui-fill-chrome"
+      :total="pager.total"
+      :page-size="pager.pageSize"
+    />
 
     <WarehouseFormDialog :open="isFormOpen" :warehouse="editing" @close="isFormOpen = false" />
   </div>

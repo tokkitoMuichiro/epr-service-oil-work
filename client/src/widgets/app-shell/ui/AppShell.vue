@@ -734,13 +734,24 @@ onUnmounted(() => {
 }
 
 .shell__main {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   scrollbar-gutter: stable;
   padding: var(--space-8) var(--space-8) 48px;
   padding-right: calc(var(--space-8) + var(--safe-right));
+}
+
+.shell__main > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.shell__main > .alert {
+  flex: 0 0 auto;
 }
 
 /* Rail: 861–1279px, свёрнутый сайдбар */

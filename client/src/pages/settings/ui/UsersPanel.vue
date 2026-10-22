@@ -115,6 +115,10 @@ onMounted(load)
   gap: var(--space-3);
 }
 
+.users__table {
+  max-height: min(52vh, 28rem);
+}
+
 .users__bar {
   display: flex;
   justify-content: flex-end;

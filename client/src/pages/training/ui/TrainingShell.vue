@@ -15,23 +15,36 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="training">
-    <PageHeader :title="title" :description="route.meta.description" />
+  <section class="training ui-fill-page">
+    <PageHeader class="ui-fill-chrome" :title="title" :description="route.meta.description" />
 
-    <UiState v-if="store.status === 'loading' || store.status === 'idle'" kind="loading" title="Загрузка…" text="Получаем программы и тесты." />
+    <UiState
+      v-if="store.status === 'loading' || store.status === 'idle'"
+      kind="loading"
+      title="Загрузка…"
+      text="Получаем программы и тесты."
+    />
     <UiState v-else-if="store.status === 'error'" kind="error" title="Не удалось загрузить" :text="store.errorText">
       <UiButton variant="primary" @click="store.load()">Повторить</UiButton>
     </UiState>
-    <RouterView v-else />
+    <RouterView v-else v-slot="{ Component }">
+      <component :is="Component" class="training__view" />
+    </RouterView>
   </section>
 </template>
 
 <style scoped>
 .training {
-  display: flex;
-  flex-direction: column;
   gap: var(--space-4);
-  min-height: 100%;
+}
+
+.training__view {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
 }
 
 @media (max-width: 860px) {

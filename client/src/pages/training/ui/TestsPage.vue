@@ -42,8 +42,8 @@ const pager = useMobilePagination(visible, { resetOn: [search, programFilter, st
 </script>
 
 <template>
-  <div class="tests">
-    <div class="tests__toolbar">
+  <div class="tests ui-fill-page">
+    <div class="tests__toolbar ui-fill-chrome">
       <input v-model="search" class="tests__search ui-control" type="search" placeholder="Поиск по названию" aria-label="Поиск" />
       <select v-model="programFilter" class="ui-control" aria-label="Программа">
         <option value="">Все программы</option>
@@ -71,8 +71,8 @@ const pager = useMobilePagination(visible, { resetOn: [search, programFilter, st
     </div>
 
     <UiState v-if="!visible.length" title="Тестов нет" :icon="IconTraining" text="Создайте тест: добавьте вопросы и опубликуйте его." />
-    <template v-else>
-      <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack">
+    <div v-else class="tests__list ui-fill-panel">
+      <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack ui-fill-scroll">
         <table class="ui-table">
           <thead>
             <tr>
@@ -108,15 +108,24 @@ const pager = useMobilePagination(visible, { resetOn: [search, programFilter, st
           </tbody>
         </table>
       </div>
-      <UiPagination v-if="pager.isPaged" v-model:page="pager.page" :total="pager.total" :page-size="pager.pageSize" />
-    </template>
+      <UiPagination
+        v-if="pager.isPaged"
+        v-model:page="pager.page"
+        class="ui-fill-chrome"
+        :total="pager.total"
+        :page-size="pager.pageSize"
+      />
+    </div>
   </div>
 </template>
 
 <style scoped>
 .tests {
-  display: grid;
   gap: var(--space-4);
+}
+
+.tests__list {
+  gap: var(--space-3);
 }
 
 .tests__toolbar {
