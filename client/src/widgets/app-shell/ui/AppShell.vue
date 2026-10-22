@@ -51,7 +51,7 @@ const access = useAccessStore()
 const roleStore = useRoleStore()
 const mobileOpen = ref(false)
 const isMobile = useIsMobile()
-const isCollapsed = ref(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) !== '0')
+const isCollapsed = ref(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1')
 const openGroups = ref<string[]>([])
 const railPopover = ref<{ id: string; top: number } | null>(null)
 const menuButton = ref<HTMLButtonElement | null>(null)
@@ -297,6 +297,17 @@ onUnmounted(() => {
     >
       <div class="brand">
         <AppLogo />
+        <button
+          v-if="!isMobile"
+          type="button"
+          class="brand__collapse"
+          :aria-label="isCollapsed ? 'Развернуть меню' : 'Свернуть меню'"
+          :title="isCollapsed ? 'Развернуть меню' : 'Свернуть меню'"
+          :aria-pressed="!isCollapsed"
+          @click="toggleCollapsed"
+        >
+          <IconPanelLeft :class="{ 'brand__collapse-icon--open': !isCollapsed }" />
+        </button>
         <div class="brand__text">
           <div class="brand__title">{{ APP_NAME }}</div>
         </div>
@@ -411,18 +422,6 @@ onUnmounted(() => {
         </RoleSwitcher>
       </div>
 
-      <button
-        v-if="!isMobile"
-        type="button"
-        class="rail__toggle"
-        :aria-label="isCollapsed ? 'Развернуть меню' : 'Свернуть меню'"
-        :title="isCollapsed ? 'Развернуть меню' : 'Свернуть меню'"
-        :aria-pressed="!isCollapsed"
-        @click="toggleCollapsed"
-      >
-        <IconPanelLeft />
-        <span class="nav__label">{{ isCollapsed ? 'Развернуть меню' : 'Свернуть меню' }}</span>
-      </button>
     </aside>
 
     <main class="shell__main">
@@ -477,9 +476,27 @@ onUnmounted(() => {
 
 .brand {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-2);
   align-items: center;
   padding: var(--space-1) var(--space-2) var(--space-2);
+}
+
+.brand__collapse {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-on-inverse-muted);
+  cursor: pointer;
+}
+
+.brand__collapse-icon--open {
+  transform: scaleX(-1);
 }
 
 .brand__text {
@@ -538,7 +555,7 @@ onUnmounted(() => {
 @media (hover: hover) and (pointer: fine) {
   .nav__link:hover,
   .nav__sublink:hover,
-  .rail__toggle:hover,
+  .brand__collapse:hover,
   .rail__avatar:hover {
     background: var(--surface-inverse-hover);
     color: var(--text-on-inverse);
@@ -653,7 +670,6 @@ onUnmounted(() => {
   border-radius: var(--radius);
 }
 
-.rail__toggle,
 .rail__avatar {
   display: flex;
   align-items: center;
@@ -734,6 +750,8 @@ onUnmounted(() => {
 }
 
 .shell--rail .brand {
+  flex-direction: column;
+  gap: var(--space-1);
   padding: var(--space-1) 0 var(--space-2);
 }
 
@@ -748,8 +766,7 @@ onUnmounted(() => {
   width: 100%;
 }
 
-.shell--rail .nav__link,
-.shell--rail .rail__toggle {
+.shell--rail .nav__link {
   justify-content: center;
   padding: 0;
 }
@@ -869,10 +886,6 @@ onUnmounted(() => {
   .shell__main {
     padding: var(--space-3) calc(var(--space-3) + var(--safe-right)) calc(var(--space-5) + var(--safe-bottom))
       calc(var(--space-3) + var(--safe-left));
-  }
-
-  .rail__toggle {
-    display: none;
   }
 }
 

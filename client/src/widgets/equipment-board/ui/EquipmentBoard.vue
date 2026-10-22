@@ -517,21 +517,6 @@ tbody tr {
   cursor: pointer;
 }
 
-tr[data-state='pending'] td,
-.cards__item[data-state='pending'] {
-  background-color: var(--status-warn-bg);
-}
-
-tr[data-state='fix'] td,
-.cards__item[data-state='fix'] {
-  background-color: var(--status-bad-bg);
-}
-
-tr[data-state='review'] td,
-.cards__item[data-state='review'] {
-  background-color: var(--status-info-bg);
-}
-
 tr[data-state='pending'] td:first-child,
 .cards__item[data-state='pending'] {
   box-shadow: inset 3px 0 0 var(--status-warn-solid);
@@ -547,22 +532,9 @@ tr[data-state='review'] td:first-child,
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
-/* Keep row tint; highlight with outline only (no layout shift). */
 @media (hover: hover) and (pointer: fine) {
   .table-wrap :deep(tbody tr:hover > td) {
-    background-color: var(--surface-card);
-  }
-
-  .table-wrap :deep(tr[data-state='pending']:hover > td) {
-    background-color: var(--status-warn-bg);
-  }
-
-  .table-wrap :deep(tr[data-state='fix']:hover > td) {
-    background-color: var(--status-bad-bg);
-  }
-
-  .table-wrap :deep(tr[data-state='review']:hover > td) {
-    background-color: var(--status-info-bg);
+    background-color: var(--row-hover-bg);
   }
 
   .table-wrap :deep(tbody tr:hover) {

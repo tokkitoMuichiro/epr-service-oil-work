@@ -29,6 +29,7 @@ import { bitrixFrameAncestors, rateLimit } from '../../security.js'
 import type { AccessStore } from '../access/store.js'
 import { BitrixLoginFailure, type BitrixDirectory, type BitrixSso } from './bitrix.js'
 import { SESSION_TTL_MS, type UserRepository } from './repository.js'
+import type { AuditLog } from '../../db.js'
 import type { BitrixUserSync } from './sync.js'
 
 export const SESSION_COOKIE = 'erp_session'
@@ -376,7 +377,14 @@ export function authRouter(users: UserRepository, options: AuthOptions) {
   return router
 }
 
-export function usersRouter(users: UserRepository, access: AccessStore, directory: BitrixDirectory, userSync: BitrixUserSync) {
+export function usersRouter(
+  users: UserRepository,
+  access: AccessStore,
+  directory: BitrixDirectory,
+  userSync: BitrixUserSync,
+  audit?: AuditLog,
+  storageMetrics?: () => { key: string; bytes: number; updatedAt: string }[],
+) {
   const router = Router()
 
   router.use((req, _res, next) => {
@@ -386,6 +394,28 @@ export function usersRouter(users: UserRepository, access: AccessStore, director
 
   router.get('/', (_req, res) => {
     res.json({ items: users.list() })
+  })
+
+  router.get('/audit', (req, res) => {
+    if (!audit) {
+      res.json({ items: [], actions: [] })
+      return
+    }
+    const limit = Number(req.query.limit) || 100
+    res.json({
+      items: audit.list({
+        limit,
+        action: trimmed(req.query.action) || undefined,
+        userId: trimmed(req.query.userId) || undefined,
+        from: trimmed(req.query.from) || undefined,
+        to: trimmed(req.query.to) || undefined,
+      }),
+      actions: audit.actions(),
+    })
+  })
+
+  router.get('/storage', (_req, res) => {
+    res.json({ items: storageMetrics?.() ?? [] })
   })
 
   router.get('/bitrix', async (req, res) => {

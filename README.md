@@ -2,7 +2,7 @@
 
 Внутренняя ERP-система компании **АММИР**: контракты и графики объектов, персонал и бригады, обучение и проверки знаний, полевые отчёты, оборудование.
 
-Стек: **Vite + Vue 3 + TypeScript + Pinia** (клиент, Feature-Sliced Design) и **Express 5 + TypeScript** (API), хранилище — SQLite (`node:sqlite`, Node.js 22.13+).
+Стек: **Vite + Vue 3 + TypeScript + Pinia** (клиент, Feature-Sliced Design) и **Express 5 + TypeScript** (API), хранилище — SQLite (`node:sqlite`). Нужен **Node.js 22.13+** (в Docker и на VDS — Node 24).
 
 ## Структура
 

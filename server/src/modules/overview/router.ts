@@ -46,6 +46,7 @@ export function overviewRouter(sources: OverviewSources) {
         ? documentOverview(sources.personnel.listWorkers(user.role), today)
         : null,
       training: canViewBlock(permissions, 'training') ? sources.training.summary().counters : null,
+      trainingAlerts: canViewBlock(permissions, 'training') ? sources.training.summary().alerts : null,
     }
     res.json({ item: overview })
   })

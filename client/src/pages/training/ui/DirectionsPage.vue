@@ -28,6 +28,7 @@ interface ProgramForm {
   name: string
   periodMonths: number
   expiringDays: number
+  bitrixFolderId: string
 }
 
 const store = useTrainingStore()
@@ -87,6 +88,7 @@ function editProgram(direction: DirectionWithPrograms, program?: TrainingProgram
         name: program.name,
         periodMonths: program.periodMonths,
         expiringDays: program.expiringDays,
+        bitrixFolderId: program.bitrixFolderId,
       }
     : {
         id: null,
@@ -95,6 +97,7 @@ function editProgram(direction: DirectionWithPrograms, program?: TrainingProgram
         name: '',
         periodMonths: 12,
         expiringDays: 30,
+        bitrixFolderId: '',
       }
 }
 
@@ -106,6 +109,7 @@ async function submitProgram() {
     name: form.name.trim(),
     periodMonths: Number(form.periodMonths),
     expiringDays: Number(form.expiringDays),
+    bitrixFolderId: form.bitrixFolderId.trim(),
   }
   const siblings = store.directions.find((d) => d.id === form.directionId)?.programs.filter((p) => p.id !== form.id) ?? []
   formError.value = validateProgramDraft(draft, siblings) ?? ''
@@ -249,9 +253,18 @@ function archiveProgram(program: TrainingProgram) {
             <input v-model.number="programForm.expiringDays" type="number" min="0" max="180" required />
           </label>
         </div>
+        <label>
+          <span>ID папки Битрикс (необязательно)</span>
+          <input
+            v-model="programForm.bitrixFolderId"
+            type="text"
+            maxlength="64"
+            placeholder="Пусто — создать под «ERP/Учебные материалы»"
+          />
+        </label>
         <p class="ui-form__note">
-          Программу можно назначить сотруднику любой должности — кому и что назначать, решает администратор или
-          специалист по охране труда. Папка в Битрикс создаётся автоматически.
+          Программу можно назначить сотруднику любой должности. Без ID папка на Диске создаётся автоматически; с ID —
+          материалы пишутся в указанную папку.
         </p>
         <p v-if="formError" class="ui-form__hint" role="alert">{{ formError }}</p>
         <div class="ui-form__actions">

@@ -168,9 +168,65 @@ function isChosen(optionId: string) {
 
 function choose(optionId: string) {
   const q = question.value
-  if (!q) return
+  if (!q || q.kind === 'order' || q.kind === 'match') return
   const chosen = answers.value[q.id] ?? []
   const next = q.kind === 'multiple' ? (chosen.includes(optionId) ? chosen.filter((x) => x !== optionId) : [...chosen, optionId]) : [optionId]
+  answers.value = { ...answers.value, [q.id]: next }
+  autosave.save(q.id, next)
+}
+
+function setOrderAnswer(orderedIds: string[]) {
+  const q = question.value
+  if (!q) return
+  answers.value = { ...answers.value, [q.id]: orderedIds }
+  autosave.save(q.id, orderedIds)
+}
+
+function moveOrder(optionId: string, rank: number) {
+  const q = question.value
+  if (!q) return
+  const ids = [...(answers.value[q.id]?.length === q.options.length ? answers.value[q.id]! : q.options.map((o) => o.id))]
+  const from = ids.indexOf(optionId)
+  if (from < 0) return
+  ids.splice(from, 1)
+  ids.splice(Math.max(0, Math.min(rank - 1, ids.length)), 0, optionId)
+  setOrderAnswer(ids)
+}
+
+function orderRankOf(optionId: string) {
+  const q = question.value
+  if (!q) return 0
+  const ids = answers.value[q.id] ?? []
+  const idx = ids.indexOf(optionId)
+  return idx >= 0 ? idx + 1 : 0
+}
+
+function matchLeft() {
+  return question.value?.options.filter((o) => o.side === 'left') ?? []
+}
+
+function matchRight() {
+  return question.value?.options.filter((o) => o.side === 'right') ?? []
+}
+
+function matchPairOf(leftId: string) {
+  const q = question.value
+  if (!q) return ''
+  const ids = answers.value[q.id] ?? []
+  for (let i = 0; i < ids.length; i += 2) if (ids[i] === leftId) return ids[i + 1] ?? ''
+  return ''
+}
+
+function setMatchPair(leftId: string, rightId: string) {
+  const q = question.value
+  if (!q) return
+  const ids = answers.value[q.id] ?? []
+  const next: string[] = []
+  for (let i = 0; i < ids.length; i += 2) {
+    if (ids[i] === leftId) continue
+    next.push(ids[i]!, ids[i + 1]!)
+  }
+  if (rightId) next.push(leftId, rightId)
   answers.value = { ...answers.value, [q.id]: next }
   autosave.save(q.id, next)
 }
@@ -337,8 +393,46 @@ onBeforeUnmount(() => {
         <article class="run__card run__question">
           <h1 class="run__question-text">{{ question.text }}</h1>
           <img v-if="question.image" :src="publicTestApi.imageUrl(token, question.image.fileId)" :alt="question.image.fileName" />
-          <p class="run__hint">{{ question.kind === 'multiple' ? 'Выберите все правильные ответы' : 'Выберите один ответ' }}</p>
-          <div class="run__options" :role="question.kind === 'multiple' ? 'group' : 'radiogroup'">
+          <p class="run__hint">
+            {{
+              question.kind === 'multiple'
+                ? 'Выберите все правильные ответы'
+                : question.kind === 'order'
+                  ? 'Расставьте варианты в правильном порядке'
+                  : question.kind === 'match'
+                    ? 'Сопоставьте левые и правые варианты'
+                    : 'Выберите один ответ'
+            }}
+          </p>
+          <div v-if="question.kind === 'order'" class="run__options">
+            <label v-for="o in question.options" :key="o.id" class="run__option run__order">
+              <select
+                class="ui-control"
+                :value="orderRankOf(o.id) || ''"
+                :aria-label="`Порядок: ${o.text}`"
+                @change="moveOrder(o.id, Number(($event.target as HTMLSelectElement).value))"
+              >
+                <option disabled value="">№</option>
+                <option v-for="n in question.options.length" :key="n" :value="n">{{ n }}</option>
+              </select>
+              <span>{{ o.text }}</span>
+            </label>
+          </div>
+          <div v-else-if="question.kind === 'match'" class="run__options">
+            <label v-for="left in matchLeft()" :key="left.id" class="run__option run__match">
+              <span>{{ left.text }}</span>
+              <select
+                class="ui-control"
+                :value="matchPairOf(left.id)"
+                :aria-label="`Пара для ${left.text}`"
+                @change="setMatchPair(left.id, ($event.target as HTMLSelectElement).value)"
+              >
+                <option value="">—</option>
+                <option v-for="right in matchRight()" :key="right.id" :value="right.id">{{ right.text }}</option>
+              </select>
+            </label>
+          </div>
+          <div v-else class="run__options" :role="question.kind === 'multiple' ? 'group' : 'radiogroup'">
             <button
               v-for="o in question.options"
               :key="o.id"
@@ -628,6 +722,23 @@ onBeforeUnmount(() => {
 .run__options {
   display: grid;
   gap: var(--space-2);
+}
+
+.run__order,
+.run__match {
+  cursor: default;
+}
+
+.run__order select,
+.run__match select {
+  flex: 0 0 4.5rem;
+  width: 4.5rem;
+}
+
+.run__match {
+  display: grid;
+  grid-template-columns: 1fr minmax(8rem, 1fr);
+  align-items: center;
 }
 
 .run__option {

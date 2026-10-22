@@ -73,7 +73,7 @@ const todayStyle = computed(() => {
     <RouterLink
       v-for="row in rows"
       :key="row.objectId"
-      :to="{ path: '/contracts', query: { object: row.objectId } }"
+      :to="{ path: '/contracts', query: { object: row.objectId, scale: 'week' } }"
       class="mini__row"
     >
       <span class="mini__label">

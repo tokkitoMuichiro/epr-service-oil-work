@@ -127,6 +127,34 @@ describe('nextDueDate', () => {
 })
 
 describe('scoreAttempt', () => {
+  it('scores order and match questions', () => {
+    const order = question('o', {
+      kind: 'order',
+      options: [
+        { id: 'o-1', text: 'Первый' },
+        { id: 'o-2', text: 'Второй' },
+        { id: 'o-3', text: 'Третий' },
+      ],
+      correctOptionIds: ['o-1', 'o-2', 'o-3'],
+    })
+    const match = question('m', {
+      kind: 'match',
+      options: [
+        { id: 'm-l1', text: 'A', side: 'left' },
+        { id: 'm-l2', text: 'B', side: 'left' },
+        { id: 'm-r1', text: '1', side: 'right' },
+        { id: 'm-r2', text: '2', side: 'right' },
+      ],
+      correctOptionIds: ['m-l1', 'm-r1', 'm-l2', 'm-r2'],
+    })
+    assert.equal(scoreAttempt([order], [{ questionId: 'o', optionIds: ['o-1', 'o-2', 'o-3'] }], 100).isPassed, true)
+    assert.equal(scoreAttempt([order], [{ questionId: 'o', optionIds: ['o-3', 'o-2', 'o-1'] }], 100).score, 0)
+    assert.equal(
+      scoreAttempt([match], [{ questionId: 'm', optionIds: ['m-l2', 'm-r2', 'm-l1', 'm-r1'] }], 100).isPassed,
+      true,
+    )
+  })
+
   const questions = [
     question('s'),
     question('m', { kind: 'multiple', correctOptionIds: ['m-a', 'm-b'], weight: 2 }),

@@ -57,6 +57,8 @@ export interface ProgramDraft {
   name: string
   periodMonths: number
   expiringDays: number
+  /** Optional Bitrix Disk folder id; empty keeps the auto path under «ERP/Учебные материалы». */
+  bitrixFolderId?: string
 }
 
 export interface DirectionWithPrograms extends TrainingDirection {
@@ -235,16 +237,20 @@ export const OUTSIDE_ROOT_ERROR = `Файл должен лежать в пап�
 
 // ─── Tests ────────────────────────────────────────────────────────────────
 
-export type QuestionKind = 'single' | 'multiple'
+export type QuestionKind = 'single' | 'multiple' | 'order' | 'match'
 
 export const QUESTION_KIND_LABEL: Record<QuestionKind, string> = {
   single: 'Один ответ',
   multiple: 'Несколько ответов',
+  order: 'Порядок',
+  match: 'Соответствие',
 }
 
 export interface TestOption {
   id: string
   text: string
+  /** For `match`: left column or right column. */
+  side?: 'left' | 'right'
 }
 
 export interface QuestionImage {
@@ -330,7 +336,7 @@ export function questionsPerAttempt(test: Pick<TestContent, 'questions' | 'quest
 
 function validateQuestion(question: TestQuestion, index: number, forPublish: boolean): string | null {
   const at = `Вопрос ${index + 1}`
-  if (question.kind !== 'single' && question.kind !== 'multiple') return `${at}: неизвестный тип вопроса`
+  if (!QUESTION_KIND_LABEL[question.kind]) return `${at}: неизвестный тип вопроса`
   if (!Array.isArray(question.options) || question.options.length > 8) return `${at}: не больше 8 вариантов ответа`
   if (!(question.weight > 0) || question.weight > 100) return `${at}: балл — больше 0 и не больше 100`
   const optionIds = new Set(question.options.map((o) => o.id))
@@ -343,6 +349,32 @@ function validateQuestion(question: TestQuestion, index: number, forPublish: boo
   if (new Set(texts).size !== texts.length) return `${at}: варианты ответа повторяются`
   if (!question.correctOptionIds.length) return `${at}: отметьте правильный ответ`
   if (question.kind === 'single' && question.correctOptionIds.length !== 1) return `${at}: должен быть ровно один правильный ответ`
+  if (question.kind === 'order') {
+    if (question.correctOptionIds.length !== question.options.length) {
+      return `${at}: задайте полный порядок всех вариантов`
+    }
+    if (new Set(question.correctOptionIds).size !== question.correctOptionIds.length) {
+      return `${at}: в порядке не должно быть повторов`
+    }
+  }
+  if (question.kind === 'match') {
+    const left = question.options.filter((o) => o.side === 'left')
+    const right = question.options.filter((o) => o.side === 'right')
+    if (!left.length || !right.length || left.length + right.length !== question.options.length) {
+      return `${at}: для соответствия отметьте левые и правые варианты`
+    }
+    if (left.length !== right.length) return `${at}: число левых и правых вариантов должно совпадать`
+    if (question.correctOptionIds.length !== left.length * 2) {
+      return `${at}: задайте пару для каждого левого варианта`
+    }
+    for (let i = 0; i < question.correctOptionIds.length; i += 2) {
+      const leftId = question.correctOptionIds[i]
+      const rightId = question.correctOptionIds[i + 1]
+      if (!left.some((o) => o.id === leftId) || !right.some((o) => o.id === rightId)) {
+        return `${at}: пары должны связывать левый вариант с правым`
+      }
+    }
+  }
   return null
 }
 
@@ -560,7 +592,7 @@ export function toPublicQuestion(question: TestQuestion): PublicQuestion {
     text: question.text,
     kind: question.kind,
     image: question.image,
-    options: question.options.map((o) => ({ id: o.id, text: o.text })),
+    options: question.options.map((o) => ({ id: o.id, text: o.text, ...(o.side ? { side: o.side } : {}) })),
   }
 }
 
@@ -576,13 +608,36 @@ function sameSet(a: string[], b: string[]): boolean {
   return left.size === new Set(b).size && b.every((id) => left.has(id))
 }
 
-export function isAnswerCorrect(question: Pick<TestQuestion, 'kind' | 'correctOptionIds'>, optionIds: string[]): boolean {
+function sameSequence(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i])
+}
+
+function sameMatchPairs(a: string[], b: string[]): boolean {
+  if (a.length !== b.length || a.length % 2 !== 0) return false
+  const toMap = (ids: string[]) => {
+    const map = new Map<string, string>()
+    for (let i = 0; i < ids.length; i += 2) map.set(ids[i]!, ids[i + 1]!)
+    return map
+  }
+  const left = toMap(a)
+  const right = toMap(b)
+  if (left.size !== right.size) return false
+  for (const [key, value] of left) if (right.get(key) !== value) return false
+  return true
+}
+
+export function isAnswerCorrect(
+  question: Pick<TestQuestion, 'kind' | 'correctOptionIds'>,
+  optionIds: string[],
+): boolean {
   if (!optionIds.length) return false
   if (question.kind === 'single') return optionIds.length === 1 && question.correctOptionIds[0] === optionIds[0]
+  if (question.kind === 'order') return sameSequence(optionIds, question.correctOptionIds)
+  if (question.kind === 'match') return sameMatchPairs(optionIds, question.correctOptionIds)
   return sameSet(optionIds, question.correctOptionIds)
 }
 
-/** single — the correct option; multiple — exactly the correct set, no partial credit; unanswered — 0. */
+/** single / multiple / order / match — no partial credit; unanswered — 0. */
 export function scoreAttempt(
   questions: Pick<TestQuestion, 'id' | 'kind' | 'correctOptionIds' | 'weight'>[],
   answers: Pick<AttemptAnswer, 'questionId' | 'optionIds'>[],
@@ -766,6 +821,104 @@ export function testingMark(statuses: Pick<ProgramStatus, 'result'>[]): TestingM
   return statuses.some((s) => s.result === 'expiring') ? 'expiring' : 'passed'
 }
 
+export type KnowledgeIssueKind = 'failed' | 'expired'
+
+export interface KnowledgeIssue {
+  workerId: string
+  workerName: string
+  programId: string
+  programName: string
+  kind: KnowledgeIssueKind
+}
+
+/**
+ * Brigade members whose assigned programmes have a failed or expired knowledge check.
+ * Used to block (or override) brigade assignment the same way as missing admissions.
+ */
+export function knowledgeCompliance(
+  brigade: { memberIds: string[] },
+  workers: { id: string; fullName: string; employment?: string }[],
+  programs: TrainingProgram[],
+  records: CertificationRecord[],
+  assignments: TestAssignment[],
+  today: string,
+): KnowledgeIssue[] {
+  const byId = new Map(workers.map((w) => [w.id, w]))
+  const programName = new Map(programs.map((p) => [p.id, p.name]))
+  return brigade.memberIds.flatMap((id) => {
+    const worker = byId.get(id)
+    if (!worker || worker.employment === 'fired') return []
+    return workerProgramStatuses(worker, programs, records, assignments, today).flatMap((status): KnowledgeIssue[] => {
+      if (status.result !== 'failed' && status.result !== 'expired') return []
+      return [
+        {
+          workerId: worker.id,
+          workerName: worker.fullName,
+          programId: status.programId,
+          programName: programName.get(status.programId) ?? status.programId,
+          kind: status.result,
+        },
+      ]
+    })
+  })
+}
+
+export function describeKnowledgeIssue(issue: KnowledgeIssue): string {
+  const when = issue.kind === 'failed' ? 'не сдана' : 'просрочена'
+  return `${issue.workerName} — ${issue.programName} — проверка ${when}`
+}
+
+export interface TrainingAlert {
+  workerId: string
+  fullName: string
+  programId: string
+  programName: string
+  kind: 'failed' | 'expired' | 'expiring' | 'assigned'
+  dueAt: string | null
+}
+
+/** Reminders for the overview: overdue / failed / expiring / open assignments. */
+export function trainingAlerts(
+  workers: { id: string; fullName: string; employment?: string }[],
+  programs: TrainingProgram[],
+  records: CertificationRecord[],
+  assignments: TestAssignment[],
+  today: string,
+  limit = 8,
+): TrainingAlert[] {
+  const programName = new Map(programs.map((p) => [p.id, p.name]))
+  const rank: Record<TrainingAlert['kind'], number> = { failed: 0, expired: 1, assigned: 2, expiring: 3 }
+  const alerts = workers.flatMap((worker) => {
+    if (worker.employment === 'fired') return []
+    return workerProgramStatuses(worker, programs, records, assignments, today).flatMap((status): TrainingAlert[] => {
+      let kind: TrainingAlert['kind'] | null = null
+      if (status.result === 'failed') kind = 'failed'
+      else if (status.result === 'expired') kind = 'expired'
+      else if (status.state === 'assigned') kind = 'assigned'
+      else if (status.result === 'expiring') kind = 'expiring'
+      if (!kind) return []
+      return [
+        {
+          workerId: worker.id,
+          fullName: worker.fullName,
+          programId: status.programId,
+          programName: programName.get(status.programId) ?? status.programId,
+          kind,
+          dueAt: status.activeAssignment?.dueDate ?? status.nextDueAt,
+        },
+      ]
+    })
+  })
+  return alerts
+    .sort(
+      (a, b) =>
+        rank[a.kind] - rank[b.kind] ||
+        (a.dueAt ?? '').localeCompare(b.dueAt ?? '') ||
+        a.fullName.localeCompare(b.fullName, 'ru'),
+    )
+    .slice(0, limit)
+}
+
 /** Only programmes that were assigned to the worker: with results or an active assignment. */
 export function workerProgramStatuses(
   worker: { id: string },
@@ -880,6 +1033,7 @@ export interface SummaryRow {
 export interface TrainingSummary {
   counters: TrainingCounters
   rows: SummaryRow[]
+  alerts: TrainingAlert[]
 }
 
 export interface ReviewItem {

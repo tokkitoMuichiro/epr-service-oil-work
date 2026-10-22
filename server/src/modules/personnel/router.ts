@@ -80,8 +80,8 @@ export function personnelRouter(repo: PersonnelRepository) {
 export function brigadesRouter(repo: PersonnelRepository) {
   const router = Router()
 
-  router.get('/', (_req, res) => {
-    res.json({ items: repo.listBrigades() })
+  router.get('/', (req, res) => {
+    res.json({ items: repo.listBrigades(requestAuth(req).user) })
   })
 
   router.post('/', (req, res) => {

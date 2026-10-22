@@ -165,7 +165,7 @@ const DEMO_RESULTS: DemoResult[] = [
     periodMonths: 12,
     electrical: { personnelKind: 'electrotechnical', group: 'III', voltage: 'up_to_1000' },
   },
-  { id: 'd7', workerId: 'p-6', programId: 'pr-fire', kind: 'regular', isPassed: true, percent: 75, passedAt: '2026-01-20', periodMonths: 6 },
+  { id: 'd7', workerId: 'p-6', programId: 'pr-fire', kind: 'regular', isPassed: true, percent: 75, passedAt: '2026-09-01', periodMonths: 6 },
 ]
 
 function demoHistory(): Pick<TrainingState, 'assignments' | 'records'> {

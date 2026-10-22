@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { persisted, type AuditLog, type Storage } from '../../db.js'
+import { workbook } from '../../excel.js'
 import { HttpError, badRequest, conflict, forbidden, notFound, nowIso, trimmed, uid, type StoredFile } from '../../http.js'
 import {
   ANSWER_GRACE_MS,
@@ -28,6 +29,8 @@ import {
   testSummary,
   toPublicQuestion,
   todayIso,
+  knowledgeCompliance,
+  trainingAlerts,
   trainingCounters,
   validateAnnulReason,
   validateDirectionDraft,
@@ -68,6 +71,10 @@ import {
   type TestSummary,
   type TrainingDirection,
   type TrainingMaterial,
+  type Brigade,
+  type KnowledgeIssue,
+  type RoleId,
+  type TrainingAlert,
   type TrainingProgram,
   type TrainingSummary,
   type TrainingTest,
@@ -86,6 +93,8 @@ export interface TrainingWorker {
 
 export interface TrainingDeps {
   workers: () => TrainingWorker[]
+  /** Active brigades for master scope on assignments. */
+  brigades?: () => Brigade[]
   today?: () => string
   now?: () => number
   audit?: AuditLog
@@ -95,6 +104,8 @@ export interface TrainingDeps {
 export interface Actor {
   id: string
   fullName: string
+  role: RoleId
+  workerId: string | null
 }
 
 interface TestSession {
@@ -540,6 +551,8 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
       name: 'name' in body ? trimmed(body.name) : (editing?.name ?? ''),
       periodMonths: 'periodMonths' in body ? int(body.periodMonths, NaN) : (editing?.periodMonths ?? NaN),
       expiringDays: 'expiringDays' in body ? int(body.expiringDays, NaN) : (editing?.expiringDays ?? 30),
+      bitrixFolderId:
+        'bitrixFolderId' in body ? trimmed(body.bitrixFolderId) : (editing?.bitrixFolderId ?? ''),
     }
     const siblings = state.programs.filter((p) => p.directionId === directionId && p.id !== editing?.id)
     const error = validateProgramDraft(draft, siblings)
@@ -606,8 +619,19 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
       const direction = findDirection(directionId)
       if (direction.isArchived) conflict('Направление в архиве')
       const draft = parseProgram(body, directionId, null)
-      const program: TrainingProgram = { id: uid('pr'), directionId, ...draft, bitrixFolderId: '', storagePath: '', isArchived: false }
-      await folderOf(program)
+      const program: TrainingProgram = {
+        id: uid('pr'),
+        directionId,
+        code: draft.code,
+        name: draft.name,
+        periodMonths: draft.periodMonths,
+        expiringDays: draft.expiringDays,
+        bitrixFolderId: draft.bitrixFolderId ?? '',
+        storagePath: '',
+        isArchived: false,
+      }
+      if (program.bitrixFolderId) program.storagePath = `Диск/${program.bitrixFolderId}`
+      else await folderOf(program)
       state.programs.push(program)
       return structuredClone(program)
     },
@@ -615,7 +639,17 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
     updateProgram(directionId: string, programId: string, body: Partial<Record<keyof ProgramDraft | 'isArchived', unknown>>): TrainingProgram {
       const program = findProgram(programId)
       if (program.directionId !== directionId) notFound('Программа не найдена')
-      Object.assign(program, parseProgram(body, directionId, program))
+      const draft = parseProgram(body, directionId, program)
+      Object.assign(program, {
+        code: draft.code,
+        name: draft.name,
+        periodMonths: draft.periodMonths,
+        expiringDays: draft.expiringDays,
+      })
+      if ('bitrixFolderId' in body) {
+        program.bitrixFolderId = draft.bitrixFolderId ?? ''
+        if (program.bitrixFolderId) program.storagePath = `Диск/${program.bitrixFolderId}`
+      }
       if (typeof body.isArchived === 'boolean') program.isArchived = body.isArchived
       return structuredClone(program)
     },
@@ -856,9 +890,22 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
       const skip = (workerId: string, reason: SkipReason, assignmentId: string | null = null) =>
         skipped.push({ workerId, workerName: workers.get(workerId)?.fullName ?? workerId, reason, label: SKIP_REASON_LABEL[reason], assignmentId })
 
+      const masterScope =
+        actor.role === 'master' && actor.workerId
+          ? new Set(
+              (deps.brigades?.() ?? [])
+                .filter((b) => !b.archived && b.masterIds.includes(actor.workerId!))
+                .flatMap((b) => b.memberIds),
+            )
+          : null
+
       for (const workerId of draft.workerIds) {
         const worker = workers.get(workerId)
         if (!worker) {
+          skip(workerId, 'not_found')
+          continue
+        }
+        if (masterScope && !masterScope.has(workerId)) {
           skip(workerId, 'not_found')
           continue
         }
@@ -977,24 +1024,73 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
       return structuredClone(record)
     },
 
+    exportTestXlsx(testId: string): { data: Buffer; fileName: string } {
+      const test = findTest(testId)
+      const rows: (string | number)[][] = [
+        ['№', 'Текст', 'Тип', 'Балл', 'Варианты', 'Правильные id', 'Пояснение'],
+        ...test.questions.map((q, index) => [
+          index + 1,
+          q.text,
+          q.kind,
+          q.weight,
+          q.options.map((o) => `${o.id}:${o.side ? `${o.side}|` : ''}${o.text}`).join(' | '),
+          q.correctOptionIds.join(','),
+          q.explanation,
+        ]),
+      ]
+      const data = workbook([{ name: 'Вопросы', columns: [6, 40, 12, 8, 48, 24, 32], rows, freeze: { rows: 1, columns: 0 } }])
+      const safe = test.title.replace(/[\\/:*?"<>|]+/g, ' ').trim() || test.id
+      return { data, fileName: `Тест ${safe}.xlsx` }
+    },
+
+    /** Replaces the question bank from a previously exported shape (JSON), keeping the test shell. */
+    importTestQuestions(actor: Actor, testId: string, body: { questions?: unknown }): TrainingTest {
+      const test = findTest(testId)
+      if (test.status === 'published') conflict('Сначала снимите публикацию или создайте новую версию через правку')
+      if (!Array.isArray(body.questions)) badRequest('Ожидается массив questions')
+      const questions = body.questions as TestQuestion[]
+      const content: TestContent = { ...test, questions }
+      checkTestContent(content, false)
+      Object.assign(test, content, { updatedAt: nowIso(), updatedBy: actor.fullName })
+      return structuredClone(test)
+    },
+
+    knowledgeIssuesFor(memberIds: string[]): KnowledgeIssue[] {
+      settleAll()
+      const workers = deps.workers().filter((w) => memberIds.includes(w.id))
+      return knowledgeCompliance(
+        { memberIds },
+        workers,
+        state.programs,
+        state.records,
+        strippedAssignments(),
+        today(),
+      )
+    },
+
     summary(): TrainingSummary {
       settleAll()
       const assignments = strippedAssignments()
-      const rows = deps
-        .workers()
-        .filter((w) => w.employment !== 'fired')
-        .map((w) => {
-          const statuses = statusesOf(w, assignments)
-          return {
-            workerId: w.id,
-            fullName: w.fullName,
-            position: w.position,
-            brigadeId: w.brigadeId,
-            worst: worstProgramState(statuses.map((s) => s.state)),
-            statuses,
-          }
-        })
-      return { counters: trainingCounters(rows), rows }
+      const activeWorkers = deps.workers().filter((w) => w.employment !== 'fired')
+      const rows = activeWorkers.map((w) => {
+        const statuses = statusesOf(w, assignments)
+        return {
+          workerId: w.id,
+          fullName: w.fullName,
+          position: w.position,
+          brigadeId: w.brigadeId,
+          worst: worstProgramState(statuses.map((s) => s.state)),
+          statuses,
+        }
+      })
+      const alerts: TrainingAlert[] = trainingAlerts(
+        activeWorkers,
+        state.programs,
+        state.records,
+        assignments,
+        today(),
+      )
+      return { counters: trainingCounters(rows), rows, alerts }
     },
 
     // ─── Public API (by link) ───────────────────────────────────────────
@@ -1124,6 +1220,10 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
       const optionIds = strings(value)
       if (optionIds.some((id) => !question.options.some((o) => o.id === id))) badRequest('Неизвестный вариант ответа')
       if (question.kind === 'single' && optionIds.length > 1) badRequest('В этом вопросе один правильный ответ')
+      if (question.kind === 'order' && optionIds.length !== question.options.length) {
+        badRequest('Укажите полный порядок вариантов')
+      }
+      if (question.kind === 'match' && optionIds.length % 2 !== 0) badRequest('Пары соответствия задаются по два id')
       const answer = { questionId, optionIds, answeredAt: new Date(now()).toISOString() }
       attempt.answers = [...attempt.answers.filter((a) => a.questionId !== questionId), answer]
       return { questionId, optionIds }
@@ -1151,6 +1251,7 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
       'removeMaterial',
       'createTest',
       'updateTest',
+      'importTestQuestions',
       'publishTest',
       'archiveTest',
       'removeTest',

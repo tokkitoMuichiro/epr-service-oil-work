@@ -398,6 +398,14 @@ const bankInfo = computed(() => {
       <div class="editor__actions">
         <UiButton v-if="test && test.status !== 'archived'" variant="ghost" :disabled="busy" @click="archive">В архив</UiButton>
         <UiButton v-if="test && test.status === 'draft'" variant="ghost" :disabled="busy" @click="remove">Удалить</UiButton>
+        <UiButton
+          v-if="test"
+          variant="ghost"
+          :disabled="busy"
+          @click="trainingApi.exportTestXlsx(test.id, `Тест ${test.title || test.id}.xlsx`)"
+        >
+          Excel
+        </UiButton>
         <span class="editor__spacer" />
         <UiButton v-if="!isArchived" :disabled="busy || (!isDirty && Boolean(test))" @click="save">
           {{ isPublished ? 'Сохранить новую версию' : 'Сохранить черновик' }}

@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
-  WORK_UNITS,
+  WORK_UNIT_MAX_LENGTH,
   contractProgress,
   isObjectArchived,
-  isWorkUnit,
   nextActualDates,
   objectStatus,
   validateObjectStatusChange,
@@ -23,22 +22,23 @@ const draft: WorkDraft = {
   plannedEnd: '2026-12-10',
 }
 
-describe('work units', () => {
-  it('lists the allowed units', () => {
-    assert.deepEqual(WORK_UNITS, ['м³', 'м²', 'м', 'шт.', 'кол-во'])
-    assert.equal(isWorkUnit('м³'), true)
-    assert.equal(isWorkUnit('т'), false)
-  })
-})
-
 describe('validateWorkDraft', () => {
   it('accepts a valid draft', () => {
     assert.equal(validateWorkDraft(draft), null)
   })
 
-  it('requires a title and a known unit', () => {
+  it('accepts a free-form unit', () => {
+    assert.equal(validateWorkDraft({ ...draft, unit: 'т' }), null)
+    assert.equal(validateWorkDraft({ ...draft, unit: 'п.м.' }), null)
+  })
+
+  it('requires a title and a non-empty unit', () => {
     assert.equal(validateWorkDraft({ ...draft, title: '  ' }), 'Укажите наименование работы')
-    assert.equal(validateWorkDraft({ ...draft, unit: 'т' as WorkDraft['unit'] }), 'Выберите единицу измерения')
+    assert.equal(validateWorkDraft({ ...draft, unit: '  ' }), 'Укажите единицу измерения')
+    assert.equal(
+      validateWorkDraft({ ...draft, unit: 'x'.repeat(WORK_UNIT_MAX_LENGTH + 1) }),
+      `Единица измерения не длиннее ${WORK_UNIT_MAX_LENGTH} символов`,
+    )
   })
 
   it('requires a positive planned volume and a non-negative actual volume', () => {

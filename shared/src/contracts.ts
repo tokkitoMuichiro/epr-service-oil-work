@@ -20,13 +20,10 @@ export interface DeadlineEdit {
   note: string
 }
 
-export const WORK_UNITS = ['м³', 'м²', 'м', 'шт.', 'кол-во'] as const
+/** Free-form unit label entered with the work volume (м³, т, п.м. …). */
+export type WorkUnit = string
 
-export type WorkUnit = (typeof WORK_UNITS)[number]
-
-export function isWorkUnit(value: unknown): value is WorkUnit {
-  return WORK_UNITS.includes(value as WorkUnit)
-}
+export const WORK_UNIT_MAX_LENGTH = 24
 
 export interface WorkItem {
   id: string
@@ -202,7 +199,11 @@ export function contractProgress(contract: Pick<Contract, 'objects'>): ContractP
 
 export function validateWorkDraft(draft: WorkDraft): string | null {
   if (!draft.title.trim()) return 'Укажите наименование работы'
-  if (!isWorkUnit(draft.unit)) return 'Выберите единицу измерения'
+  const unit = draft.unit.trim()
+  if (!unit) return 'Укажите единицу измерения'
+  if (unit.length > WORK_UNIT_MAX_LENGTH) {
+    return `Единица измерения не длиннее ${WORK_UNIT_MAX_LENGTH} символов`
+  }
   if (!Number.isFinite(draft.plannedVolume) || draft.plannedVolume <= 0) {
     return 'Плановый объём должен быть больше нуля'
   }
