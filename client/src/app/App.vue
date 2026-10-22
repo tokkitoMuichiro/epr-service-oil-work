@@ -3,6 +3,7 @@ import { computed, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { useRoleStore } from '@/entities/role'
 import { useTheme } from '@/features/theme-switch'
+import { isEmbedPath } from '@shared/auth'
 import { UiButton, UiConfirmHost, UiState } from '@/shared/ui'
 import { AppShell } from '@/widgets/app-shell'
 import { EmbedShell } from '@/widgets/embed-shell'
@@ -18,9 +19,12 @@ const isEmbed = computed(() => route.matched.some((r) => r.meta.isEmbed))
 watch(
   () => session.status,
   (status) => {
-    if (status === 'anonymous' && route.matched.length && !route.meta.isPublic) {
-      void router.replace({ name: 'login', query: route.fullPath === '/' ? {} : { redirect: route.fullPath } })
+    if (status !== 'anonymous' || !route.matched.length || route.meta.isPublic) return
+    if (route.meta.isEmbed || isEmbedPath(route.path)) {
+      void router.replace({ name: 'embed-signin', query: { to: route.fullPath } })
+      return
     }
+    void router.replace({ name: 'login', query: route.fullPath === '/' ? {} : { redirect: route.fullPath } })
   },
 )
 

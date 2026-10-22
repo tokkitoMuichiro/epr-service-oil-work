@@ -865,9 +865,10 @@ describe('bitrix sign-in', () => {
     assert.match(response.headers.get('set-cookie') ?? '', /SameSite=None/i)
     const html = await response.text()
     assert.match(html, /sessionStorage\.setItem/)
-    assert.match(html, /\/e\/equipment/)
+    assert.match(html, /\/e\/equipment#erp-embed-token=/)
     const token = /sessionStorage\.setItem\("erp-embed-token", "([^"]+)"\)/.exec(html)?.[1]
     assert.ok(token, 'bootstrap page must expose the embed token')
+    assert.match(html, new RegExp(`erp-embed-token=${encodeURIComponent(token).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))
     const session = await fetch(`${sso.base}/api/auth/session`, {
       headers: { 'x-erp-embed-token': token },
     })

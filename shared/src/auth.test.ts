@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   bitrixLoginErrorText,
+  embedLandingUrl,
+  embedTokenFromHash,
   normalizeLogin,
   isEmbedPath,
   safeRedirectPath,
@@ -40,6 +42,15 @@ describe('users', () => {
     for (const bad of ['//evil.example', '/\\evil.example', 'https://evil.example', 'equipment', '', null, '/a\nb']) {
       assert.equal(safeRedirectPath(bad), '/', String(bad))
     }
+  })
+
+  it('passes the embed bearer in the URL hash for iframe browsers that block sessionStorage', () => {
+    const url = embedLandingUrl('/e/equipment/mine', 'tok+en/1')
+    assert.equal(url.startsWith('/e/equipment/mine#'), true)
+    assert.equal(embedTokenFromHash(url.slice(url.indexOf('#'))), 'tok+en/1')
+    assert.equal(embedTokenFromHash('#erp-embed-token=abc'), 'abc')
+    assert.equal(embedTokenFromHash(''), null)
+    assert.equal(embedLandingUrl('/e/reports#old', 'x').startsWith('/e/reports#'), true)
   })
 
   it('maps only known Bitrix24 sign-in error codes to text', () => {

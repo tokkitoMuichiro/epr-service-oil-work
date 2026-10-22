@@ -84,6 +84,26 @@ export const EMBED_TOKEN_HEADER = 'x-erp-embed-token'
 /** sessionStorage key for the embed bearer (iframe modules). */
 export const EMBED_TOKEN_STORAGE_KEY = 'erp-embed-token'
 
+/**
+ * Landing URL after AUTH_ID: path + hash with the bearer.
+ * Hash is not sent to the server; browsers that block third-party sessionStorage
+ * (e.g. Yandex) still deliver the token to the SPA on first load.
+ */
+export function embedLandingUrl(path: string, token: string): string {
+  const base = path.split('#')[0] || '/'
+  const params = new URLSearchParams()
+  params.set(EMBED_TOKEN_STORAGE_KEY, token)
+  return `${base}#${params.toString()}`
+}
+
+/** Reads the embed bearer from `location.hash` (`#erp-embed-token=…`). */
+export function embedTokenFromHash(hash: string): string | null {
+  const raw = hash.startsWith('#') ? hash.slice(1) : hash
+  if (!raw) return null
+  const value = new URLSearchParams(raw).get(EMBED_TOKEN_STORAGE_KEY)
+  return value?.trim() ? value.trim() : null
+}
+
 /** Keeps redirects after sign-in inside the ERP: only same-origin absolute paths. */
 export function safeRedirectPath(value: unknown): string {
   if (typeof value !== 'string' || !value.startsWith('/') || value.length > 2000) return '/'
