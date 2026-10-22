@@ -4,7 +4,7 @@ import { authFor, canConfirmFill, isIncomingFor, ownsItem, type EquipmentState }
 import { trainingDocState, type Worker } from './personnel.js'
 import type { ReportDay } from './reports.js'
 import { periodContaining, plannedVolumeOn, progressState, type DateSpan, type ProgressState } from './schedule.js'
-import type { TrainingCounters } from './training.js'
+import type { TrainingAlert, TrainingCounters } from './training.js'
 
 /** Objects lagging by at least this many percentage points of volume count as behind schedule. */
 export const OVERVIEW_LAG_POINTS = 10
@@ -71,6 +71,7 @@ export interface Overview {
   equipment: OverviewEquipment | null
   documents: OverviewDocuments | null
   training: TrainingCounters | null
+  trainingAlerts: TrainingAlert[] | null
 }
 
 type MeasurableWork = Pick<WorkItem, 'id' | 'plannedStart' | 'plannedEnd' | 'plannedVolume' | 'actualVolume'>

@@ -1,4 +1,5 @@
 import { Router, type Request, type RequestHandler } from 'express'
+import { XLSX_MIME } from '../../excel.js'
 import { param, rawBody as rawBodyOf, requestAuth, requestRole, sendFile, trimmed, uploadedFile } from '../../http.js'
 import { MATERIAL_MAX_BYTES, type Permission } from '../../shared.js'
 import type { AccessStore } from '../access/store.js'
@@ -42,7 +43,7 @@ export function trainingRouter(repo: TrainingRepository, access: AccessStore, op
 
   function actor(req: Request): Actor {
     const { user } = requestAuth(req)
-    return { id: user.id, fullName: user.fullName }
+    return { id: user.id, fullName: user.fullName, role: user.role, workerId: user.workerId }
   }
 
   const origin = (req: Request) => requestOrigin(req, options.publicUrl)
@@ -128,6 +129,15 @@ export function trainingRouter(repo: TrainingRepository, access: AccessStore, op
 
   router.get('/tests/:id', need('training_manage'), (req, res) => {
     res.json({ item: repo.getTest(param(req, 'id')) })
+  })
+
+  router.get('/tests/:id/export.xlsx', need('training_manage'), (req, res) => {
+    const { data, fileName } = repo.exportTestXlsx(param(req, 'id'))
+    sendFile(res, { data, mimeType: XLSX_MIME }, fileName)
+  })
+
+  router.post('/tests/:id/import', need('training_manage'), (req, res) => {
+    res.json({ item: repo.importTestQuestions(actor(req), param(req, 'id'), req.body ?? {}) })
   })
 
   router.patch('/tests/:id', need('training_manage'), (req, res) => {

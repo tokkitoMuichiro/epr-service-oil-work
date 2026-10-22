@@ -1,4 +1,4 @@
-import { apiUrl, http } from '@/shared/api'
+import { apiUrl, downloadFile, http } from '@/shared/api'
 import type {
   AssignmentResult,
   AssignmentView,
@@ -120,6 +120,14 @@ export const trainingApi = {
 
   async updateTest(id: string, content: TestContent): Promise<TrainingTest> {
     return (await http.patch<Item<TrainingTest>>(`/training/tests/${id}`, content)).item
+  },
+
+  async exportTestXlsx(id: string, fileName = 'Тест.xlsx'): Promise<void> {
+    await downloadFile(`/training/tests/${id}/export.xlsx`, fileName)
+  },
+
+  async importTestQuestions(id: string, questions: TestContent['questions']): Promise<TrainingTest> {
+    return (await http.post<Item<TrainingTest>>(`/training/tests/${id}/import`, { questions })).item
   },
 
   async publishTest(id: string): Promise<TrainingTest> {

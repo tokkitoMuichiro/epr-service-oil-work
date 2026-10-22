@@ -26,6 +26,15 @@ const q = computed(() => props.question)
 function setKind(kind: QuestionKind) {
   q.value.kind = kind
   if (kind === 'single' && q.value.correctOptionIds.length > 1) q.value.correctOptionIds = q.value.correctOptionIds.slice(0, 1)
+  if (kind === 'order') q.value.correctOptionIds = q.value.options.map((o) => o.id)
+  if (kind === 'match') {
+    for (const option of q.value.options) {
+      if (!option.side) option.side = q.value.options.indexOf(option) % 2 === 0 ? 'left' : 'right'
+    }
+    q.value.correctOptionIds = []
+  } else {
+    for (const option of q.value.options) delete option.side
+  }
 }
 
 function isCorrect(id: string) {
@@ -34,12 +43,58 @@ function isCorrect(id: string) {
 
 function toggleCorrect(id: string) {
   if (q.value.kind === 'single') q.value.correctOptionIds = [id]
-  else q.value.correctOptionIds = isCorrect(id) ? q.value.correctOptionIds.filter((x) => x !== id) : [...q.value.correctOptionIds, id]
+  else if (q.value.kind === 'multiple') {
+    q.value.correctOptionIds = isCorrect(id) ? q.value.correctOptionIds.filter((x) => x !== id) : [...q.value.correctOptionIds, id]
+  }
 }
+
+function setOrderRank(id: string, rank: number) {
+  const ids = q.value.options.map((o) => o.id)
+  const next = [...(q.value.correctOptionIds.length === ids.length ? q.value.correctOptionIds : ids)]
+  const from = next.indexOf(id)
+  if (from < 0) return
+  next.splice(from, 1)
+  next.splice(Math.max(0, Math.min(rank - 1, next.length)), 0, id)
+  q.value.correctOptionIds = next
+}
+
+function orderRank(id: string) {
+  const idx = q.value.correctOptionIds.indexOf(id)
+  return idx >= 0 ? idx + 1 : 0
+}
+
+function setSide(id: string, side: 'left' | 'right') {
+  const option = q.value.options.find((o) => o.id === id)
+  if (option) option.side = side
+}
+
+function setMatchPair(leftId: string, rightId: string) {
+  const pairs = q.value.correctOptionIds
+  const cleaned: string[] = []
+  for (let i = 0; i < pairs.length; i += 2) {
+    if (pairs[i] === leftId) continue
+    cleaned.push(pairs[i]!, pairs[i + 1]!)
+  }
+  if (rightId) cleaned.push(leftId, rightId)
+  q.value.correctOptionIds = cleaned
+}
+
+function matchRightOf(leftId: string) {
+  for (let i = 0; i < q.value.correctOptionIds.length; i += 2) {
+    if (q.value.correctOptionIds[i] === leftId) return q.value.correctOptionIds[i + 1] ?? ''
+  }
+  return ''
+}
+
+const leftOptions = computed(() => q.value.options.filter((o) => o.side === 'left'))
+const rightOptions = computed(() => q.value.options.filter((o) => o.side === 'right'))
 
 function addOption() {
   if (q.value.options.length >= MAX_OPTIONS) return
-  q.value.options.push({ id: newId('o'), text: '' })
+  const side =
+    q.value.kind === 'match' ? (leftOptions.value.length <= rightOptions.value.length ? 'left' : 'right') : undefined
+  q.value.options.push({ id: newId('o'), text: '', ...(side ? { side } : {}) })
+  if (q.value.kind === 'order') q.value.correctOptionIds = q.value.options.map((o) => o.id)
 }
 
 function removeOption(id: string) {
@@ -122,20 +177,58 @@ async function onImage(event: Event) {
       <p v-if="uploadError" class="ui-form__hint" role="alert">{{ uploadError }}</p>
     </div>
 
-    <p class="ui-form__section">Варианты ответа · отметьте {{ q.kind === 'single' ? 'правильный' : 'все правильные' }}</p>
+    <p class="ui-form__section">
+      <template v-if="q.kind === 'order'">Варианты · задайте правильный порядок</template>
+      <template v-else-if="q.kind === 'match'">Варианты · левая и правая колонки, пары</template>
+      <template v-else>Варианты ответа · отметьте {{ q.kind === 'single' ? 'правильный' : 'все правильные' }}</template>
+    </p>
     <ul class="question__options">
       <li v-for="(option, i) in q.options" :key="option.id" class="question__option">
-        <input
-          :type="q.kind === 'single' ? 'radio' : 'checkbox'"
-          :name="`correct-${q.id}`"
-          :checked="isCorrect(option.id)"
-          :aria-label="`Вариант ${i + 1} правильный`"
-          @change="toggleCorrect(option.id)"
-        />
+        <template v-if="q.kind === 'single' || q.kind === 'multiple'">
+          <input
+            :type="q.kind === 'single' ? 'radio' : 'checkbox'"
+            :name="`correct-${q.id}`"
+            :checked="isCorrect(option.id)"
+            :aria-label="`Вариант ${i + 1} правильный`"
+            @change="toggleCorrect(option.id)"
+          />
+        </template>
+        <select
+          v-else-if="q.kind === 'order'"
+          class="ui-control question__rank"
+          :value="orderRank(option.id)"
+          :aria-label="`Порядок варианта ${i + 1}`"
+          @change="setOrderRank(option.id, Number(($event.target as HTMLSelectElement).value))"
+        >
+          <option v-for="n in q.options.length" :key="n" :value="n">{{ n }}</option>
+        </select>
+        <select
+          v-else
+          class="ui-control question__side"
+          :value="option.side ?? 'left'"
+          :aria-label="`Сторона варианта ${i + 1}`"
+          @change="setSide(option.id, ($event.target as HTMLSelectElement).value as 'left' | 'right')"
+        >
+          <option value="left">Левый</option>
+          <option value="right">Правый</option>
+        </select>
         <input v-model="option.text" class="ui-control" type="text" maxlength="500" :placeholder="`Вариант ${i + 1}`" />
         <button type="button" class="ui-icon-button" aria-label="Удалить вариант" @click="removeOption(option.id)">
           <IconClose :size="16" />
         </button>
+      </li>
+    </ul>
+    <ul v-if="q.kind === 'match' && leftOptions.length" class="question__pairs">
+      <li v-for="left in leftOptions" :key="left.id" class="question__pair">
+        <span>{{ left.text || 'Левый' }}</span>
+        <select
+          class="ui-control"
+          :value="matchRightOf(left.id)"
+          @change="setMatchPair(left.id, ($event.target as HTMLSelectElement).value)"
+        >
+          <option value="">— пара —</option>
+          <option v-for="right in rightOptions" :key="right.id" :value="right.id">{{ right.text || 'Правый' }}</option>
+        </select>
       </li>
     </ul>
     <div>
@@ -214,6 +307,27 @@ async function onImage(event: Event) {
   flex: 0 0 auto;
   width: 20px;
   height: 20px;
+}
+
+.question__rank,
+.question__side {
+  flex: 0 0 5.5rem;
+  width: 5.5rem;
+}
+
+.question__pairs {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.question__pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  align-items: center;
 }
 
 @media (max-width: 560px) {

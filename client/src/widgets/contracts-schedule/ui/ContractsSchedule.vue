@@ -57,6 +57,8 @@ const props = withDefaults(
     canPlan?: boolean
     canEdit?: boolean
     isExporting?: boolean
+    /** Initial scale when the selection changes; default — month for object, year for summary. */
+    preferredScale?: 'week' | 'month' | 'year' | null
   }>(),
   {
     isArchive: false,
@@ -67,6 +69,7 @@ const props = withDefaults(
     brigadeName: (id: string) => id,
     canPlan: false,
     canEdit: false,
+    preferredScale: null,
   },
 )
 
@@ -98,8 +101,9 @@ const schedule = useSchedulePeriod(toRef(props, 'bounds'), focus)
 const today = schedule.today
 
 watch(
-  () => [props.object?.id ?? props.contract?.id ?? null, Boolean(props.bounds)] as const,
-  () => schedule.prefer(props.object ? 'month' : 'year'),
+  () =>
+    [props.object?.id ?? props.contract?.id ?? null, Boolean(props.bounds), props.preferredScale] as const,
+  () => schedule.prefer(props.preferredScale ?? (props.object ? 'month' : 'year')),
   { immediate: true },
 )
 

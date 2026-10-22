@@ -1,6 +1,6 @@
 export { useAccessStore } from './model/access-store'
 export { useRoleStore } from './model/store'
-export { bitrixLoginUrl, usersApi } from './api/users'
+export { bitrixLoginUrl, usersApi, type AuditEntry, type SnapshotSize } from './api/users'
 export {
   ACCESS_SECTIONS,
   PASSWORD_MIN_LENGTH,

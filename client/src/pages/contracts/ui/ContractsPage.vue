@@ -37,6 +37,8 @@ const canEdit = computed(() => access.can('contracts_edit'))
 const route = useRoute()
 const router = useRouter()
 
+const preferredScale = ref<'week' | 'month' | 'year' | null>(null)
+
 onMounted(async () => {
   void brigadesStore.load()
   await store.load()
@@ -44,11 +46,14 @@ onMounted(async () => {
 })
 
 function openLinkedObject() {
+  const scale = typeof route.query.scale === 'string' ? route.query.scale : ''
+  if (scale === 'week' || scale === 'month' || scale === 'year') preferredScale.value = scale
   const objectId = typeof route.query.object === 'string' ? route.query.object : ''
-  if (!objectId) return
-  const contract = items.value.find((c) => c.objects.some((o) => o.id === objectId))
-  if (contract) store.selectObject(objectId, contract.id)
-  void router.replace({ query: {} })
+  if (objectId) {
+    const contract = items.value.find((c) => c.objects.some((o) => o.id === objectId))
+    if (contract) store.selectObject(objectId, contract.id)
+  }
+  if (objectId || preferredScale.value) void router.replace({ query: {} })
 }
 
 const bounds = computed(() => scheduleBounds(items.value, reportDays.value.map((d) => d.date)))
@@ -472,6 +477,7 @@ const isDialogOpen = computed(
           :can-edit="canEdit"
           :report-days="reportDays"
           :is-exporting="isExporting"
+          :preferred-scale="preferredScale"
           @export-excel="exportExcel"
           @select-contract="store.selectContract"
           @select-object="store.selectObject"

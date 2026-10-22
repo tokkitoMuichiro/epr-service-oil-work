@@ -232,7 +232,12 @@ const description = computed(() =>
             <p v-if="lagging.length > LIST_LIMIT" class="more">И ещё {{ lagging.length - LIST_LIMIT }} — в разделе «Контракты».</p>
           </OverviewPanel>
 
-          <OverviewPanel title="График на неделю" :icon="IconContracts" to="/contracts" link-text="Сводный график">
+          <OverviewPanel
+            title="График на неделю"
+            :icon="IconContracts"
+            to="/contracts?scale=week"
+            link-text="Сводный график"
+          >
             <MiniSchedule :objects="objects" :window="data.window" :today="data.today" />
           </OverviewPanel>
         </div>
@@ -328,6 +333,50 @@ const description = computed(() =>
               </li>
             </ul>
             <p v-if="hiddenAlerts" class="more">И ещё {{ hiddenAlerts }} — в разделе «Персонал».</p>
+          </OverviewPanel>
+
+          <OverviewPanel
+            v-if="data.trainingAlerts"
+            title="Напоминания по обучению"
+            :icon="IconTraining"
+            :count="data.trainingAlerts.length"
+            :tone="data.trainingAlerts.some((a) => a.kind === 'failed' || a.kind === 'expired') ? 'bad' : 'warn'"
+            to="/training"
+            link-text="Обучение"
+            :is-empty="!data.trainingAlerts.length"
+            empty-text="Просроченных и открытых проверок нет."
+          >
+            <ul class="list">
+              <li v-for="alert in data.trainingAlerts" :key="`${alert.workerId}:${alert.programId}:${alert.kind}`">
+                <div class="row row--static">
+                  <UiAvatar :name="alert.fullName" />
+                  <span class="row__text">
+                    <strong :title="alert.fullName">{{ alert.fullName }}</strong>
+                    <small>{{ alert.programName }}<template v-if="alert.dueAt"> · {{ formatDateRu(alert.dueAt) }}</template></small>
+                  </span>
+                  <span
+                    class="ui-badge"
+                    :class="
+                      alert.kind === 'failed' || alert.kind === 'expired'
+                        ? 'ui-badge--bad'
+                        : alert.kind === 'assigned'
+                          ? 'ui-badge--info'
+                          : 'ui-badge--warn'
+                    "
+                  >
+                    {{
+                      alert.kind === 'failed'
+                        ? 'Не сдана'
+                        : alert.kind === 'expired'
+                          ? 'Просрочена'
+                          : alert.kind === 'assigned'
+                            ? 'Назначена'
+                            : 'Истекает'
+                    }}
+                  </span>
+                </div>
+              </li>
+            </ul>
           </OverviewPanel>
         </div>
       </div>

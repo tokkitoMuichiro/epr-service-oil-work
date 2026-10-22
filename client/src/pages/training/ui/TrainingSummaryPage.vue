@@ -147,7 +147,7 @@ function onAssigned() {
           <option value="">Все программы</option>
           <option v-for="p in programOptions" :key="p.id" :value="p.id">{{ store.labelOf(p.id) }}</option>
         </select>
-        <UiButton v-if="canAssign" variant="primary" :disabled="!selected.length" @click="openBulk">
+        <UiButton v-if="canAssign && selected.length" variant="primary" @click="openBulk">
           Назначить<span class="ui-hide-mobile">&nbsp;выбранным</span> ({{ selected.length }})
         </UiButton>
         <label v-if="canAssign && selectable.length" class="summary__select-all">

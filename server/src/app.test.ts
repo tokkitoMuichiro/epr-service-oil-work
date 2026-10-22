@@ -352,14 +352,15 @@ describe('api', () => {
       plannedEnd: '2027-06-20',
     }
 
-    assert.equal((await call('POST', path, 'admin', { ...draft, unit: 'т' })).status, 400)
+    assert.equal((await call('POST', path, 'admin', { ...draft, unit: '  ' })).status, 400)
 
-    const created = await call('POST', path, 'admin', draft)
+    const created = await call('POST', path, 'admin', { ...draft, unit: 'т' })
     assert.equal(created.status, 201)
     const work = (created.json.item as Contract).objects
       .find((o) => o.id === object.id)
       ?.works.find((w) => w.title === draft.title)
     assert.ok(work)
+    assert.equal(work.unit, 'т')
     assert.equal(work.status, 'planned')
 
     const updated = await call('PATCH', `${path}/${work.id}`, 'admin', {

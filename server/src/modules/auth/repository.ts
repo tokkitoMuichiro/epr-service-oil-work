@@ -88,6 +88,7 @@ export function createUserRepository(db: Database, now: () => number = Date.now)
     byId: db.prepare('SELECT * FROM users WHERE id = ?'),
     byLogin: db.prepare('SELECT * FROM users WHERE login = ?'),
     byBitrixUserId: db.prepare('SELECT * FROM users WHERE bitrix_user_id = ?'),
+    byWorkerId: db.prepare('SELECT * FROM users WHERE worker_id = ?'),
     insert: db.prepare(
       `INSERT INTO users (id, login, full_name, role, worker_id, bitrix_user_id, active, password_hash, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -123,9 +124,16 @@ export function createUserRepository(db: Database, now: () => number = Date.now)
     if (taken && taken.id !== exceptId) conflict(`Этот пользователь Битрикс24 уже привязан к учётной записи «${taken.full_name}»`)
   }
 
+  function assertWorkerFree(workerId: string | null | undefined, exceptId: string | null) {
+    if (!workerId) return
+    const taken = statements.byWorkerId.get(workerId) as UserRow | undefined
+    if (taken && taken.id !== exceptId) conflict(`Этот сотрудник уже привязан к учётной записи «${taken.full_name}»`)
+  }
+
   function insert(draft: UserDraft, id = uid('u')): User {
     assertLoginFree(draft.login, null)
     assertBitrixUserFree(draft.bitrixUserId, null)
+    assertWorkerFree(draft.workerId, null)
     statements.insert.run(
       id,
       draft.login,
@@ -168,6 +176,7 @@ export function createUserRepository(db: Database, now: () => number = Date.now)
       const draft = parseDraft({ ...current, ...body }, false)
       assertLoginFree(draft.login, id)
       assertBitrixUserFree(draft.bitrixUserId, id)
+      assertWorkerFree(draft.workerId, id)
       if (!draft.bitrixUserId && !current.hasPassword && !draft.password) {
         badRequest('Задайте пароль: без привязки к Битрикс24 пользователь не сможет войти')
       }

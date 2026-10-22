@@ -58,7 +58,7 @@ export function createContractsRepository(storage: Storage, deps: { today?: () =
     const actualEnd = optionalDate(body.actualEnd, 'Факт окончания')
     const draft: WorkDraft = {
       title: trimmed(body.title),
-      unit: body.unit as WorkDraft['unit'],
+      unit: trimmed(body.unit),
       plannedVolume: Number(body.plannedVolume),
       actualVolume: Number(body.actualVolume ?? 0),
       plannedStart: optionalDate(body.plannedStart, 'План начала') ?? '',

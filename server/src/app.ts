@@ -3,7 +3,15 @@ import path from 'node:path'
 import cors from 'cors'
 import express from 'express'
 import { compressJson, precompressedFiles } from './compression.js'
-import { createAuditLog, createStorage, openDatabase, type Database, type DatabaseSeed, type Storage } from './db.js'
+import {
+  createAuditLog,
+  createStorage,
+  openDatabase,
+  snapshotSizes,
+  type Database,
+  type DatabaseSeed,
+  type Storage,
+} from './db.js'
 import { createDisk, type BitrixConfig, type Disk } from './disk/index.js'
 import { diskRouter } from './disk/router.js'
 import { createDiskSync, scheduleDiskSync } from './disk/sync.js'
@@ -104,9 +112,11 @@ export function createApp(options: AppOptions = {}) {
     equipmentOf: (worker) => equipment.itemsOwnedBy(worker),
     audit,
     onFired: (workerId) => training?.cancelForWorker(workerId, 'Сотрудник уволен') ?? 0,
+    knowledgeIssues: (memberIds) => training?.knowledgeIssuesFor(memberIds) ?? [],
   })
   training = createTrainingRepository(storage, createTrainingStorage(disk), {
     workers: () => personnel.directory(),
+    brigades: () => personnel.listBrigades(),
     today: options.today,
     audit,
   })
@@ -164,7 +174,10 @@ export function createApp(options: AppOptions = {}) {
   )
   api.use('/public/test/:token', publicTestRouter(training, { secureCookies: options.secureCookies }))
   api.use(requireSession)
-  api.use('/users', usersRouter(users, access, bitrixDirectory, bitrixUserSync))
+  api.use(
+    '/users',
+    usersRouter(users, access, bitrixDirectory, bitrixUserSync, audit, () => snapshotSizes(db)),
+  )
   api.use('/disk', diskRouter(disk, diskSync, access))
   api.use('/access', accessRouter(access))
   api.use(

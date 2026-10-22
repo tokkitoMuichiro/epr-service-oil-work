@@ -7,6 +7,7 @@ import {
   canViewPii,
   defaultExpiry,
   describeAssignmentIssue,
+  describeKnowledgeIssue,
   formatIsoDate,
   hasPastAssignments,
   isEmploymentStatus,
@@ -28,6 +29,7 @@ import {
   workerStatus,
   type AssignmentDraft,
   type AssignmentOverride,
+  type KnowledgeIssue,
   type Brigade,
   type BrigadeAssignment,
   type BrigadeDraft,
@@ -71,6 +73,8 @@ export interface PersonnelDeps {
   audit?: AuditLog
   /** Cancels active knowledge checks of a dismissed worker; returns how many were cancelled. */
   onFired?: (workerId: string) => number
+  /** Failed / expired knowledge checks for brigade members (training module). */
+  knowledgeIssues?: (memberIds: string[]) => KnowledgeIssue[]
 }
 
 export interface AssignmentActor {
@@ -258,13 +262,15 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
           `Период назначения выходит за плановые сроки объекта (${formatIsoDate(object.plannedStart)} — ${formatIsoDate(object.plannedEnd)})`,
         ]
       : []
-    const issues = assignmentCompliance(brigade, state.workers, object.requiredQualificationIds ?? [], draft)
-    if (!issues.length) return { item: draft, warnings }
+    const docIssues = assignmentCompliance(brigade, state.workers, object.requiredQualificationIds ?? [], draft)
+    const knowledgeIssues = deps.knowledgeIssues?.(brigade.memberIds) ?? []
+    if (!docIssues.length && !knowledgeIssues.length) return { item: draft, warnings }
 
     const comment = trimmed(body.overrideComment)
     if (!comment) {
-      conflict('Не у всех сотрудников бригады есть действующие допуски на период назначения', {
-        issues,
+      conflict('Не у всех сотрудников бригады есть действующие допуски или проверки знаний на период назначения', {
+        issues: docIssues,
+        knowledgeIssues,
         canOverride: actor.canOverride,
       })
     }
@@ -280,10 +286,22 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
       details: [
         `${brigade.name} → ${object.name}, ${formatIsoDate(draft.from)} — ${formatIsoDate(draft.to)}`,
         `Обоснование: ${comment}`,
-        ...issues.map(describeAssignmentIssue),
+        ...docIssues.map(describeAssignmentIssue),
+        ...knowledgeIssues.map(describeKnowledgeIssue),
       ].join('\n'),
     })
-    return { item: { ...draft, override }, warnings: [...warnings, `Назначено без допусков: ${issues.length} замеч.`] }
+    const remarkCount = docIssues.length + knowledgeIssues.length
+    return {
+      item: { ...draft, override },
+      warnings: [...warnings, `Назначено без допусков или проверок знаний: ${remarkCount} замеч.`],
+    }
+  }
+
+  function assertMasterOwnsBrigade(actor: AssignmentActor, brigade: Brigade) {
+    if (actor.user.role !== 'master') return
+    if (!actor.user.workerId || !brigade.masterIds.includes(actor.user.workerId)) {
+      forbidden('Мастер может назначать только свои бригады')
+    }
   }
 
   const repository = {
@@ -465,8 +483,12 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
       return lines
     },
 
-    listBrigades(): Brigade[] {
-      return structuredClone(state.brigades)
+    listBrigades(viewer?: Pick<User, 'role' | 'workerId'>): Brigade[] {
+      const list =
+        viewer?.role === 'master' && viewer.workerId
+          ? state.brigades.filter((b) => b.masterIds.includes(viewer.workerId!))
+          : state.brigades
+      return structuredClone(list)
     },
 
     createBrigade(body: Partial<BrigadeDraft>): Brigade {
@@ -518,6 +540,7 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
 
     createAssignment(actor: AssignmentActor, body: Partial<AssignmentDraft>): WithWarnings<BrigadeAssignment> {
       const { item, warnings } = checkCompliance(actor, body, null)
+      assertMasterOwnsBrigade(actor, findBrigade(item.brigadeId))
       const assignment: BrigadeAssignment = { id: uid('a'), ...item }
       state.assignments.push(assignment)
       return { item: structuredClone(assignment), warnings }
@@ -527,6 +550,7 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
       const index = state.assignments.findIndex((a) => a.id === id)
       if (index < 0) notFound('Назначение не найдено')
       const { item, warnings } = checkCompliance(actor, body, id)
+      assertMasterOwnsBrigade(actor, findBrigade(item.brigadeId))
       state.assignments[index] = { id, ...item }
       return { item: structuredClone(state.assignments[index]), warnings }
     },

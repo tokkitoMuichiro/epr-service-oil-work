@@ -3,7 +3,7 @@ export {
   OBJECT_STATUSES,
   OBJECT_STATUS_LABEL,
   OBJECT_STATUS_MOVES,
-  WORK_UNITS,
+  WORK_UNIT_MAX_LENGTH,
   contractProgress,
   isObjectArchived,
   isRollback,

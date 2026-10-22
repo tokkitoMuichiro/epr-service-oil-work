@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import { personnelApi, type Worker } from '@/entities/personnel'
 import {
   PASSWORD_MIN_LENGTH,
   ROLES,
@@ -26,10 +27,12 @@ const form = reactive({
   active: true,
   password: '',
   bitrixUserId: null as string | null,
+  workerId: '' as string,
 })
 const isSubmitted = ref(false)
 const isBusy = ref(false)
 const serverError = ref('')
+const workers = ref<Worker[]>([])
 
 const linked = ref<BitrixPortalUser | null>(null)
 const query = ref('')
@@ -41,7 +44,11 @@ let searchSeq = 0
 
 const isNew = computed(() => !props.user)
 const error = computed(() => {
-  const draft = { ...form, workerId: props.user?.workerId ?? null, password: form.password || undefined }
+  const draft = {
+    ...form,
+    workerId: form.workerId || null,
+    password: form.password || undefined,
+  }
   const invalid = validateUserDraft(draft, isNew.value)
   if (invalid) return invalid
   if (props.user && !props.user.hasPassword && !form.bitrixUserId && !form.password) {
@@ -49,6 +56,13 @@ const error = computed(() => {
   }
   return ''
 })
+
+const workerOptions = computed(() =>
+  workers.value
+    .filter((w) => w.employment !== 'fired')
+    .slice()
+    .sort((a, b) => a.fullName.localeCompare(b.fullName, 'ru')),
+)
 
 const passwordLabel = computed(() => {
   if (props.user) return props.user.hasPassword ? 'Новый пароль (если нужно сменить)' : 'Пароль (не задан)'
@@ -115,11 +129,20 @@ watch(
     form.active = props.user?.active ?? true
     form.password = ''
     form.bitrixUserId = props.user?.bitrixUserId ?? null
+    form.workerId = props.user?.workerId ?? ''
     linked.value = null
     query.value = ''
     results.value = []
     searchError.value = ''
     if (form.bitrixUserId) void loadLinked(form.bitrixUserId)
+    void personnelApi
+      .list()
+      .then((list) => {
+        workers.value = list
+      })
+      .catch(() => {
+        workers.value = []
+      })
   },
 )
 
@@ -134,7 +157,7 @@ async function save() {
       fullName: form.fullName.trim(),
       role: form.role,
       active: form.active,
-      workerId: props.user?.workerId ?? null,
+      workerId: form.workerId || null,
       bitrixUserId: form.bitrixUserId,
       ...(form.password ? { password: form.password } : {}),
     }
@@ -207,6 +230,16 @@ const passwordHint = computed(() =>
           <option v-for="role in ROLES" :key="role.id" :value="role.id">{{ role.label }}</option>
         </select>
       </label>
+      <label>
+        <span>Карточка сотрудника</span>
+        <select v-model="form.workerId">
+          <option value="">Не привязан</option>
+          <option v-for="worker in workerOptions" :key="worker.id" :value="worker.id">
+            {{ worker.fullName }} · {{ worker.position }}
+          </option>
+        </select>
+      </label>
+      <p class="ui-form__note">Нужна, чтобы мастер видел только свои бригады и связывал учётку с персоналом.</p>
       <label>
         <span>{{ passwordLabel }}</span>
         <input v-model="form.password" type="password" autocomplete="new-password" />

@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import {
-  WORK_UNITS,
+  WORK_UNIT_MAX_LENGTH,
   validateWorkDraft,
   type ContractObject,
   type WorkDraft,
   type WorkItem,
-  type WorkUnit,
 } from '@/entities/contract'
 import { UiButton, UiDialog } from '@/shared/ui'
 
@@ -26,7 +25,7 @@ const emit = defineEmits<{
 
 const form = reactive({
   title: '',
-  unit: WORK_UNITS[0] as WorkUnit,
+  unit: '',
   plannedVolume: '',
   actualVolume: '',
   plannedStart: '',
@@ -43,7 +42,7 @@ watch(
     if (!open) return
     isSubmitted.value = false
     form.title = work?.title ?? ''
-    form.unit = work?.unit ?? WORK_UNITS[0]
+    form.unit = work?.unit ?? ''
     form.plannedVolume = work ? String(work.plannedVolume) : ''
     form.actualVolume = work ? String(work.actualVolume) : ''
     form.plannedStart = work?.plannedStart ?? object?.plannedStart ?? ''
@@ -59,7 +58,7 @@ function parseVolume(value: string): number {
 
 const draft = computed<WorkDraft>(() => ({
   title: form.title.trim(),
-  unit: form.unit,
+  unit: form.unit.trim(),
   plannedVolume: parseVolume(form.plannedVolume),
   actualVolume: form.actualVolume.trim() === '' ? 0 : parseVolume(form.actualVolume),
   plannedStart: form.plannedStart,
@@ -90,9 +89,12 @@ function onSubmit() {
       <div class="ui-form__row volumes">
         <label>
           <span>Ед. изм. *</span>
-          <select v-model="form.unit">
-            <option v-for="unit in WORK_UNITS" :key="unit" :value="unit">{{ unit }}</option>
-          </select>
+          <input
+            v-model="form.unit"
+            :maxlength="WORK_UNIT_MAX_LENGTH"
+            placeholder="м³"
+            autocomplete="off"
+          />
         </label>
         <label>
           <span>Объём по плану *</span>
@@ -143,7 +145,7 @@ function onSubmit() {
 
 <style scoped>
 .volumes {
-  grid-template-columns: 110px 1fr 1fr;
+  grid-template-columns: minmax(5.5rem, 0.7fr) 1fr 1fr;
 }
 
 @media (max-width: 560px) {
