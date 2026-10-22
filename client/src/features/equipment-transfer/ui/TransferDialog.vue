@@ -9,6 +9,7 @@ import {
   type EquipmentItem,
   type OwnerType,
 } from '@/entities/equipment'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { UiButton, UiDialog } from '@/shared/ui'
 
 const props = defineProps<{ open: boolean; items: EquipmentItem[] }>()
@@ -23,6 +24,7 @@ const form = reactive({
   quantity: 1,
 })
 const result = ref<BulkTransferResult | null>(null)
+const { isDirty } = useDialogDirty(() => ({ ...form }), () => props.open && !result.value)
 
 const single = computed(() => (props.items.length === 1 ? props.items[0] : null))
 const isBulk = computed(() => props.items.length > 1)
@@ -99,7 +101,7 @@ async function save() {
 </script>
 
 <template>
-  <UiDialog :open="open" :title="isBulk ? 'Массовая передача' : 'Передача'" @close="emit('close')">
+  <UiDialog :open="open" :title="isBulk ? 'Массовая передача' : 'Передача'" :dirty="isDirty" @close="emit('close')">
     <div v-if="result" class="ui-form">
       <p class="summary">
         Передано: <strong>{{ positionsLabel(result.transferred) }}</strong>. Не удалось:

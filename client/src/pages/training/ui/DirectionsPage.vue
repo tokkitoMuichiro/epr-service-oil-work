@@ -11,6 +11,7 @@ import {
   type TrainingProgram,
 } from '@/entities/training'
 import { errorMessage } from '@/shared/api'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { UiButton, UiDialog } from '@/shared/ui'
 
 interface DirectionForm {
@@ -39,6 +40,8 @@ const formError = ref('')
 const actionError = ref('')
 const busy = ref(false)
 const showArchived = ref(false)
+const { isDirty: isDirectionDirty } = useDialogDirty(() => directionForm.value, () => directionForm.value !== null)
+const { isDirty: isProgramDirty } = useDialogDirty(() => programForm.value, () => programForm.value !== null)
 
 const directions = computed(() => store.directions.filter((d) => showArchived.value || !d.isArchived))
 
@@ -203,7 +206,12 @@ function archiveProgram(program: TrainingProgram) {
       <p v-else class="direction__empty">Программ пока нет.</p>
     </article>
 
-    <UiDialog :open="directionForm !== null" :title="directionForm?.id ? 'Направление' : 'Новое направление'" @close="directionForm = null">
+    <UiDialog
+      :open="directionForm !== null"
+      :title="directionForm?.id ? 'Направление' : 'Новое направление'"
+      :dirty="isDirectionDirty"
+      @close="directionForm = null"
+    >
       <form v-if="directionForm" class="ui-form" novalidate @submit.prevent="submitDirection">
         <label>
           <span>Название</span>
@@ -233,7 +241,12 @@ function archiveProgram(program: TrainingProgram) {
       </form>
     </UiDialog>
 
-    <UiDialog :open="programForm !== null" :title="programForm?.id ? 'Программа' : 'Новая программа'" @close="programForm = null">
+    <UiDialog
+      :open="programForm !== null"
+      :title="programForm?.id ? 'Программа' : 'Новая программа'"
+      :dirty="isProgramDirty"
+      @close="programForm = null"
+    >
       <form v-if="programForm" class="ui-form" novalidate @submit.prevent="submitProgram">
         <label>
           <span>Код</span>

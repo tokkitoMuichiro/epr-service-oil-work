@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useEquipmentStore, validateWarehouseDraft, type Warehouse } from '@/entities/equipment'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { UiButton, UiDialog } from '@/shared/ui'
 
 const props = defineProps<{ open: boolean; warehouse?: Warehouse | null }>()
@@ -10,6 +11,7 @@ const store = useEquipmentStore()
 
 const form = reactive({ name: '', address: '', keeperIds: [] as string[] })
 const isSubmitted = ref(false)
+const { isDirty } = useDialogDirty(() => ({ ...form, keeperIds: form.keeperIds }), () => props.open)
 
 const error = computed(() => validateWarehouseDraft(form) ?? '')
 
@@ -40,7 +42,7 @@ async function save() {
 </script>
 
 <template>
-  <UiDialog :open="open" :title="warehouse ? 'Редактирование базы' : 'Новая база'" @close="emit('close')">
+  <UiDialog :open="open" :title="warehouse ? 'Редактирование базы' : 'Новая база'" :dirty="isDirty" @close="emit('close')">
     <form class="ui-form" novalidate @submit.prevent="save">
       <label>
         <span>Название</span>

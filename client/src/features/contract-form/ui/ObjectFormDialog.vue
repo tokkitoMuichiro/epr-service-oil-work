@@ -7,6 +7,7 @@ import {
   type ContractObject,
   type QualificationTypeId,
 } from '@/entities/contract'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { UiButton, UiDialog } from '@/shared/ui'
 import type { ObjectFormValue } from '../model/types'
 
@@ -34,6 +35,19 @@ const form = reactive({
 })
 const isSubmitted = ref(false)
 const isQualsOpen = ref(false)
+const { isDirty } = useDialogDirty(
+  () => ({
+    name: form.name,
+    location: form.location,
+    plannedStart: form.plannedStart,
+    plannedEnd: form.plannedEnd,
+    actualStart: form.actualStart,
+    actualEnd: form.actualEnd,
+    note: form.note,
+    requiredQualificationIds: form.requiredQualificationIds,
+  }),
+  () => props.open,
+)
 
 watch(
   () => [props.open, props.object] as const,
@@ -100,7 +114,7 @@ function onSubmit() {
 </script>
 
 <template>
-  <UiDialog :open="open" :title="object ? 'Объект: параметры и сроки' : 'Новый объект'" @close="emit('close')">
+  <UiDialog :open="open" :title="object ? 'Объект: параметры и сроки' : 'Новый объект'" :dirty="isDirty" @close="emit('close')">
     <form class="ui-form" novalidate @submit.prevent="onSubmit">
       <div class="ui-form__row">
         <label>

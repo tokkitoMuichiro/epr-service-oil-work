@@ -27,6 +27,7 @@ import {
 } from '@/entities/training'
 import { errorMessage } from '@/shared/api'
 import { addDays } from '@/shared/lib/date'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { UiButton, UiDialog } from '@/shared/ui'
 import AssignmentLinks from './AssignmentLinks.vue'
 
@@ -61,6 +62,22 @@ const result = ref<AssignmentResult | null>(null)
 
 const today = todayIso()
 
+const { isDirty, markClean } = useDialogDirty(
+  () => ({
+    kind: kind.value,
+    programId: programId.value,
+    testId: testId.value,
+    dueDate: dueDate.value,
+    reason: reason.value,
+    reasonNote: reasonNote.value,
+    selected: selected.value,
+    elKind: elKind.value,
+    elGroup: elGroup.value,
+    elVoltage: elVoltage.value,
+  }),
+  () => props.open && !result.value,
+)
+
 watch(
   () => props.open,
   async (open) => {
@@ -84,6 +101,7 @@ watch(
     if (store.summaryStatus !== 'ready') void store.loadSummary()
     if (brigades.status === 'idle') void brigades.load()
     pickDefaultTest()
+    markClean()
   },
   { immediate: true },
 )
@@ -184,7 +202,7 @@ const title = computed(() => {
 </script>
 
 <template>
-  <UiDialog :open="open" :title="title" wide @close="emit('close')">
+  <UiDialog :open="open" :title="title" wide :dirty="isDirty" @close="emit('close')">
     <AssignmentLinks v-if="result" :result="result" />
 
     <form v-else class="ui-form" novalidate @submit.prevent="submit">

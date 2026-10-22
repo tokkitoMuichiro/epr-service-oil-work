@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue'
 import type { Contract, ContractDraft } from '@/entities/contract'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { UiButton, UiDialog, UiInput } from '@/shared/ui'
 
 const props = defineProps<{
@@ -18,6 +19,8 @@ const form = reactive<ContractDraft>({
   customer: '',
   year: new Date().getFullYear(),
 })
+
+const { isDirty } = useDialogDirty(() => ({ ...form }), () => props.open)
 
 watch(
   () => [props.open, props.contract] as const,
@@ -43,6 +46,7 @@ function onSubmit() {
   <UiDialog
     :open="open"
     :title="contract ? 'Редактировать контракт' : 'Новый контракт'"
+    :dirty="isDirty"
     @close="emit('close')"
   >
     <form class="ui-form" @submit.prevent="onSubmit">

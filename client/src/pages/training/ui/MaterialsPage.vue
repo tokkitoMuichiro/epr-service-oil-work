@@ -12,6 +12,7 @@ import {
 import { errorMessage } from '@/shared/api'
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { useMobilePagination } from '@/shared/lib/pagination'
 import { IconTraining, UiButton, UiDialog, UiFileDrop, UiPagination, UiState, askConfirm } from '@/shared/ui'
 
@@ -34,6 +35,16 @@ const form = ref<MaterialForm | null>(null)
 const formError = ref('')
 const actionError = ref('')
 const busy = ref(false)
+const { isDirty: isFormDirty } = useDialogDirty(
+  () =>
+    form.value
+      ? {
+          ...form.value,
+          file: form.value.file ? `${form.value.file.name}:${form.value.file.size}` : null,
+        }
+      : null,
+  () => form.value !== null,
+)
 
 const visible = computed(() => {
   const q = search.value.trim().toLocaleLowerCase('ru')
@@ -205,7 +216,13 @@ function openHref(material: TrainingMaterial) {
       />
     </div>
 
-    <UiDialog :open="form !== null" :title="form?.id ? 'Материал' : 'Новый материал'" wide @close="form = null">
+    <UiDialog
+      :open="form !== null"
+      :title="form?.id ? 'Материал' : 'Новый материал'"
+      wide
+      :dirty="isFormDirty"
+      @close="form = null"
+    >
       <form v-if="form" class="ui-form" novalidate @submit.prevent="submit">
         <div v-if="!form.id" class="ui-segmented" role="tablist" aria-label="Источник">
           <button type="button" role="tab" :aria-selected="form.mode === 'upload'" @click="form.mode = 'upload'">Загрузить файл</button>

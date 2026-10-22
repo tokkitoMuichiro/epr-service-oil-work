@@ -7,6 +7,7 @@ import {
   type WorkDraft,
   type WorkItem,
 } from '@/entities/contract'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { UiButton, UiDialog } from '@/shared/ui'
 
 const props = defineProps<{
@@ -35,6 +36,7 @@ const form = reactive({
 })
 
 const isSubmitted = ref(false)
+const { isDirty } = useDialogDirty(() => ({ ...form }), () => props.open)
 
 watch(
   () => [props.open, props.work, props.object] as const,
@@ -77,7 +79,7 @@ function onSubmit() {
 </script>
 
 <template>
-  <UiDialog :open="open" :title="work ? 'Редактировать работу' : 'Добавить работу'" @close="emit('close')">
+  <UiDialog :open="open" :title="work ? 'Редактировать работу' : 'Добавить работу'" :dirty="isDirty" @close="emit('close')">
     <form class="ui-form" novalidate @submit.prevent="onSubmit">
       <p v-if="object" class="ui-form__note">{{ object.name }} · {{ object.location }}</p>
 

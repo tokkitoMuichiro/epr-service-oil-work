@@ -17,6 +17,7 @@ import { errorMessage } from '@/shared/api'
 import { copyText } from '@/shared/lib/clipboard'
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/date'
 import { reloadStatus } from '@/shared/lib/load-status'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { useMobilePagination } from '@/shared/lib/pagination'
 import { todayIso } from '@shared/dates'
 import { IconTraining, UiButton, UiDialog, UiPagination, UiState, askConfirm } from '@/shared/ui'
@@ -37,6 +38,7 @@ const search = ref('')
 const isAssignOpen = ref(false)
 const cancelTarget = ref<AssignmentView | null>(null)
 const cancelReason = ref('')
+const { isDirty: isCancelDirty } = useDialogDirty(() => cancelReason.value, () => cancelTarget.value !== null)
 
 const canAssign = computed(() => access.can('training_assign'))
 const today = todayIso()
@@ -221,7 +223,12 @@ function onAssigned() {
 
     <AssignTestDialog :open="isAssignOpen" @close="isAssignOpen = false" @assigned="onAssigned" />
 
-    <UiDialog :open="cancelTarget !== null" title="Отозвать назначение" @close="cancelTarget = null">
+    <UiDialog
+      :open="cancelTarget !== null"
+      title="Отозвать назначение"
+      :dirty="isCancelDirty"
+      @close="cancelTarget = null"
+    >
       <form class="ui-form" @submit.prevent="confirmCancel">
         <p class="ui-form__note">
           Ссылка для {{ cancelTarget?.workerName }} перестанет работать. Результат не будет записан.

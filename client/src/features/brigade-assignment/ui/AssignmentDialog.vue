@@ -11,6 +11,7 @@ import {
   type BrigadeAssignment,
 } from '@/entities/brigade'
 import { formatDateRu } from '@/shared/lib/date'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { UiButton, UiDialog } from '@/shared/ui'
 import type { AssignmentObjectOption } from '../model/types'
 
@@ -60,6 +61,11 @@ const form = reactive<AssignmentDraft>({
   to: '',
   note: '',
 })
+
+const { isDirty } = useDialogDirty(
+  () => ({ ...form, overrideComment: overrideComment.value }),
+  () => props.open,
+)
 
 watch(
   () => [props.open, props.assignment?.id] as const,
@@ -130,6 +136,7 @@ function save() {
   <UiDialog
     :open="open"
     :title="assignment ? 'Назначение бригады' : 'Назначить бригаду'"
+    :dirty="isDirty"
     @close="emit('close')"
   >
     <form class="ui-form" @submit.prevent="save">
