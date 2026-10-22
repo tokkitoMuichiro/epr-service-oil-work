@@ -134,8 +134,8 @@ function onAssigned() {
 </script>
 
 <template>
-  <div class="assignments">
-    <div class="assignments__toolbar">
+  <div class="assignments ui-fill-page">
+    <div class="assignments__toolbar ui-fill-chrome">
       <input v-model="search" class="ui-control" type="search" placeholder="Поиск: ФИО или тест" aria-label="Поиск" />
       <select v-model="statusFilter" class="ui-control" aria-label="Статус">
         <option value="active">Активные</option>
@@ -164,8 +164,8 @@ function onAssigned() {
       <UiButton variant="primary" @click="load">Повторить</UiButton>
     </UiState>
     <UiState v-else-if="!visible.length" title="Назначений нет" :icon="IconTraining" text="Измените фильтры или назначьте проверку." />
-    <template v-else>
-      <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack">
+    <div v-else class="assignments__list ui-fill-panel">
+      <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack ui-fill-scroll">
         <table class="ui-table">
           <thead>
             <tr>
@@ -210,8 +210,14 @@ function onAssigned() {
           </tbody>
         </table>
       </div>
-      <UiPagination v-if="pager.isPaged" v-model:page="pager.page" :total="pager.total" :page-size="pager.pageSize" />
-    </template>
+      <UiPagination
+        v-if="pager.isPaged"
+        v-model:page="pager.page"
+        class="ui-fill-chrome"
+        :total="pager.total"
+        :page-size="pager.pageSize"
+      />
+    </div>
 
     <AssignTestDialog :open="isAssignOpen" @close="isAssignOpen = false" @assigned="onAssigned" />
 
@@ -235,8 +241,17 @@ function onAssigned() {
 
 <style scoped>
 .assignments {
-  display: grid;
   gap: var(--space-4);
+}
+
+.assignments__list {
+  gap: var(--space-3);
+}
+
+.assignments__toolbar,
+.assignments__notice,
+.alert {
+  flex: 0 0 auto;
 }
 
 .assignments__toolbar {

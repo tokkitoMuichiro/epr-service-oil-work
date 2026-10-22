@@ -119,14 +119,14 @@ function onAssigned() {
 </script>
 
 <template>
-  <div class="summary">
+  <div class="summary ui-fill-page">
     <UiState v-if="store.summaryStatus === 'loading' && !store.summary" kind="loading" title="Считаем сводку…" />
     <UiState v-else-if="store.summaryStatus === 'error'" kind="error" title="Не удалось загрузить сводку" :text="store.summaryError">
       <UiButton variant="primary" @click="store.loadSummary()">Повторить</UiButton>
     </UiState>
 
     <template v-else-if="store.summary">
-      <div class="summary__counters">
+      <div class="summary__counters ui-fill-chrome">
         <button
           v-for="c in COUNTERS"
           :key="c.key"
@@ -141,7 +141,7 @@ function onAssigned() {
         </button>
       </div>
 
-      <div class="summary__toolbar">
+      <div class="summary__toolbar ui-fill-chrome">
         <input v-model="search" class="summary__search ui-control" type="search" placeholder="Поиск по ФИО" aria-label="Поиск по ФИО" />
         <select v-model="programFilter" class="ui-control" aria-label="Программа">
           <option value="">Все программы</option>
@@ -157,8 +157,8 @@ function onAssigned() {
       </div>
 
       <UiState v-if="!visible.length" title="Никого нет" :icon="IconSearch" text="По выбранным фильтрам сотрудников нет." />
-      <template v-else>
-        <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack">
+      <div v-else class="summary__list ui-fill-panel">
+        <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack ui-fill-scroll">
           <table class="ui-table">
             <thead>
               <tr>
@@ -206,8 +206,14 @@ function onAssigned() {
             </tbody>
           </table>
         </div>
-        <UiPagination v-if="pager.isPaged" v-model:page="pager.page" :total="pager.total" :page-size="pager.pageSize" />
-      </template>
+        <UiPagination
+          v-if="pager.isPaged"
+          v-model:page="pager.page"
+          class="ui-fill-chrome"
+          :total="pager.total"
+          :page-size="pager.pageSize"
+        />
+      </div>
     </template>
 
     <AssignTestDialog
@@ -222,8 +228,11 @@ function onAssigned() {
 
 <style scoped>
 .summary {
-  display: grid;
   gap: var(--space-4);
+}
+
+.summary__list {
+  gap: var(--space-3);
 }
 
 .summary__counters {

@@ -36,9 +36,9 @@ function tone(value: TransferStatus) {
 </script>
 
 <template>
-  <div class="page">
-    <div class="panel">
-      <div class="filters">
+  <div class="page ui-fill-page">
+    <div class="panel ui-fill-panel">
+      <div class="filters ui-fill-chrome">
         <input v-model="query" class="ui-control" type="search" placeholder="Поиск: позиция, откуда, куда" aria-label="Поиск" />
         <select v-model="actor" class="ui-control" aria-label="Кто передал">
           <option value="">Все сотрудники</option>
@@ -54,11 +54,11 @@ function tone(value: TransferStatus) {
         </select>
       </div>
 
-      <p class="count muted">{{ rows.length }} {{ pluralRu(rows.length, 'передача', 'передачи', 'передач') }}</p>
+      <p class="count muted ui-fill-chrome">{{ rows.length }} {{ pluralRu(rows.length, 'передача', 'передачи', 'передач') }}</p>
 
       <UiState v-if="!rows.length" title="Передач нет" :icon="IconEquipment" text="Измените фильтры или дождитесь первых передач." />
 
-      <div v-else :ref="pager.bindFit" class="table-wrap ui-table-wrap ui-table-wrap--stack">
+      <div v-else :ref="pager.bindFit" class="table-wrap ui-table-wrap ui-table-wrap--stack ui-fill-scroll">
         <table class="ui-table">
           <thead>
             <tr>
@@ -92,7 +92,7 @@ function tone(value: TransferStatus) {
       <UiPagination
         v-if="pager.isPaged"
         v-model:page="pager.page"
-        class="pager"
+        class="pager ui-fill-chrome"
         :total="pager.total"
         :page-size="pager.pageSize"
       />

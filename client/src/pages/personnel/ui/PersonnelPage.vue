@@ -152,8 +152,8 @@ function openCreateBrigade() {
 </script>
 
 <template>
-  <section class="page">
-    <PageHeader title="Персонал" description="Карточки сотрудников, документы и бригады.">
+  <section class="page ui-fill-page">
+    <PageHeader class="ui-fill-chrome" title="Персонал" description="Карточки сотрудников, документы и бригады.">
       <template v-if="(tab === 'workers' && canEdit) || (tab === 'brigades' && canPlan)" #actions>
         <UiButton v-if="tab === 'workers'" variant="primary" @click="openCreateWorker">Добавить сотрудника</UiButton>
         <UiButton v-else variant="primary" @click="openCreateBrigade">Новая бригада</UiButton>
@@ -204,8 +204,8 @@ function openCreateBrigade() {
         <UiButton v-if="canEdit" variant="primary" @click="openCreateWorker">Добавить</UiButton>
       </UiState>
 
-      <div v-else class="panel">
-        <div class="toolbar">
+      <div v-else class="panel ui-fill-panel">
+        <div class="toolbar ui-fill-chrome">
           <label class="search">
             <IconSearch class="search__icon" :size="18" />
             <input
@@ -238,7 +238,7 @@ function openCreateBrigade() {
           />
         </div>
 
-        <div class="legend">
+        <div class="legend ui-fill-chrome">
           <span>
             <i class="legend__swatch legend__swatch--expiring" />Документ истекает<span class="ui-hide-mobile">&nbsp;в течение {{ TRAINING_EXPIRING_DAYS }} дней</span>
           </span>
@@ -249,7 +249,7 @@ function openCreateBrigade() {
 
         <UiState v-if="!rows.length" title="Ничего не найдено" :icon="IconSearch" text="Измените поиск или фильтры." />
 
-        <div v-else :ref="workerPager.bindFit" class="table-wrap ui-table-wrap">
+        <div v-else :ref="workerPager.bindFit" class="table-wrap ui-table-wrap ui-fill-scroll">
           <table class="table--workers">
             <thead>
               <tr>
@@ -306,7 +306,7 @@ function openCreateBrigade() {
         <UiPagination
           v-if="workerPager.isPaged"
           v-model:page="workerPager.page"
-          class="pager"
+          class="pager ui-fill-chrome"
           :total="workerPager.total"
           :page-size="workerPager.pageSize"
           label="Страницы списка сотрудников"
@@ -324,8 +324,8 @@ function openCreateBrigade() {
         <UiButton v-if="canPlan" variant="primary" @click="openCreateBrigade">Новая бригада</UiButton>
       </UiState>
 
-      <div v-else class="panel">
-        <div class="legend legend--brigades">
+      <div v-else class="panel ui-fill-panel">
+        <div class="legend legend--brigades ui-fill-chrome">
           <span class="legend__count">Бригад: {{ brigadeRows.length }}</span>
           <MobileSort
             v-model:sort-key="brigadeSortKey"
@@ -334,7 +334,7 @@ function openCreateBrigade() {
             :options="BRIGADE_COLUMNS"
           />
         </div>
-        <div :ref="brigadePager.bindFit" class="table-wrap ui-table-wrap">
+        <div :ref="brigadePager.bindFit" class="table-wrap ui-table-wrap ui-fill-scroll">
           <table class="table--brigades">
             <thead>
               <tr>
@@ -381,7 +381,7 @@ function openCreateBrigade() {
         <UiPagination
           v-if="brigadePager.isPaged"
           v-model:page="brigadePager.page"
-          class="pager"
+          class="pager ui-fill-chrome"
           :total="brigadePager.total"
           :page-size="brigadePager.pageSize"
           label="Страницы списка бригад"
@@ -409,10 +409,11 @@ function openCreateBrigade() {
 
 <style scoped>
 .page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-height: 100%;
+  gap: var(--space-4);
+}
+
+.page :deep(.page-header) {
+  flex: 0 0 auto;
 }
 
 .tabs__badge {
@@ -512,7 +513,7 @@ function openCreateBrigade() {
   display: flex;
   flex-wrap: wrap;
   gap: 6px var(--space-4);
-  margin: var(--space-3) 0;
+  margin: 0;
   font-size: var(--font-size-xs);
   color: var(--text-secondary);
 }

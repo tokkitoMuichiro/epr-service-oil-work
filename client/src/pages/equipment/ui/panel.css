@@ -1,8 +1,11 @@
 .page {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .page__bar {
@@ -14,12 +17,22 @@
 }
 
 .panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   padding: var(--space-5);
+  overflow: hidden;
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   box-shadow: var(--shadow-card);
+}
+
+.panel.head {
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
 .panel__title {

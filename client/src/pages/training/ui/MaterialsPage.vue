@@ -141,8 +141,8 @@ function openHref(material: TrainingMaterial) {
 </script>
 
 <template>
-  <div class="materials">
-    <div class="materials__toolbar">
+  <div class="materials ui-fill-page">
+    <div class="materials__toolbar ui-fill-chrome">
       <input v-model="search" class="ui-control" type="search" placeholder="Поиск по названию" aria-label="Поиск" />
       <select v-model="programFilter" class="ui-control" aria-label="Программа">
         <option value="">Все программы</option>
@@ -155,14 +155,14 @@ function openHref(material: TrainingMaterial) {
       <UiButton variant="primary" @click="openNew">Добавить материал</UiButton>
     </div>
 
-    <p v-if="actionError" class="alert" role="alert">
+    <p v-if="actionError" class="alert ui-fill-chrome" role="alert">
       <span>{{ actionError }}</span>
       <button type="button" aria-label="Скрыть" @click="actionError = ''">×</button>
     </p>
 
     <UiState v-if="!visible.length" title="Материалов нет" :icon="IconTraining" text="Загрузите файл или добавьте ссылку на файл в Битрикс." />
-    <template v-else>
-      <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack">
+    <div v-else class="materials__list ui-fill-panel">
+      <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack ui-fill-scroll">
         <table class="ui-table">
           <thead>
             <tr>
@@ -196,8 +196,14 @@ function openHref(material: TrainingMaterial) {
           </tbody>
         </table>
       </div>
-      <UiPagination v-if="pager.isPaged" v-model:page="pager.page" :total="pager.total" :page-size="pager.pageSize" />
-    </template>
+      <UiPagination
+        v-if="pager.isPaged"
+        v-model:page="pager.page"
+        class="ui-fill-chrome"
+        :total="pager.total"
+        :page-size="pager.pageSize"
+      />
+    </div>
 
     <UiDialog :open="form !== null" :title="form?.id ? 'Материал' : 'Новый материал'" wide @close="form = null">
       <form v-if="form" class="ui-form" novalidate @submit.prevent="submit">
@@ -250,8 +256,11 @@ function openHref(material: TrainingMaterial) {
 
 <style scoped>
 .materials {
-  display: grid;
   gap: var(--space-4);
+}
+
+.materials__list {
+  gap: var(--space-3);
 }
 
 .materials__toolbar {

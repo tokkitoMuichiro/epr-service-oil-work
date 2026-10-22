@@ -315,7 +315,9 @@ function changeObject() {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .layout {
@@ -324,18 +326,16 @@ function changeObject() {
   gap: var(--space-4);
   min-height: 0;
   flex: 1;
-  align-items: start;
+  align-items: stretch;
 }
 
 .objects {
-  position: sticky;
-  top: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
-  max-height: calc(100vh - 10rem);
-  max-height: calc(100dvh - 10rem);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .objects__search {

@@ -28,10 +28,10 @@ const canStock = computed(() => !isRepair.value && canStockWarehouse(store.auth,
     <RouterLink class="back" :to="{ name: nameOf('equipment-warehouses') }">К списку баз</RouterLink>
   </UiState>
 
-  <div v-else class="page">
-    <RouterLink class="back" :to="{ name: nameOf('equipment-warehouses') }"><IconChevron class="back__icon" :size="18" />Все базы</RouterLink>
+  <div v-else class="page ui-fill-page">
+    <RouterLink class="back ui-fill-chrome" :to="{ name: nameOf('equipment-warehouses') }"><IconChevron class="back__icon" :size="18" />Все базы</RouterLink>
 
-    <div class="panel head">
+    <div class="panel head ui-fill-chrome">
       <div>
         <h2 class="panel__title">{{ warehouse.name }}</h2>
         <p class="panel__text">
@@ -44,7 +44,7 @@ const canStock = computed(() => !isRepair.value && canStockWarehouse(store.auth,
       </div>
     </div>
 
-    <div class="page__bar">
+    <div class="page__bar ui-fill-chrome">
       <CategoryTabs :active="category" :items="items" />
       <UiButton v-if="canStock" variant="primary" @click="isCreateOpen = true">Внести на базу</UiButton>
     </div>

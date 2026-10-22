@@ -80,6 +80,10 @@ const currentRoleHint = computed(() => {
   display: grid;
   gap: var(--space-4);
   min-width: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  align-content: start;
 }
 
 .panel {

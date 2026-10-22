@@ -554,7 +554,9 @@ const isDialogOpen = computed(
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
 }
 
 .info,

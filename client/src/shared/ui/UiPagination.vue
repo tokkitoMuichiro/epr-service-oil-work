@@ -16,21 +16,14 @@ const numbers = computed(() => pageNumbers(range.value.page, range.value.pageCou
 const isFirst = computed(() => range.value.page <= 1)
 const isLast = computed(() => range.value.page >= range.value.pageCount)
 
-function scrollParentTop(element: Element): number {
-  for (let node = element.parentElement; node; node = node.parentElement) {
-    const { overflowY } = getComputedStyle(node)
-    if (overflowY === 'auto' || overflowY === 'scroll') return node.getBoundingClientRect().top
-  }
-  return 0
-}
-
 async function go(target: number) {
   const next = Math.min(Math.max(1, target), range.value.pageCount)
   if (next === range.value.page) return
   page.value = next
   await nextTick()
+  // Reset only the list scrollport — never scroll the page chrome (search/toolbar stay put).
   const list = root.value?.previousElementSibling
-  if (list && list.getBoundingClientRect().top < scrollParentTop(list)) list.scrollIntoView({ block: 'start' })
+  if (list instanceof HTMLElement) list.scrollTop = 0
 }
 </script>
 
