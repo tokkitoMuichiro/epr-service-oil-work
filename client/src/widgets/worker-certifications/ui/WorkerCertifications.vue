@@ -22,6 +22,7 @@ import { AssignTestDialog } from '@/features/training-assign'
 import { errorMessage } from '@/shared/api'
 import { copyText } from '@/shared/lib/clipboard'
 import { formatDateRu, formatDateTimeRu } from '@/shared/lib/date'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { UiButton, UiDialog, askConfirm } from '@/shared/ui'
 
 const props = defineProps<{ workerId: string; isFired?: boolean }>()
@@ -40,6 +41,7 @@ const review = ref<{ attempt: TestAttempt; title: string } | null>(null)
 const annulTarget = ref<CertificationRecord | null>(null)
 const annulReason = ref('')
 const annulError = ref('')
+const { isDirty: isAnnulDirty } = useDialogDirty(() => annulReason.value, () => annulTarget.value !== null)
 
 const isVisible = computed(() => access.canView('training'))
 const canAssign = computed(() => access.can('training_assign') && !props.isFired)
@@ -292,7 +294,12 @@ function onAssigned() {
       </div>
     </UiDialog>
 
-    <UiDialog :open="annulTarget !== null" title="Аннулировать результат" @close="annulTarget = null">
+    <UiDialog
+      :open="annulTarget !== null"
+      title="Аннулировать результат"
+      :dirty="isAnnulDirty"
+      @close="annulTarget = null"
+    >
       <form class="ui-form" novalidate @submit.prevent="confirmAnnul">
         <p class="ui-form__note">
           Результат перестанет учитываться в сроках и допусках. Действие записывается в журнал.

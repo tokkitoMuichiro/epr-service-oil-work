@@ -11,6 +11,7 @@ import {
   type EquipmentCondition,
   type EquipmentItem,
 } from '@/entities/equipment'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { UiButton, UiDialog } from '@/shared/ui'
 
 const props = defineProps<{ item: EquipmentItem }>()
@@ -20,6 +21,7 @@ const store = useEquipmentStore()
 const pending = ref<EquipmentCondition | null>(null)
 const note = ref('')
 const isSubmitted = ref(false)
+const { isDirty } = useDialogDirty(() => note.value, () => Boolean(pending.value))
 
 const isEditable = computed(() => canChangeCondition(store.auth, props.item, store.transfers))
 const noteError = computed(() => (note.value.trim().length < 3 ? 'Опишите, что случилось (минимум 3 символа)' : ''))
@@ -61,7 +63,7 @@ async function confirm() {
   </select>
   <ConditionBadge v-else :condition="item.condition" />
 
-  <UiDialog :open="Boolean(pending)" title="Смена состояния" @close="pending = null">
+  <UiDialog :open="Boolean(pending)" title="Смена состояния" :dirty="isDirty" @close="pending = null">
     <form v-if="pending" class="ui-form" novalidate @submit.prevent="confirm">
       <p class="ui-form__note">
         <strong>{{ item.name }}</strong>: {{ CONDITION_LABEL[item.condition] }} → {{ CONDITION_LABEL[pending] }}

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { assetDisplayName, useEquipmentStore, type EquipmentItem } from '@/entities/equipment'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { UiButton, UiDialog } from '@/shared/ui'
 
 const props = defineProps<{ open: boolean; item: EquipmentItem | null }>()
@@ -9,6 +10,7 @@ const emit = defineEmits<{ close: [] }>()
 const store = useEquipmentStore()
 const comment = ref('')
 const isSubmitted = ref(false)
+const { isDirty } = useDialogDirty(() => comment.value, () => props.open)
 
 watch(
   () => props.open,
@@ -28,7 +30,7 @@ async function save() {
 </script>
 
 <template>
-  <UiDialog :open="open" title="Замечание по заполнению" @close="emit('close')">
+  <UiDialog :open="open" title="Замечание по заполнению" :dirty="isDirty" @close="emit('close')">
     <form v-if="item" class="ui-form" novalidate @submit.prevent="save">
       <p class="ui-form__note">
         <strong>{{ assetDisplayName(item) }}</strong> получит отметку «Неверно заполнено». Владелец исправит карточку,

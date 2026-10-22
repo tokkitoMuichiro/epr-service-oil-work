@@ -11,6 +11,7 @@ import {
   type ObjectStatusChange,
 } from '@/entities/contract'
 import { formatDateRu } from '@/shared/lib/date'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { UiButton, UiDialog } from '@/shared/ui'
 import { todayIso } from '@shared/dates'
 
@@ -35,6 +36,8 @@ const form = reactive({
   taskTitle: '',
   taskRef: '',
 })
+
+const { isDirty } = useDialogDirty(() => ({ ...form }), () => props.open)
 
 watch(
   () => [props.open, props.object, props.status] as const,
@@ -93,7 +96,7 @@ function onSubmit() {
 </script>
 
 <template>
-  <UiDialog :open="open" :title="title" @close="emit('close')">
+  <UiDialog :open="open" :title="title" :dirty="isDirty" @close="emit('close')">
     <form v-if="object && status" class="ui-form" novalidate @submit.prevent="onSubmit">
       <p class="ui-form__note">
         {{ object.name }} · {{ object.location || 'без адреса' }}<br />

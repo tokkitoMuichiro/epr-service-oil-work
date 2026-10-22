@@ -12,6 +12,7 @@ import {
   type User,
 } from '@/entities/role'
 import { errorMessage } from '@/shared/api'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { UiButton, UiDialog } from '@/shared/ui'
 
 const props = defineProps<{ open: boolean; user?: User | null }>()
@@ -43,6 +44,18 @@ let searchTimer: ReturnType<typeof setTimeout> | undefined
 let searchSeq = 0
 
 const isNew = computed(() => !props.user)
+const { isDirty } = useDialogDirty(
+  () => ({
+    login: form.login,
+    fullName: form.fullName,
+    role: form.role,
+    active: form.active,
+    password: form.password,
+    bitrixUserId: form.bitrixUserId,
+    workerId: form.workerId,
+  }),
+  () => props.open,
+)
 const error = computed(() => {
   const draft = {
     ...form,
@@ -177,7 +190,7 @@ const passwordHint = computed(() =>
 </script>
 
 <template>
-  <UiDialog :open="open" :title="user ? 'Пользователь' : 'Новый пользователь'" @close="emit('close')">
+  <UiDialog :open="open" :title="user ? 'Пользователь' : 'Новый пользователь'" :dirty="isDirty" @close="emit('close')">
     <form class="ui-form" novalidate @submit.prevent="save">
       <div class="bitrix">
         <span class="bitrix__label">Пользователь Битрикс24</span>

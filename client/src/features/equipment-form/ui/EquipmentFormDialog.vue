@@ -24,6 +24,7 @@ import {
   type OwnerType,
   type VehicleKind,
 } from '@/entities/equipment'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { formatFileSize } from '@/shared/lib/file'
 import { IconClose, UiButton, UiDialog, UiFileDrop } from '@/shared/ui'
 import type { OwnerPreset } from '../model/types'
@@ -55,6 +56,13 @@ const form = reactive({
 })
 const files = ref<File[]>([])
 const isSubmitted = ref(false)
+const { isDirty } = useDialogDirty(
+  () => ({
+    ...form,
+    files: files.value.map((f) => `${f.name}:${f.size}:${f.lastModified}`),
+  }),
+  () => props.open,
+)
 
 const isEdit = computed(() => Boolean(props.item))
 const category = computed<AssetCategory>(() => props.item?.category ?? props.category)
@@ -151,7 +159,7 @@ async function save() {
 </script>
 
 <template>
-  <UiDialog :open="open" :title="title" @close="emit('close')">
+  <UiDialog :open="open" :title="title" :dirty="isDirty" @close="emit('close')">
     <form class="ui-form" novalidate @submit.prevent="save">
       <p v-if="item?.fillStatus === 'NEEDS_FIX' && item.fillComment" class="remark">
         <strong>Замечание:</strong> {{ item.fillComment }}

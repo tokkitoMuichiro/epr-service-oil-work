@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useEscape, useScrollLock } from '@/shared/lib/scroll-lock'
+import { askConfirm } from './confirm'
 import { IconClose } from './icons'
 
 const props = defineProps<{
   open: boolean
   title: string
   wide?: boolean
+  /** When true, Esc / overlay / close ask before discarding the form. */
+  dirty?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -15,13 +18,39 @@ const emit = defineEmits<{
 
 const panel = ref<HTMLElement | null>(null)
 let returnFocus: HTMLElement | null = null
+let isConfirming = false
 
 useScrollLock(() => props.open)
-useEscape(() => props.open, () => emit('close'))
+useEscape(
+  () => props.open && !isConfirming,
+  () => {
+    void requestClose()
+  },
+)
 
 function restoreFocus() {
   if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true })
   returnFocus = null
+}
+
+async function requestClose() {
+  if (!props.open || isConfirming) return
+  if (props.dirty) {
+    isConfirming = true
+    try {
+      const discard = await askConfirm({
+        title: 'Имеются несохранённые данные',
+        message: 'Закрыть окно? Введённые данные будут потеряны.',
+        confirmText: 'Закрыть без сохранения',
+        cancelText: 'Остаться',
+        tone: 'danger',
+      })
+      if (!discard) return
+    } finally {
+      isConfirming = false
+    }
+  }
+  emit('close')
 }
 
 watch(
@@ -43,7 +72,7 @@ onBeforeUnmount(restoreFocus)
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="ui-overlay" @click.self="$emit('close')">
+    <div v-if="open" class="ui-overlay" @click.self="requestClose">
       <div
         ref="panel"
         class="ui-sheet ui-dialog"
@@ -57,7 +86,7 @@ onBeforeUnmount(restoreFocus)
           <h2 class="ui-sheet__title">{{ title }}</h2>
           <div class="ui-sheet__head-actions">
             <slot name="header-actions" />
-            <button class="ui-icon-button" type="button" aria-label="Закрыть" title="Закрыть" @click="$emit('close')">
+            <button class="ui-icon-button" type="button" aria-label="Закрыть" title="Закрыть" @click="requestClose">
               <IconClose />
             </button>
           </div>

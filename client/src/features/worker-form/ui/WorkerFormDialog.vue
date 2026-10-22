@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
 import { validateWorkerDraft, type Worker, type WorkerDraft } from '@/entities/personnel'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { UiButton, UiDialog } from '@/shared/ui'
 
 const props = defineProps<{
@@ -23,6 +24,8 @@ const form = reactive({
   birthDate: '',
   passport: '',
 })
+
+const { isDirty } = useDialogDirty(() => ({ ...form }), () => props.open)
 
 watch(
   () => [props.open, props.worker?.id] as const,
@@ -60,7 +63,7 @@ function save() {
 </script>
 
 <template>
-  <UiDialog :open="open" :title="worker ? 'Карточка сотрудника' : 'Новый сотрудник'" @close="emit('close')">
+  <UiDialog :open="open" :title="worker ? 'Карточка сотрудника' : 'Новый сотрудник'" :dirty="isDirty" @close="emit('close')">
     <form class="ui-form" @submit.prevent="save">
       <label>
         <span>ФИО</span>
