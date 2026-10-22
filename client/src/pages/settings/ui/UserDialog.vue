@@ -226,13 +226,13 @@ const passwordHint = computed(() =>
       </label>
       <label>
         <span>Роль</span>
-        <select v-model="form.role">
+        <select v-model="form.role" aria-label="Роль">
           <option v-for="role in ROLES" :key="role.id" :value="role.id">{{ role.label }}</option>
         </select>
       </label>
       <label>
         <span>Карточка сотрудника</span>
-        <select v-model="form.workerId">
+        <select v-model="form.workerId" aria-label="Карточка сотрудника">
           <option value="">Не привязан</option>
           <option v-for="worker in workerOptions" :key="worker.id" :value="worker.id">
             {{ worker.fullName }} · {{ worker.position }}
