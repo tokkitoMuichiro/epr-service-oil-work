@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { canCreateFor, positionsLabel, useEquipmentStore } from '@/entities/equipment'
 import { EquipmentFormDialog } from '@/features/equipment-form'
@@ -17,6 +17,7 @@ const category = useRouteCategory()
 const isCreateOpen = ref(false)
 const search = ref('')
 const isPeopleCollapsed = ref(localStorage.getItem(PEOPLE_COLLAPSED_KEY) === '1')
+const peopleScroller = ref<HTMLElement | null>(null)
 
 const people = computed(() => {
   const q = search.value.trim().toLowerCase()
@@ -43,6 +44,14 @@ watch(isPeopleCollapsed, (collapsed) => {
   localStorage.setItem(PEOPLE_COLLAPSED_KEY, collapsed ? '1' : '0')
 })
 
+watch(userId, async (id) => {
+  if (!id || isPeopleCollapsed.value) return
+  await nextTick()
+  peopleScroller.value
+    ?.querySelector<HTMLElement>('.people__item--active')
+    ?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' })
+})
+
 function select(id: string) {
   void router.replace({ query: { ...route.query, userId: id } })
 }
@@ -64,42 +73,53 @@ function personLabel(id: string, fullName: string) {
     </label>
 
     <aside class="people" :class="{ 'people--collapsed': isPeopleCollapsed }" aria-label="Сотрудники">
-      <button
-        type="button"
-        class="people__toggle"
-        :aria-label="isPeopleCollapsed ? 'Развернуть список сотрудников' : 'Свернуть список сотрудников'"
-        :title="isPeopleCollapsed ? 'Развернуть список' : 'Свернуть список'"
-        :aria-expanded="!isPeopleCollapsed"
-        @click="isPeopleCollapsed = !isPeopleCollapsed"
-      >
-        <IconChevronsLeft class="people__toggle-icon" :size="18" />
-        <span v-if="!isPeopleCollapsed" class="people__toggle-label">Свернуть</span>
-      </button>
-
-      <div v-show="!isPeopleCollapsed" class="people__list">
+      <div class="people__toolbar">
+        <button
+          type="button"
+          class="people__toggle"
+          :aria-label="isPeopleCollapsed ? 'Развернуть список сотрудников' : 'Свернуть список сотрудников'"
+          :title="isPeopleCollapsed ? 'Развернуть список' : 'Свернуть список'"
+          :aria-expanded="!isPeopleCollapsed"
+          @click="isPeopleCollapsed = !isPeopleCollapsed"
+        >
+          <IconChevronsLeft class="people__toggle-icon" :size="18" />
+          <span v-if="!isPeopleCollapsed" class="people__toggle-label">Свернуть</span>
+        </button>
         <input
+          v-show="!isPeopleCollapsed"
           v-model="search"
           class="people__search ui-control"
           type="search"
           placeholder="Поиск сотрудника"
           aria-label="Поиск сотрудника"
         />
-        <button
-          v-for="p in people"
-          :key="p.id"
-          type="button"
-          class="people__item"
-          :class="{ 'people__item--active': p.id === userId }"
-          @click="select(p.id)"
-        >
-          <strong>{{ personLabel(p.id, p.fullName) }}</strong>
-          <span class="num">{{ positionsLabel(store.itemsOfUser(p.id).length) }}</span>
-        </button>
+      </div>
+
+      <div v-show="!isPeopleCollapsed" ref="peopleScroller" class="people__scroller">
+        <div class="people__track">
+          <button
+            v-for="p in people"
+            :key="p.id"
+            type="button"
+            class="people__item"
+            :class="{ 'people__item--active': p.id === userId }"
+            :title="personLabel(p.id, p.fullName)"
+            @click="select(p.id)"
+          >
+            <strong>{{ personLabel(p.id, p.fullName) }}</strong>
+            <span class="num">{{ positionsLabel(store.itemsOfUser(p.id).length) }}</span>
+          </button>
+        </div>
         <p v-if="!people.length" class="muted">Никого не найдено</p>
       </div>
     </aside>
 
-    <UiState v-if="!person" title="Выберите сотрудника" :icon="IconPersonnel" text="Слева список сотрудников с числом позиций." />
+    <UiState
+      v-if="!person"
+      title="Выберите сотрудника"
+      :icon="IconPersonnel"
+      text="В списке — сотрудники с числом позиций."
+    />
     <div v-else class="page">
       <div class="page__bar">
         <CategoryTabs :active="category" :items="items" />
@@ -130,42 +150,59 @@ function personLabel(id: string, fullName: string) {
 
 <style scoped>
 .layout {
+  --people-visible: 9;
+  --people-gap: var(--space-2);
   display: grid;
-  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   align-items: start;
   min-width: 0;
 }
 
-.layout--collapsed {
-  grid-template-columns: var(--control-height) minmax(0, 1fr);
-  gap: var(--space-3);
-}
-
 .people {
   position: sticky;
   top: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  align-items: stretch;
-  max-height: calc(100vh - 8rem);
-  max-height: calc(100dvh - 8rem);
-  min-width: 0;
-  padding: 2px;
-  overflow: hidden;
-}
-
-.people__list {
+  z-index: 2;
   display: grid;
   gap: var(--space-2);
-  align-content: start;
-  min-height: 0;
-  overflow: auto;
+  min-width: 0;
+  padding: var(--space-1) 0 var(--space-2);
+  background: var(--surface-app);
+}
+
+.people__toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.people__search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.people__scroller {
+  container-type: inline-size;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+
+.people__track {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--people-gap);
+  min-width: 100%;
+  width: max-content;
 }
 
 .people--collapsed {
-  overflow: visible;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .people__toggle {
@@ -174,9 +211,9 @@ function personLabel(id: string, fullName: string) {
   justify-content: center;
   gap: var(--space-2);
   flex: 0 0 auto;
-  width: 100%;
+  min-width: var(--control-height);
   min-height: var(--control-height);
-  padding: 0 var(--space-2);
+  padding: 0 var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--surface-card);
@@ -188,25 +225,29 @@ function personLabel(id: string, fullName: string) {
 
 .people--collapsed .people__toggle {
   width: var(--control-height);
-  height: var(--control-height);
   padding: 0;
 }
 
 .people--collapsed .people__toggle-icon {
-  transform: rotate(180deg);
+  transform: rotate(90deg);
+}
+
+.people:not(.people--collapsed) .people__toggle-icon {
+  transform: rotate(-90deg);
 }
 
 .people__toggle-label {
-  flex: 1;
-  text-align: left;
+  white-space: nowrap;
 }
 
 .people__item {
+  box-sizing: border-box;
   display: grid;
   gap: 2px;
-  min-width: 0;
-  max-width: 100%;
-  min-height: var(--tap-size);
+  align-content: center;
+  flex: 1 0 calc((100cqw - (var(--people-visible) - 1) * var(--people-gap)) / var(--people-visible));
+  min-width: calc((100cqw - (var(--people-visible) - 1) * var(--people-gap)) / var(--people-visible));
+  min-height: calc(var(--tap-size) + var(--space-2));
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
@@ -218,29 +259,33 @@ function personLabel(id: string, fullName: string) {
   overflow: hidden;
 }
 
-.people__item strong,
+.people__item strong {
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: var(--line-height-tight);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .people__item .num {
   min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.people__item strong {
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-}
-
-.people__item .num {
-  font-size: var(--font-size-xs);
-  color: var(--text-secondary);
 }
 
 .people__item--active {
   border-color: var(--accent);
   background: var(--accent-subtle);
   color: var(--text-primary);
-  box-shadow: inset 3px 0 0 var(--accent);
+  box-shadow: inset 0 3px 0 var(--accent);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -263,9 +308,7 @@ function personLabel(id: string, fullName: string) {
 }
 
 @media (max-width: 860px) {
-  .layout,
-  .layout--collapsed {
-    grid-template-columns: minmax(0, 1fr);
+  .layout {
     gap: var(--space-3);
   }
 
