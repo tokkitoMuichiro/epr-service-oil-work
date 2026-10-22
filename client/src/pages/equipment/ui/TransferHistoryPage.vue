@@ -58,7 +58,7 @@ function tone(value: TransferStatus) {
 
       <UiState v-if="!rows.length" title="Передач нет" :icon="IconEquipment" text="Измените фильтры или дождитесь первых передач." />
 
-      <div v-else class="table-wrap ui-table-wrap ui-table-wrap--stack">
+      <div v-else :ref="pager.bindFit" class="table-wrap ui-table-wrap ui-table-wrap--stack">
         <table class="ui-table">
           <thead>
             <tr>

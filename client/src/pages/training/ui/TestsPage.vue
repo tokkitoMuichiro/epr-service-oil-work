@@ -72,7 +72,7 @@ const pager = useMobilePagination(visible, { resetOn: [search, programFilter, st
 
     <UiState v-if="!visible.length" title="Тестов нет" :icon="IconTraining" text="Создайте тест: добавьте вопросы и опубликуйте его." />
     <template v-else>
-      <div class="ui-table-wrap ui-table-wrap--stack">
+      <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack">
         <table class="ui-table">
           <thead>
             <tr>

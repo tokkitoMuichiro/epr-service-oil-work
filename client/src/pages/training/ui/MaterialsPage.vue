@@ -162,7 +162,7 @@ function openHref(material: TrainingMaterial) {
 
     <UiState v-if="!visible.length" title="Материалов нет" :icon="IconTraining" text="Загрузите файл или добавьте ссылку на файл в Битрикс." />
     <template v-else>
-      <div class="ui-table-wrap ui-table-wrap--stack">
+      <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack">
         <table class="ui-table">
           <thead>
             <tr>

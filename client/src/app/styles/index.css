@@ -487,11 +487,13 @@ time,
 .ui-form {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .ui-form label {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 
 .ui-form label > span {
@@ -537,7 +539,7 @@ time,
 
 .ui-form__row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
 }
 
@@ -874,9 +876,11 @@ textarea::placeholder {
 
 .ui-sheet__body {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
   padding: var(--space-5);
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
 }
 

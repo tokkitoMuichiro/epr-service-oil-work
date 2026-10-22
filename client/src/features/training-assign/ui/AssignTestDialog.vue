@@ -326,22 +326,29 @@ const title = computed(() => {
 </template>
 
 <style scoped>
+.ui-form {
+  min-width: 0;
+}
+
 .assign__el {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-3);
+  min-width: 0;
 }
 
 .assign__filters {
   display: grid;
-  grid-template-columns: 1.4fr repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .assign__bulk {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .assign__people {
@@ -349,10 +356,12 @@ const title = computed(() => {
   max-height: 320px;
   margin: 0;
   padding: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   list-style: none;
+  min-width: 0;
 }
 
 .assign__people li + li {
@@ -363,6 +372,7 @@ const title = computed(() => {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  min-width: 0;
   min-height: var(--tap-size);
   padding: var(--space-2) var(--space-3);
   cursor: pointer;
@@ -374,10 +384,24 @@ const title = computed(() => {
   flex: 0 0 auto;
 }
 
+.assign__person > div:last-child {
+  flex: 0 1 auto;
+  max-width: 40%;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .assign__name {
   display: grid;
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.assign__name strong,
+.assign__name small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .assign__name strong {

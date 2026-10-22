@@ -32,3 +32,42 @@ export function pageSlice<T>(items: readonly T[], page: number, pageSize = DEFAU
   const { from, to } = pageWindow(page, items.length, pageSize)
   return from ? items.slice(from - 1, to) : []
 }
+
+export type PageNumberToken = number | 'ellipsis'
+
+/**
+ * Builds a compact page-number window for numbered pagers:
+ * always first/last, siblings around the current page, `ellipsis` for gaps.
+ */
+export function pageNumbers(page: number, pageCount: number, siblingCount = 1): PageNumberToken[] {
+  const last = Math.max(1, Math.trunc(pageCount) || 1)
+  const current = Math.min(Math.max(1, Math.trunc(page) || 1), last)
+  const siblings = Math.max(0, Math.trunc(siblingCount))
+
+  if (last <= siblings * 2 + 5) {
+    return Array.from({ length: last }, (_, i) => i + 1)
+  }
+
+  let left = Math.max(1, current - siblings)
+  let right = Math.min(last, current + siblings)
+
+  if (current <= siblings + 2) {
+    left = 1
+    right = Math.min(last, siblings + 2)
+  } else if (current >= last - (siblings + 1)) {
+    left = Math.max(1, last - (siblings + 1))
+    right = last
+  }
+
+  const tokens: PageNumberToken[] = []
+  if (left > 1) {
+    tokens.push(1)
+    if (left > 2) tokens.push('ellipsis')
+  }
+  for (let n = left; n <= right; n += 1) tokens.push(n)
+  if (right < last) {
+    if (right < last - 1) tokens.push('ellipsis')
+    tokens.push(last)
+  }
+  return tokens
+}
