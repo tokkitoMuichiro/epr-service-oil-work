@@ -9,6 +9,7 @@ import {
   laggingObjects,
   missingReports,
   overviewObjects,
+  overviewWindow,
   upcomingEvents,
   volumeProgress,
   type OverviewObject,
@@ -81,6 +82,15 @@ describe('volumeProgress', () => {
 
   it('skips works without planned volume or dates', () => {
     assert.equal(volumeProgress([work({ plannedVolume: 0 }), work({ plannedEnd: '' })], {}, TODAY), null)
+  })
+})
+
+describe('overviewWindow', () => {
+  it('covers the Monday–Sunday week that contains today', () => {
+    // 2026-10-13 is a Tuesday → week 2026-10-12 … 2026-10-18
+    assert.deepEqual(overviewWindow(TODAY), { from: '2026-10-12', to: '2026-10-18' })
+    assert.deepEqual(overviewWindow('2026-10-12'), { from: '2026-10-12', to: '2026-10-18' })
+    assert.deepEqual(overviewWindow('2026-10-18'), { from: '2026-10-12', to: '2026-10-18' })
   })
 })
 

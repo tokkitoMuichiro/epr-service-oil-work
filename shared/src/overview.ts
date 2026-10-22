@@ -3,11 +3,12 @@ import { addDaysIso } from './dates.js'
 import { authFor, canConfirmFill, isIncomingFor, ownsItem, type EquipmentState } from './equipment.js'
 import { trainingDocState, type Worker } from './personnel.js'
 import type { ReportDay } from './reports.js'
-import { plannedVolumeOn, progressState, type DateSpan, type ProgressState } from './schedule.js'
+import { periodContaining, plannedVolumeOn, progressState, type DateSpan, type ProgressState } from './schedule.js'
 import type { TrainingCounters } from './training.js'
 
 /** Objects lagging by at least this many percentage points of volume count as behind schedule. */
 export const OVERVIEW_LAG_POINTS = 10
+/** Horizon for «Ближайшие события» on the overview (forward from today). */
 export const OVERVIEW_WINDOW_DAYS = 14
 
 export interface VolumeProgress {
@@ -92,8 +93,10 @@ export function volumeProgress(works: MeasurableWork[], reported: Record<string,
   return { expected: Math.round(expected * 100), actual: Math.round(actual * 100) }
 }
 
+/** Calendar week (Mon–Sun) that contains `today` — the overview mini-schedule. */
 export function overviewWindow(today: string): DateSpan {
-  return { from: addDaysIso(today, -OVERVIEW_WINDOW_DAYS), to: addDaysIso(today, OVERVIEW_WINDOW_DAYS) }
+  const week = periodContaining('week', today)
+  return { from: week.start, to: week.end }
 }
 
 /** Active (not archived, not finished) objects with planned dates. */

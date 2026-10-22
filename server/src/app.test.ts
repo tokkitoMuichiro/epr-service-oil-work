@@ -554,7 +554,7 @@ describe('api', () => {
   it('builds the overview from the blocks the role can see', async () => {
     const asAdmin = (await call('GET', '/api/overview')).json.item as Overview
     assert.equal(asAdmin.today, TODAY)
-    assert.deepEqual(asAdmin.window, { from: '2026-09-15', to: '2026-10-13' })
+    assert.deepEqual(asAdmin.window, { from: '2026-09-28', to: '2026-10-04' })
     assert.ok(asAdmin.objects && asAdmin.objects.length > 0)
     assert.ok(asAdmin.objects.every((o) => !o.actualEnd))
     assert.ok(asAdmin.objects.some((o) => o.progress !== null && o.lastReport !== null))

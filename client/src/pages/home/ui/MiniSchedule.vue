@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { addDaysIso, daysBetweenIso } from '@shared/dates'
 import type { OverviewObject } from '@shared/overview'
 import type { DateSpan } from '@shared/schedule'
-import { formatDateRu, formatDayMonth, isWeekend } from '@/shared/lib/date'
+import { formatDateRu, formatDayMonth, isWeekend, weekdayShort } from '@/shared/lib/date'
 
 const props = defineProps<{ objects: OverviewObject[]; window: DateSpan; today: string }>()
 
@@ -24,58 +24,49 @@ function indexOf(day: string): number {
 }
 
 function percent(index: number): string {
-  return `${(index / days.value.length) * 100}%`
+  const n = days.value.length || 1
+  return `${(index / n) * 100}%`
 }
 
 function spanStyle(from: string, to: string) {
   const start = Math.max(indexOf(from), 0)
   const end = Math.min(indexOf(to), days.value.length - 1)
+  if (end < start) return { left: '0%', width: '0%' }
   return { left: percent(start), width: percent(end - start + 1) }
 }
 
 function dayStyle(day: string) {
-  return { left: percent(indexOf(day)), width: percent(1) }
+  const i = indexOf(day)
+  if (i < 0 || i >= days.value.length) return { left: '0%', width: '0%' }
+  return { left: percent(i), width: percent(1) }
 }
 
-const DAY_LABEL_MIN_WIDTH = 18
+const todayInWindow = computed(() => props.today >= props.window.from && props.today <= props.window.to)
 
-const headTrack = ref<HTMLElement | null>(null)
-const trackWidth = ref(0)
-let observer: ResizeObserver | null = null
-
-onMounted(() => {
-  if (!headTrack.value) return
-  observer = new ResizeObserver(([entry]) => {
-    trackWidth.value = entry.contentRect.width
-  })
-  observer.observe(headTrack.value)
+const todayStyle = computed(() => {
+  if (!todayInWindow.value) return null
+  const i = indexOf(props.today)
+  return { left: `calc(${percent(i)} + ${50 / days.value.length}%)` }
 })
-
-onBeforeUnmount(() => observer?.disconnect())
-
-const labelStep = computed(() => {
-  if (!trackWidth.value) return 1
-  return Math.max(1, Math.ceil(DAY_LABEL_MIN_WIDTH / (trackWidth.value / days.value.length)))
-})
-
-function isLabeled(day: string): boolean {
-  return (indexOf(day) - indexOf(props.today)) % labelStep.value === 0
-}
-
-const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))} + ${50 / days.value.length}%)` }))
 </script>
 
 <template>
   <div class="mini" :style="{ '--days': days.length }">
     <div class="mini__head" aria-hidden="true">
-      <span class="mini__label">{{ formatDayMonth(window.from) }} — {{ formatDayMonth(window.to) }}</span>
-      <span ref="headTrack" class="mini__track mini__days">
-        <span
-          v-for="day in days"
-          :key="day"
-          :class="{ 'is-weekend': isWeekend(day), 'is-today': day === today, 'is-month': day.endsWith('-01') }"
-        >
-          <template v-if="isLabeled(day)">{{ Number(day.slice(8)) }}</template>
+      <span class="mini__label">
+        <strong>{{ formatDayMonth(window.from) }} — {{ formatDayMonth(window.to) }}</strong>
+      </span>
+      <span class="mini__track">
+        <span class="mini__days">
+          <span
+            v-for="day in days"
+            :key="day"
+            class="mini__day"
+            :class="{ 'is-weekend': isWeekend(day), 'is-today': day === today }"
+          >
+            <em>{{ Number(day.slice(8)) }}</em>
+            <small>{{ weekdayShort(day) }}</small>
+          </span>
         </span>
       </span>
     </div>
@@ -90,6 +81,14 @@ const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))
         <small :title="row.contractName">{{ row.contractName }}</small>
       </span>
       <span class="mini__track">
+        <span class="mini__days mini__days--bg" aria-hidden="true">
+          <span
+            v-for="day in days"
+            :key="day"
+            class="mini__day"
+            :class="{ 'is-weekend': isWeekend(day), 'is-today': day === today }"
+          />
+        </span>
         <span class="mini__plan" :style="spanStyle(row.plannedStart, row.plannedEnd)" />
         <span
           v-for="day in row.reportDays"
@@ -98,10 +97,10 @@ const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))
           :style="dayStyle(day)"
           :title="`Отчёт ${formatDateRu(day)}`"
         />
-        <span class="mini__today" :style="todayStyle" />
+        <span v-if="todayStyle" class="mini__today" :style="todayStyle" />
       </span>
     </RouterLink>
-    <p v-if="!rows.length" class="mini__empty">В эти две недели работ по графику нет.</p>
+    <p v-if="!rows.length" class="mini__empty">На этой неделе работ по графику нет.</p>
     <ul class="mini__legend">
       <li><i class="mini__legend-plan" />План</li>
       <li><i class="mini__legend-report" />Отчёт за день</li>
@@ -112,7 +111,7 @@ const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))
 
 <style scoped>
 .mini {
-  --label-width: 220px;
+  --label-width: 11rem;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -122,13 +121,13 @@ const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))
 .mini__row {
   display: grid;
   grid-template-columns: var(--label-width) minmax(0, 1fr);
-  align-items: center;
+  align-items: stretch;
+  min-width: 0;
 }
 
 .mini__head {
-  min-height: 32px;
+  min-height: 2.5rem;
   border-bottom: 1px solid var(--border-subtle);
-  font-size: var(--font-size-2xs);
   color: var(--text-secondary);
 }
 
@@ -141,8 +140,9 @@ const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))
 
 .mini__label {
   display: grid;
+  align-content: center;
   min-width: 0;
-  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-4);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
 }
 
 .mini__label strong,
@@ -162,64 +162,102 @@ const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))
   font-size: var(--font-size-2xs);
 }
 
+.mini__head .mini__label strong {
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 .mini__track {
   position: relative;
-  height: 100%;
-  min-height: 24px;
+  min-width: 0;
+  min-height: 100%;
   margin-right: var(--space-3);
+  overflow: hidden;
 }
 
 .mini__days {
   display: grid;
   grid-template-columns: repeat(var(--days), minmax(0, 1fr));
   align-items: stretch;
+  height: 100%;
+  min-height: inherit;
 }
 
-.mini__days > span {
+.mini__days--bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.mini__day {
   display: grid;
   place-items: center;
-  white-space: nowrap;
+  gap: 0;
+  min-width: 0;
   font-variant-numeric: tabular-nums;
+  line-height: 1.1;
 }
 
-.mini__days > .is-weekend {
+.mini__days:not(.mini__days--bg) .mini__day {
+  padding: var(--space-1) 0;
+}
+
+.mini__day em {
+  font-style: normal;
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+}
+
+.mini__day small {
+  font-size: 10px;
+  color: inherit;
+  opacity: 0.85;
+  text-transform: lowercase;
+}
+
+.mini__day.is-weekend {
   background: var(--chart-weekend-bg);
   color: var(--chart-weekend-fg);
 }
 
-.mini__days > .is-month {
-  box-shadow: inset 1px 0 0 var(--border-strong);
-}
-
-.mini__days > .is-today {
+.mini__day.is-today {
   background: var(--chart-today-bg);
   color: var(--chart-today);
+}
+
+.mini__day.is-today em {
   font-weight: 700;
 }
 
 .mini__plan {
   position: absolute;
   top: 50%;
+  z-index: 1;
   height: 12px;
   transform: translateY(-50%);
   border: 1px solid var(--chart-plan-border);
   border-radius: var(--radius);
   background: var(--chart-plan-bg);
+  box-sizing: border-box;
 }
 
 .mini__report {
   position: absolute;
   top: 50%;
+  z-index: 2;
   height: 12px;
   transform: translateY(-50%);
   border-left: 1px solid var(--surface-card);
   background: var(--accent);
+  box-sizing: border-box;
 }
 
 .mini__today {
   position: absolute;
   top: 0;
   bottom: 0;
+  z-index: 3;
   width: 2px;
   margin-left: -1px;
   background: var(--chart-today);
@@ -237,7 +275,7 @@ const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-4);
   margin: 0;
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   list-style: none;
   color: var(--text-secondary);
   font-size: var(--font-size-2xs);
@@ -279,14 +317,34 @@ const todayStyle = computed(() => ({ left: `calc(${percent(indexOf(props.today))
 
 @media (max-width: 860px) {
   .mini {
-    --label-width: 140px;
+    --label-width: 7.5rem;
   }
 
+  .mini__track {
+    margin-right: var(--space-2);
+  }
+
+  .mini__label {
+    padding-left: var(--space-2);
+    padding-right: var(--space-1);
+  }
 }
 
 @media (max-width: 560px) {
   .mini {
-    --label-width: 120px;
+    --label-width: 5.5rem;
+  }
+
+  .mini__day em {
+    font-size: 10px;
+  }
+
+  .mini__day small {
+    font-size: 9px;
+  }
+
+  .mini__label strong {
+    font-size: var(--font-size-xs);
   }
 }
 </style>
