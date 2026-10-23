@@ -15,7 +15,20 @@ import { formatFileSize } from '@/shared/lib/file'
 import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { shortFullName } from '@shared/person-name'
 import { useMobilePagination } from '@/shared/lib/pagination'
-import { IconTraining, UiButton, UiClipText, UiDialog, UiFileDrop, UiPagination, UiState, askConfirm } from '@/shared/ui'
+import {
+  IconArchive,
+  IconPencil,
+  IconTraining,
+  IconTrash,
+  IconUndo,
+  UiButton,
+  UiClipText,
+  UiDialog,
+  UiFileDrop,
+  UiPagination,
+  UiState,
+  askConfirm,
+} from '@/shared/ui'
 
 interface MaterialForm {
   id: string | null
@@ -202,9 +215,22 @@ function openHref(material: TrainingMaterial) {
                 <small class="materials__sub">{{ shortFullName(m.updatedBy) }}</small>
               </td>
               <td class="col-actions materials__actions ui-cell--actions">
-                <UiButton variant="ghost" size="sm" @click="openEdit(m)">Изменить</UiButton>
-                <UiButton variant="ghost" size="sm" @click="toggleArchive(m)">{{ m.isArchived ? 'Вернуть' : 'В архив' }}</UiButton>
-                <UiButton variant="ghost" size="sm" @click="remove(m)">Удалить</UiButton>
+                <UiButton variant="ghost" size="icon" aria-label="Изменить" title="Изменить" @click="openEdit(m)">
+                  <IconPencil :size="16" />
+                </UiButton>
+                <UiButton
+                  variant="ghost"
+                  size="icon"
+                  :aria-label="m.isArchived ? 'Вернуть из архива' : 'В архив'"
+                  :title="m.isArchived ? 'Вернуть из архива' : 'В архив'"
+                  @click="toggleArchive(m)"
+                >
+                  <IconUndo v-if="m.isArchived" :size="16" />
+                  <IconArchive v-else :size="16" />
+                </UiButton>
+                <UiButton variant="ghost" size="icon" aria-label="Удалить" title="Удалить" @click="remove(m)">
+                  <IconTrash :size="16" />
+                </UiButton>
               </td>
             </tr>
           </tbody>
@@ -284,23 +310,31 @@ function openHref(material: TrainingMaterial) {
 }
 
 .materials__table {
-  table-layout: auto;
+  table-layout: fixed;
   width: 100%;
 }
 
 .col-title {
-  width: 100%;
-}
-
-.col-programs,
-.col-updated,
-.col-actions {
-  width: 1%;
-  white-space: nowrap;
+  min-width: 10rem;
+  max-width: 28rem;
 }
 
 .col-programs {
+  width: 11rem;
+  min-width: 7rem;
   max-width: 14rem;
+}
+
+.col-updated {
+  width: 9rem;
+  min-width: 7rem;
+  max-width: 11rem;
+}
+
+.col-actions {
+  width: calc(3 * var(--tap-size) + 2 * var(--space-1));
+  min-width: calc(3 * var(--control-height-sm));
+  max-width: calc(3 * var(--tap-size) + 2 * var(--space-1));
 }
 
 .materials__toolbar {
@@ -330,23 +364,31 @@ function openHref(material: TrainingMaterial) {
 }
 
 .materials__title {
+  display: block;
+  min-width: 8rem;
+  max-width: min(28rem, 100%);
   color: var(--text-link);
   font-weight: 600;
 }
 
 .materials__sub {
   display: block;
+  min-width: 8rem;
+  max-width: min(28rem, 100%);
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
 }
 
-.materials__actions {
-  text-align: right;
-  white-space: normal;
+.col-title,
+.col-programs {
+  overflow: hidden;
 }
 
-.materials__actions :deep(.btn) {
-  margin-left: var(--space-1);
+.materials__actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  white-space: nowrap;
 }
 
 .materials__programs {
@@ -399,6 +441,14 @@ function openHref(material: TrainingMaterial) {
 
   .hide-md {
     display: none;
+  }
+
+  .col-title,
+  .col-programs,
+  .materials__title,
+  .materials__sub {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .materials__sub {

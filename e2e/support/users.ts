@@ -12,5 +12,8 @@ export async function createUser(request: APIRequestContext, user: E2eUser) {
   const response = await request.post('/api/users', {
     data: { ...user, active: true, workerId: null, bitrixUserId: null },
   })
-  expect(response.ok(), await response.text()).toBe(true)
+  if (response.ok()) return
+  const body = await response.text()
+  // Повторный прогон (retry Playwright) уже создал этого пользователя.
+  expect(body.includes('уже есть'), body).toBe(true)
 }

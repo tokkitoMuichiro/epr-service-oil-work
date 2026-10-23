@@ -1,9 +1,11 @@
 import { expect, test } from '@playwright/test'
+import { shortFullName } from '../shared/src/person-name'
 import { NO_SESSION, signIn } from './support/session'
 import { createUser } from './support/users'
 
 const KEEPER = { login: 'e2e-keeper', password: 'e2e-keeper-pass', fullName: 'Складов Пётр Ильич', role: 'storekeeper' as const }
 const ITEM = 'Рукав напорный'
+const KEEPER_SHORT = shortFullName(KEEPER.fullName)
 
 test('передача оборудования: отправитель передаёт, получатель принимает, передача видна в истории', async ({ page, browser }) => {
   await createUser(page.request, KEEPER)
@@ -37,7 +39,7 @@ test('передача оборудования: отправитель пере
   await page.getByRole('searchbox', { name: 'Поиск' }).fill('Рукав')
   await expect(row).not.toContainText('→')
   await expect(row).not.toContainText('База Север')
-  await expect(row).toContainText(KEEPER.fullName)
+  await expect(row).toContainText(KEEPER_SHORT)
 
   await page.goto('/equipment/history')
   await expect(page.getByText(ITEM).first()).toBeVisible()
