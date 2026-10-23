@@ -86,8 +86,8 @@ const pager = useMobilePagination(visible, { resetOn: [search, programFilter, st
           </thead>
           <tbody>
             <tr v-for="t in pager.pageItems" :key="t.id">
-              <td class="col-title ui-cell--main" :title="t.title">
-                <RouterLink :to="`/training/tests/${t.id}`" class="tests__title"><UiClipText :text="t.title" /></RouterLink>
+              <td class="col-title ui-cell--main">
+                <RouterLink :to="`/training/tests/${t.id}`" class="tests__title">{{ t.title }}</RouterLink>
                 <small v-if="t.electrical" class="tests__sub">{{ describeElectricalScope(t.electrical) }}</small>
               </td>
               <td class="col-program tests__program" :title="store.labelOf(t.programId)">
@@ -129,25 +129,43 @@ const pager = useMobilePagination(visible, { resetOn: [search, programFilter, st
   gap: var(--space-3);
 }
 
+.tests .ui-table-wrap {
+  overflow-x: clip;
+}
+
 .tests__table {
-  table-layout: auto;
+  table-layout: fixed;
   width: 100%;
 }
 
 .col-title {
-  width: 100%;
+  width: auto;
+}
+
+.col-program {
+  width: 12rem;
+}
+
+.col-status {
+  width: 8.5rem;
+}
+
+.col-questions {
+  width: 6.5rem;
+}
+
+.col-updated {
+  width: 9rem;
 }
 
 .col-program,
 .col-questions,
 .col-status,
 .col-updated {
-  width: 1%;
   white-space: nowrap;
 }
 
 .tests__program {
-  max-width: 14rem;
   overflow: hidden;
 }
 
@@ -177,8 +195,12 @@ const pager = useMobilePagination(visible, { resetOn: [search, programFilter, st
 }
 
 .tests__title {
+  display: block;
+  max-width: 28rem;
   color: var(--text-link);
   font-weight: 600;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .tests__sub {
@@ -228,6 +250,14 @@ const pager = useMobilePagination(visible, { resetOn: [search, programFilter, st
 
   .hide-md {
     display: none;
+  }
+
+  .col-title,
+  .col-program,
+  .col-status,
+  .tests__title {
+    max-width: 100%;
+    white-space: normal;
   }
 }
 </style>
