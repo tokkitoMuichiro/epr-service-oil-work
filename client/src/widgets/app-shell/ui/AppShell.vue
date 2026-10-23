@@ -5,6 +5,7 @@ import { authFor, canViewAllList, useEquipmentStore } from '@/entities/equipment
 import { equipmentPermissionsOf, useAccessStore, useRoleStore, type AccessBlock } from '@/entities/role'
 import { ThemeSwitch } from '@/features/theme-switch'
 import { APP_NAME } from '@/shared/config'
+import { isEmbedPath } from '@shared/auth'
 import { useIsMobile } from '@/shared/lib/media'
 import { useEscape, useScrollLock } from '@/shared/lib/scroll-lock'
 import {
@@ -70,15 +71,18 @@ function isVisible(link: NavLink) {
   return !link.block || access.canView(link.block)
 }
 
-const topLinks = computed(() => MODULE_LINKS.filter(isVisible))
-const bottomLinks = computed(() => [SETTINGS_LINK].filter(isVisible))
+const isEmbed = computed(() => route.matched.some((r) => r.meta.isEmbed) || isEmbedPath(route.path))
+const equipmentBase = computed(() => (isEmbed.value ? '/e/equipment' : '/equipment'))
+
+const topLinks = computed(() => (isEmbed.value ? [] : MODULE_LINKS.filter(isVisible)))
+const bottomLinks = computed(() => (isEmbed.value ? [] : [SETTINGS_LINK].filter(isVisible)))
 
 const equipmentAuth = computed(() =>
   equipment.isReady ? equipment.auth : authFor(equipment.persona, equipmentPermissionsOf(access.permissions)),
 )
 
 const trainingGroup = computed<NavGroup | null>(() => {
-  if (!access.canView('training')) return null
+  if (isEmbed.value || !access.canView('training')) return null
   const canManage = access.can('training_manage')
   const children: NavLink[] = [
     { to: '/training', label: 'Сводка', exact: true },
@@ -97,14 +101,15 @@ const trainingGroup = computed<NavGroup | null>(() => {
 const equipmentGroup = computed<NavGroup | null>(() => {
   if (!access.canView('equipment')) return null
   const incoming = equipment.pendingIncoming.length
+  const base = equipmentBase.value
   const children: NavLink[] = [
-    { to: '/equipment/mine', label: 'Моё оборудование', badge: incoming },
-    { to: '/equipment/people', label: 'У сотрудников' },
-    ...(canViewAllList(equipmentAuth.value) ? [{ to: '/equipment/all', label: 'Всё оборудование' }] : []),
-    { to: '/equipment/warehouses', label: 'Производственные базы' },
-    { to: '/equipment/history', label: 'История передач' },
+    { to: `${base}/mine`, label: 'Моё оборудование', badge: incoming },
+    { to: `${base}/people`, label: 'У сотрудников' },
+    ...(canViewAllList(equipmentAuth.value) ? [{ to: `${base}/all`, label: 'Всё оборудование' }] : []),
+    { to: `${base}/warehouses`, label: 'Производственные базы' },
+    { to: `${base}/history`, label: 'История передач' },
   ]
-  return { id: 'equipment', base: '/equipment', label: 'Оборудование', badge: incoming, icon: IconEquipment, children }
+  return { id: 'equipment', base, label: 'Оборудование', badge: incoming, icon: IconEquipment, children }
 })
 
 const navGroups = computed(() => [trainingGroup.value, equipmentGroup.value].filter((g): g is NavGroup => g !== null))
@@ -119,7 +124,9 @@ watch(
   () => access.permissions,
   () => {
     const block = route.meta.block
-    if (access.isReady && block && !access.canView(block)) void router.replace({ name: 'home' })
+    if (access.isReady && block && !access.canView(block)) {
+      void router.replace({ name: isEmbed.value ? 'embed-signin' : 'home' })
+    }
   },
 )
 
