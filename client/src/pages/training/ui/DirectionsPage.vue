@@ -12,7 +12,7 @@ import {
 } from '@/entities/training'
 import { errorMessage } from '@/shared/api'
 import { useDialogDirty } from '@/shared/lib/dialog-dirty'
-import { UiButton, UiDialog } from '@/shared/ui'
+import { IconArchive, IconPencil, IconUndo, UiButton, UiClipText, UiDialog } from '@/shared/ui'
 
 interface DirectionForm {
   id: string | null
@@ -159,17 +159,29 @@ function archiveProgram(program: TrainingProgram) {
 
     <article v-for="d in directions" :key="d.id" class="direction" :class="{ 'is-archived': d.isArchived }">
       <header class="direction__head">
-        <div>
+        <div class="direction__intro">
           <h2 class="direction__title">
-            {{ d.name }} <span class="direction__code">{{ d.code }}</span>
+            <UiClipText tag="strong" class="direction__name" :text="d.name" />
+            <span class="direction__code">{{ d.code }}</span>
             <span v-if="d.isArchived" class="ui-badge">В архиве</span>
           </h2>
           <p class="direction__kind">{{ DIRECTION_KIND_LABEL[d.kind] }}</p>
         </div>
         <div class="direction__actions">
           <UiButton variant="ghost" size="sm" :disabled="d.isArchived" @click="editProgram(d)">Добавить программу</UiButton>
-          <UiButton variant="ghost" size="sm" @click="editDirection(d)">Изменить</UiButton>
-          <UiButton variant="ghost" size="sm" @click="archiveDirection(d)">{{ d.isArchived ? 'Вернуть' : 'В архив' }}</UiButton>
+          <UiButton variant="ghost" size="icon" aria-label="Изменить направление" title="Изменить" @click="editDirection(d)">
+            <IconPencil :size="16" />
+          </UiButton>
+          <UiButton
+            variant="ghost"
+            size="icon"
+            :aria-label="d.isArchived ? 'Вернуть направление из архива' : 'В архив'"
+            :title="d.isArchived ? 'Вернуть из архива' : 'В архив'"
+            @click="archiveDirection(d)"
+          >
+            <IconUndo v-if="d.isArchived" :size="16" />
+            <IconArchive v-else :size="16" />
+          </UiButton>
         </div>
       </header>
 
@@ -185,9 +197,9 @@ function archiveProgram(program: TrainingProgram) {
           <tbody>
             <tr v-for="p in programsOf(d)" :key="p.id" :class="{ 'is-archived': p.isArchived }">
               <td class="col-program" :title="`${store.labelOf(p.id)} · ${p.name}`">
-                <strong class="direction__label">{{ store.labelOf(p.id) }}</strong>
-                <small class="direction__sub">{{ p.name }}</small>
-                <small v-if="p.storagePath" class="direction__sub direction__path" :title="p.storagePath">{{ p.storagePath }}</small>
+                <UiClipText tag="strong" class="direction__label" :text="store.labelOf(p.id)" />
+                <UiClipText tag="small" class="direction__sub" :text="p.name" />
+                <UiClipText v-if="p.storagePath" tag="small" class="direction__sub direction__path" :text="p.storagePath" :tip="p.storagePath" />
               </td>
               <td class="col-period">
                 {{ p.periodMonths }} мес.
@@ -195,8 +207,19 @@ function archiveProgram(program: TrainingProgram) {
               </td>
               <td class="col-actions direction__cell-actions">
                 <div class="direction__row-actions">
-                  <UiButton variant="ghost" size="sm" @click="editProgram(d, p)">Изменить</UiButton>
-                  <UiButton variant="ghost" size="sm" @click="archiveProgram(p)">{{ p.isArchived ? 'Вернуть' : 'В архив' }}</UiButton>
+                  <UiButton variant="ghost" size="icon" aria-label="Изменить программу" title="Изменить" @click="editProgram(d, p)">
+                    <IconPencil :size="16" />
+                  </UiButton>
+                  <UiButton
+                    variant="ghost"
+                    size="icon"
+                    :aria-label="p.isArchived ? 'Вернуть программу из архива' : 'В архив'"
+                    :title="p.isArchived ? 'Вернуть из архива' : 'В архив'"
+                    @click="archiveProgram(p)"
+                  >
+                    <IconUndo v-if="p.isArchived" :size="16" />
+                    <IconArchive v-else :size="16" />
+                  </UiButton>
                 </div>
               </td>
             </tr>
@@ -318,11 +341,13 @@ function archiveProgram(program: TrainingProgram) {
   display: grid;
   gap: var(--space-3);
   min-width: 0;
+  max-width: 100%;
   padding: var(--space-4);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--surface-card);
   box-shadow: var(--shadow-card);
+  overflow-x: clip;
 }
 
 .direction__table-wrap {
@@ -332,31 +357,33 @@ function archiveProgram(program: TrainingProgram) {
 }
 
 .direction__table {
-  table-layout: auto;
+  table-layout: fixed;
   width: 100%;
 }
 
 .col-program {
-  width: 100%;
-  min-width: 0;
-  max-width: 0;
+  min-width: 8rem;
+  max-width: 28rem;
   overflow: hidden;
 }
 
-.col-period,
+.col-period {
+  width: 9rem;
+  min-width: 7rem;
+  max-width: 11rem;
+}
+
 .col-actions {
-  width: 1%;
-  white-space: nowrap;
+  width: calc(2 * var(--tap-size) + var(--space-1));
+  min-width: calc(2 * var(--control-height-sm));
+  max-width: calc(2 * var(--tap-size) + var(--space-1));
 }
 
 .direction__label,
 .direction__sub {
   display: block;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 8rem;
+  max-width: min(28rem, 100%);
 }
 
 .direction__head {
@@ -365,6 +392,13 @@ function archiveProgram(program: TrainingProgram) {
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
+  min-width: 0;
+}
+
+.direction__intro {
+  flex: 1 1 12rem;
+  min-width: 0;
+  max-width: 36rem;
 }
 
 .direction__title {
@@ -373,7 +407,15 @@ function archiveProgram(program: TrainingProgram) {
   align-items: center;
   gap: var(--space-2);
   margin: 0;
+  min-width: 0;
+  max-width: min(36rem, 100%);
   font-size: var(--font-size-lg);
+}
+
+.direction__name {
+  flex: 1 1 8rem;
+  min-width: 8rem;
+  max-width: min(28rem, 100%);
 }
 
 .direction__code {
@@ -396,7 +438,8 @@ function archiveProgram(program: TrainingProgram) {
 .direction__row-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-1);
 }
 
 .direction__row-actions {
@@ -423,9 +466,8 @@ function archiveProgram(program: TrainingProgram) {
 }
 
 .direction__path {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 8rem;
+  max-width: min(28rem, 100%);
 }
 
 .direction__empty {
@@ -456,8 +498,23 @@ function archiveProgram(program: TrainingProgram) {
     gap: var(--space-1);
   }
 
-  .direction__actions :deep(.btn) {
+  .direction__actions :deep(.btn:not(.btn--icon)) {
     flex: 1 1 auto;
+  }
+
+  .direction__actions :deep(.btn--icon) {
+    flex: 0 0 auto;
+  }
+
+  .direction__intro,
+  .direction__title,
+  .direction__name,
+  .direction__label,
+  .direction__sub,
+  .direction__path,
+  .col-program {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .direction .ui-table-wrap {
@@ -522,8 +579,8 @@ function archiveProgram(program: TrainingProgram) {
     padding-top: var(--space-1);
   }
 
-  .direction__row-actions :deep(.btn) {
-    flex: 1 1 0;
+  .direction__row-actions :deep(.btn--icon) {
+    flex: 0 0 auto;
   }
 }
 </style>
