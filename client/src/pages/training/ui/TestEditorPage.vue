@@ -252,7 +252,7 @@ const bankInfo = computed(() => {
         </div>
       </div>
 
-      <div class="ui-segmented" role="tablist" aria-label="Разделы теста">
+      <div class="ui-segmented editor__tabs" role="tablist" aria-label="Разделы теста">
         <button type="button" role="tab" :aria-selected="tab === 'params'" @click="tab = 'params'">Параметры</button>
         <button type="button" role="tab" :aria-selected="tab === 'questions'" @click="tab = 'questions'">
           Вопросы ({{ content.questions.length }})
@@ -260,6 +260,7 @@ const bankInfo = computed(() => {
         <button type="button" role="tab" :aria-selected="tab === 'preview'" @click="tab = 'preview'">Предпросмотр</button>
       </div>
 
+      <div class="editor__body">
       <form v-show="tab === 'params'" class="ui-form editor__card" novalidate @submit.prevent="save">
         <label>
           <span>Название</span>
@@ -394,6 +395,7 @@ const bankInfo = computed(() => {
         <span>{{ error }}</span>
         <button type="button" aria-label="Скрыть" @click="error = ''">×</button>
       </p>
+      </div>
 
       <div class="editor__actions">
         <UiButton v-if="test && test.status !== 'archived'" variant="ghost" :disabled="busy" @click="archive">В архив</UiButton>
@@ -419,18 +421,50 @@ const bankInfo = computed(() => {
 </template>
 
 <style scoped>
-.editor {
-  display: grid;
-  gap: var(--space-4);
-  padding-bottom: calc(var(--control-height) + var(--space-6));
+div.editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  align-self: stretch;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .editor__head {
   display: flex;
+  flex: 0 0 auto;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+}
+
+.editor__tabs {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.editor__tabs > button {
+  flex: 0 0 auto;
+}
+
+.editor__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .editor__back {
@@ -456,7 +490,8 @@ const bankInfo = computed(() => {
 }
 
 .editor__card {
-  max-width: 820px;
+  width: 100%;
+  max-width: none;
   padding: var(--space-5);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
@@ -490,7 +525,8 @@ const bankInfo = computed(() => {
 }
 
 .editor__questions {
-  max-width: 820px;
+  width: 100%;
+  max-width: none;
 }
 
 .editor__notice {
@@ -504,13 +540,11 @@ const bankInfo = computed(() => {
 }
 
 .editor__actions {
-  position: sticky;
-  bottom: 0;
-  z-index: var(--z-sticky);
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  padding: var(--space-3) 0;
+  padding: var(--space-3) 0 calc(var(--space-3) + var(--safe-bottom));
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-app);
 }
@@ -519,17 +553,22 @@ const bankInfo = computed(() => {
   flex: 1 1 auto;
 }
 
-@media (max-width: 560px) {
-  .editor__card {
-    padding: var(--space-4);
-  }
-
+@media (max-width: 860px) {
   .editor__actions > :deep(.btn) {
+    min-height: var(--control-height-sm);
+    padding: 0 var(--space-3);
+    font-size: var(--font-size-sm);
     flex: 1 1 auto;
   }
 
   .editor__spacer {
     display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .editor__card {
+    padding: var(--space-4);
   }
 }
 </style>

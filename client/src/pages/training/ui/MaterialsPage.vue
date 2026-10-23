@@ -309,32 +309,36 @@ function openHref(material: TrainingMaterial) {
   gap: var(--space-3);
 }
 
+.materials .ui-table-wrap {
+  overflow-x: hidden;
+}
+
 .materials__table {
-  table-layout: fixed;
+  table-layout: auto;
   width: 100%;
 }
 
+.materials__table th,
+.materials__table td {
+  height: auto;
+  vertical-align: middle;
+}
+
 .col-title {
-  min-width: 10rem;
-  max-width: 28rem;
+  width: 100%;
+  overflow: hidden;
 }
 
-.col-programs {
-  width: 11rem;
-  min-width: 7rem;
-  max-width: 14rem;
-}
-
+.col-programs,
 .col-updated {
-  width: 9rem;
-  min-width: 7rem;
-  max-width: 11rem;
+  width: 1%;
+  max-width: 12rem;
+  overflow: hidden;
 }
 
 .col-actions {
-  width: calc(3 * var(--tap-size) + 2 * var(--space-1));
-  min-width: calc(3 * var(--control-height-sm));
-  max-width: calc(3 * var(--tap-size) + 2 * var(--space-1));
+  width: 1%;
+  white-space: nowrap;
 }
 
 .materials__toolbar {
@@ -365,16 +369,16 @@ function openHref(material: TrainingMaterial) {
 
 .materials__title {
   display: block;
-  min-width: 8rem;
-  max-width: min(28rem, 100%);
+  min-width: 0;
+  max-width: 100%;
   color: var(--text-link);
   font-weight: 600;
 }
 
 .materials__sub {
   display: block;
-  min-width: 8rem;
-  max-width: min(28rem, 100%);
+  min-width: 0;
+  max-width: 100%;
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
 }
@@ -385,10 +389,13 @@ function openHref(material: TrainingMaterial) {
 }
 
 .materials__actions {
-  display: inline-flex;
-  justify-content: flex-end;
-  gap: var(--space-1);
+  text-align: right;
   white-space: nowrap;
+  vertical-align: middle;
+}
+
+.materials__actions :deep(.btn + .btn) {
+  margin-left: var(--space-1);
 }
 
 .materials__programs {
@@ -445,6 +452,7 @@ function openHref(material: TrainingMaterial) {
 
   .col-title,
   .col-programs,
+  .col-actions,
   .materials__title,
   .materials__sub {
     min-width: 0;
@@ -453,6 +461,26 @@ function openHref(material: TrainingMaterial) {
 
   .materials__sub {
     overflow-wrap: anywhere;
+  }
+
+  .materials .ui-table-wrap--stack .ui-table tr {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .materials .ui-table-wrap--stack .ui-table td.col-title {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .materials .ui-table-wrap--stack .ui-table td.col-actions {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+    margin-top: 0;
+  }
+
+  .materials .ui-table-wrap--stack .ui-table td.col-programs {
+    grid-column: 1 / -1;
   }
 }
 </style>
