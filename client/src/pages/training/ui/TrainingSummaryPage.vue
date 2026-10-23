@@ -201,7 +201,15 @@ function onAssigned() {
                   {{ dueLabel(item.status) || '—' }}
                 </td>
                 <td v-if="canAssign" class="col-action summary__action ui-cell--actions">
-                  <UiButton v-if="!item.status?.activeAssignment" variant="ghost" size="sm" @click="openOne(item)">Назначить</UiButton>
+                  <UiButton
+                    v-if="!item.status?.activeAssignment"
+                    class="summary__assign"
+                    variant="ghost"
+                    size="sm"
+                    @click="openOne(item)"
+                  >
+                    Назначить
+                  </UiButton>
                 </td>
               </tr>
             </tbody>
@@ -415,6 +423,7 @@ function onAssigned() {
   .summary__toolbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
   }
 
   .summary__toolbar .ui-control {
@@ -422,54 +431,126 @@ function onAssigned() {
     min-width: 0;
   }
 
-  .summary__search {
-    grid-column: 1 / -1;
+  .summary__toolbar select {
+    width: auto;
+    max-width: 12.5rem;
   }
 
-  .summary__toolbar :deep(.btn) {
+  .summary__toolbar :deep(.btn),
+  .summary__select-all {
+    grid-column: 1 / -1;
     margin-left: 0;
   }
 
   .summary__select-all {
-    grid-column: 1 / -1;
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    min-height: 36px;
+    min-height: var(--control-height-sm);
     color: var(--text-secondary);
     font-size: var(--font-size-sm);
   }
 
-  .summary .ui-table td.summary__worker {
+  .summary .ui-table-wrap--stack .ui-table tr {
+    --person-block: calc(
+      var(--font-size-base) * var(--line-height-tight) + var(--font-size-xs) * var(--line-height-tight)
+    );
+    grid-template-columns: auto minmax(0, 1fr) 8.5rem;
+    grid-template-rows: auto auto;
+    align-items: center;
+    column-gap: var(--space-2);
+    row-gap: var(--space-1);
+  }
+
+  .summary .ui-table-wrap--stack .ui-table td.summary__check {
+    grid-column: 1;
     grid-row: 1 / span 2;
-    align-self: start;
-  }
-
-  .ui-table td.summary__program,
-  .ui-table td.summary__due {
-    grid-column: 2 / -1;
-  }
-
-  .summary__due {
-    color: var(--text-secondary);
-  }
-
-  .summary .ui-table td.summary__action {
+    align-self: center;
     display: flex;
+    align-items: center;
+    margin: 0;
+  }
+
+  .summary .ui-table-wrap--stack .ui-table td.summary__worker {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    min-width: 0;
+  }
+
+  .summary .ui-table-wrap--stack .ui-table td.col-status {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: end;
+    justify-self: stretch;
+    margin: 0;
+  }
+
+  .summary .ui-table-wrap--stack .ui-table td.col-status :deep(.ui-badge) {
+    box-sizing: border-box;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .summary .ui-table-wrap--stack .ui-table td.summary__action {
+    display: flex;
+    align-items: center;
     grid-column: 3;
     grid-row: 2;
-    justify-self: end;
-    margin: var(--space-1) 0 0 var(--space-2);
+    justify-self: stretch;
+    margin: 0;
   }
 
-  .ui-table td.summary__check {
-    width: auto;
+  .summary .ui-table-wrap--stack .ui-table td.summary__action > :deep(*) {
+    flex: 0 0 auto;
+  }
+
+  .summary .ui-table-wrap--stack .ui-table td.summary__program,
+  .summary .ui-table-wrap--stack .ui-table td.summary__due {
+    display: none;
+  }
+
+  .summary__person {
+    display: grid;
+    grid-template-columns: var(--person-block) minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: center;
+    gap: 0 var(--space-2);
+  }
+
+  .summary__person :deep(.avatar.avatar--sm) {
+    grid-row: 1 / span 2;
+    align-self: stretch;
+    box-sizing: border-box;
+    width: var(--person-block);
+    min-width: var(--person-block);
+    height: var(--person-block);
+  }
+
+  .summary__name {
+    display: contents;
+  }
+
+  .summary__name strong,
+  .summary__position {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: var(--line-height-tight);
   }
 
   .summary__check input {
-    width: 20px;
-    height: 20px;
-    margin-top: 2px;
+    width: var(--person-block);
+    height: var(--person-block);
+    margin: 0;
+  }
+
+  .summary__assign {
+    width: 100%;
+    min-height: var(--control-height-sm);
+    padding: 0 var(--space-2);
+    font-size: var(--font-size-xs);
   }
 }
 </style>

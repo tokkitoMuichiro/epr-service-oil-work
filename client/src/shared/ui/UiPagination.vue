@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
-import { DEFAULT_PAGE_SIZE, pageNumbers, pageWindow } from '@shared/pagination'
+import { compactPageNumbers, DEFAULT_PAGE_SIZE, pageWindow } from '@shared/pagination'
 import { IconChevron, IconChevronsLeft } from './icons'
 
 const props = withDefaults(defineProps<{ total: number; pageSize?: number; label?: string }>(), {
@@ -12,9 +12,10 @@ const page = defineModel<number>('page', { required: true })
 const root = ref<HTMLElement | null>(null)
 
 const range = computed(() => pageWindow(page.value, props.total, props.pageSize))
-const numbers = computed(() => pageNumbers(range.value.page, range.value.pageCount))
+const numbers = computed(() => compactPageNumbers(range.value.page, range.value.pageCount))
 const isFirst = computed(() => range.value.page <= 1)
 const isLast = computed(() => range.value.page >= range.value.pageCount)
+const showFirstJump = computed(() => range.value.page >= 3 && !numbers.value.includes(1))
 
 async function go(target: number) {
   const next = Math.min(Math.max(1, target), range.value.pageCount)
@@ -29,7 +30,13 @@ async function go(target: number) {
 
 <template>
   <nav v-if="range.pageCount > 1" ref="root" class="pager" :aria-label="label">
-    <button type="button" class="pager__btn" :disabled="isFirst" aria-label="Первая страница" @click="go(1)">
+    <button
+      v-if="showFirstJump"
+      type="button"
+      class="pager__btn"
+      aria-label="Первая страница"
+      @click="go(1)"
+    >
       <IconChevronsLeft :size="18" />
     </button>
     <button type="button" class="pager__btn" :disabled="isFirst" aria-label="Предыдущая страница" @click="go(range.page - 1)">
@@ -54,16 +61,13 @@ async function go(target: number) {
     <button type="button" class="pager__btn" :disabled="isLast" aria-label="Следующая страница" @click="go(range.page + 1)">
       <IconChevron class="pager__next" :size="18" />
     </button>
-    <button type="button" class="pager__btn" :disabled="isLast" aria-label="Последняя страница" @click="go(range.pageCount)">
-      <IconChevronsLeft class="pager__last" :size="18" />
-    </button>
   </nav>
 </template>
 
 <style scoped>
 .pager {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
   gap: var(--space-1);
@@ -72,6 +76,12 @@ async function go(target: number) {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--surface-card);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.pager::-webkit-scrollbar {
+  display: none;
 }
 
 .pager__btn {
@@ -130,8 +140,18 @@ async function go(target: number) {
   transform: rotate(-90deg);
 }
 
-.pager__last {
-  transform: rotate(180deg);
+@media (max-width: 860px) {
+  .pager {
+    padding: 0;
+    gap: 2px;
+  }
+
+  .pager__btn,
+  .pager__ellipsis {
+    width: var(--control-height-sm);
+    min-width: var(--control-height-sm);
+    height: var(--control-height-sm);
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {
