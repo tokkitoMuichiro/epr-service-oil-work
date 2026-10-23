@@ -43,8 +43,7 @@ const brigadesStore = useBrigadesStore()
 const contracts = useContractsStore()
 const roleStore = useRoleStore()
 
-const { workers, status, errorText, actionError, notices, busy, isEmpty, attentionCount, today, profileId } =
-  storeToRefs(personnel)
+const { workers, status, errorText, actionError, notices, busy, isEmpty, today, profileId } = storeToRefs(personnel)
 const { brigades, assignments, actionError: brigadeError } = storeToRefs(brigadesStore)
 const { currentRole, piiVisible } = storeToRefs(roleStore)
 
@@ -157,21 +156,19 @@ function openCreateBrigade() {
   <section class="page ui-fill-page">
     <PageHeader class="ui-fill-chrome" title="Персонал" description="Карточки сотрудников, документы и бригады.">
       <template v-if="(tab === 'workers' && canEdit) || (tab === 'brigades' && canPlan)" #actions>
-        <UiButton v-if="tab === 'workers'" variant="primary" @click="openCreateWorker">Добавить сотрудника</UiButton>
-        <UiButton v-else variant="primary" @click="openCreateBrigade">Новая бригада</UiButton>
+        <UiButton v-if="tab === 'workers'" variant="primary" class="header-add" @click="openCreateWorker">
+          <span class="header-add__full">Добавить сотрудника</span>
+          <span class="header-add__short">Добавить</span>
+        </UiButton>
+        <UiButton v-else variant="primary" class="header-add" @click="openCreateBrigade">
+          <span class="header-add__full">Новая бригада</span>
+          <span class="header-add__short">Добавить</span>
+        </UiButton>
       </template>
       <template #tabs>
         <div class="ui-segmented" role="tablist" aria-label="Разделы персонала">
           <button type="button" role="tab" :aria-selected="tab === 'workers'" @click="tab = 'workers'">
             Сотрудники <span class="ui-segmented__count">{{ workers.length }}</span>
-            <span
-              v-if="attentionCount"
-              class="tabs__badge"
-              :title="`Документы истекают или просрочены: ${attentionCount}`"
-              :aria-label="`документы требуют внимания: ${attentionCount}`"
-            >
-              {{ attentionCount }}
-            </span>
           </button>
           <button type="button" role="tab" :aria-selected="tab === 'brigades'" @click="tab = 'brigades'">
             Бригады <span class="ui-segmented__count">{{ brigades.length }}</span>
@@ -245,7 +242,7 @@ function openCreateBrigade() {
             <i class="legend__swatch legend__swatch--expiring" />Документ истекает<span class="ui-hide-mobile">&nbsp;в течение {{ TRAINING_EXPIRING_DAYS }} дней</span>
           </span>
           <span><i class="legend__swatch legend__swatch--expired" />Документ просрочен</span>
-          <span class="legend__count">Показано: {{ rows.length }} из {{ workers.length }}</span>
+          <span class="legend__count">Показано: {{ workerPager.pageItems.length }} из {{ rows.length }}</span>
           <MobileSort v-model:sort-key="sortKey" v-model:direction="sortDirection" class="legend__sort" :options="COLUMNS" />
         </div>
 
@@ -292,18 +289,16 @@ function openCreateBrigade() {
                   </span>
                 </td>
                 <td class="col--position" data-label="Должность" :title="w.position">
+                  <span class="cell-key">Должность</span>
                   <UiClipText :text="w.position" />
                 </td>
                 <td class="col--brigade" data-label="Бригада" :title="brigadeName(w.brigadeId)">
+                  <span class="cell-key">Бригада</span>
                   <UiClipText :text="brigadeName(w.brigadeId)" />
                 </td>
                 <td class="nowrap col--phone" data-label="Телефон">{{ w.phone || '—' }}</td>
                 <td class="col--status" data-label="Занятость"><WorkerStatusBadge :status="w.status" /></td>
-                <td
-                  class="nowrap col--employment"
-                  :class="{ 'ui-hide-mobile': w.employment === 'active' }"
-                  data-label="В компании"
-                >
+                <td class="nowrap col--employment ui-hide-mobile" data-label="В компании">
                   {{ EMPLOYMENT_STATUS_LABEL[w.employment] }}
                 </td>
                 <td v-if="showTraining" class="col--testing" data-label="Проверка знаний">
@@ -432,6 +427,14 @@ function openCreateBrigade() {
 
 .page :deep(.page-header) {
   flex: 0 0 auto;
+}
+
+.header-add__short {
+  display: none;
+}
+
+.cell-key {
+  display: none;
 }
 
 .tabs__badge {
@@ -578,30 +581,38 @@ table {
   border-spacing: 0;
 }
 
-.table--workers .col--fullName,
+.table--workers {
+  table-layout: fixed;
+}
+
+.table--workers .col--fullName {
+  width: 22%;
+}
+
+.table--workers .col--position,
+.table--workers .col--brigade {
+  width: 15%;
+}
+
+.table--workers .col--phone,
+.table--workers .col--status,
+.table--workers .col--employment {
+  width: 12%;
+}
+
+.table--workers .col--testing {
+  width: 12%;
+}
+
 .table--brigades .col--name {
   width: 100%;
 }
 
-.table--workers .col--position,
-.table--workers .col--brigade,
-.table--workers .col--phone,
-.table--workers .col--status,
-.table--workers .col--employment,
-.table--workers .col--testing,
 .table--brigades .col--status,
 .table--brigades .col--size,
 .table--brigades .col--leader {
   width: 1%;
   white-space: nowrap;
-}
-
-.table--workers .col--position {
-  max-width: 11rem;
-}
-
-.table--workers .col--brigade {
-  max-width: 9rem;
 }
 
 .table--brigades .col--leader {
@@ -636,12 +647,14 @@ tbody tr:last-child td {
 }
 
 .person strong {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 th {
   padding: 0;
+  overflow: hidden;
   background: var(--table-head-bg);
   position: sticky;
   top: 0;
@@ -661,6 +674,7 @@ th {
   padding: 0 12px;
   border: 0;
   background: transparent;
+  overflow: hidden;
   font-size: var(--font-size-xs);
   font-weight: 600;
   color: var(--text-secondary);
@@ -784,6 +798,46 @@ tbody tr.row--expired td:first-child {
     gap: var(--space-3);
   }
 
+  .page :deep(.page-header) {
+    flex-wrap: nowrap;
+    align-items: stretch;
+  }
+
+  .page :deep(.page-header__tabs),
+  .page :deep(.page-header__actions) {
+    display: flex;
+    align-items: stretch;
+    height: var(--control-height);
+  }
+
+  .page :deep(.ui-segmented) {
+    width: 100%;
+    height: var(--control-height);
+    padding: 0;
+    gap: 0;
+  }
+
+  .page :deep(.ui-segmented > button) {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    padding: 0 var(--space-2);
+  }
+
+  .page :deep(.page-header__actions .btn) {
+    height: var(--control-height);
+    min-height: var(--control-height);
+    padding: 0 var(--space-3);
+  }
+
+  .header-add__full {
+    display: none;
+  }
+
+  .header-add__short {
+    display: inline;
+  }
+
   .panel {
     padding: 0;
     border: 0;
@@ -803,7 +857,7 @@ tbody tr.row--expired td:first-child {
   }
 
   .legend__sort {
-    margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) auto;
+    margin-left: auto;
   }
 
   .pager {
@@ -813,20 +867,6 @@ tbody tr.row--expired td:first-child {
   .table--workers .col--phone,
   .table--workers th.col--testing {
     display: none;
-  }
-
-  .table--workers td.col--testing {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--space-1);
-    grid-column: 2;
-    grid-row: 2;
-    font-size: var(--font-size-xs);
-  }
-
-  .table--workers td:nth-child(2) {
-    grid-column: 1;
   }
 
   .legend__count {
@@ -864,6 +904,14 @@ tbody tr.row--expired td:first-child {
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius);
     background: var(--surface-card);
+  }
+
+  .table--workers tbody tr {
+    grid-template-areas:
+      'name status'
+      'position testing'
+      'brigade brigade';
+    align-items: center;
   }
 
   tbody tr.row--expiring {
@@ -908,28 +956,93 @@ tbody tr.row--expired td:first-child {
     font-size: var(--font-size-base);
   }
 
-  .table--workers tbody tr td:first-child,
+  .table--workers tbody tr td.col--fullName,
+  .table--workers tbody tr.row--expiring td.col--fullName,
+  .table--workers tbody tr.row--expired td.col--fullName {
+    grid-area: name;
+    box-shadow: none;
+  }
+
+  .table--workers tbody tr td.col--status,
+  .table--workers tbody tr.row--expiring td.col--status,
+  .table--workers tbody tr.row--expired td.col--status {
+    grid-area: status;
+    justify-self: end;
+  }
+
+  .table--workers tbody tr td.col--position,
+  .table--workers tbody tr.row--expiring td.col--position,
+  .table--workers tbody tr.row--expired td.col--position {
+    grid-area: position;
+  }
+
+  .table--workers tbody tr td.col--testing,
+  .table--workers tbody tr.row--expiring td.col--testing,
+  .table--workers tbody tr.row--expired td.col--testing {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    grid-area: testing;
+    justify-self: end;
+  }
+
+  .table--workers tbody tr td.col--brigade,
+  .table--workers tbody tr.row--expiring td.col--brigade,
+  .table--workers tbody tr.row--expired td.col--brigade {
+    grid-area: brigade;
+  }
+
+  .table--workers td.col--position,
+  .table--workers td.col--brigade {
+    display: grid;
+    grid-template-columns: 7.5em minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .table--workers td.col--position .cell-key,
+  .table--workers td.col--brigade .cell-key {
+    display: block;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-tight);
+    white-space: nowrap;
+  }
+
+  .table--workers td.col--position :deep(.clip-text),
+  .table--workers td.col--brigade :deep(.clip-text) {
+    min-width: 0;
+  }
+
+  .table--workers td.col--position::before,
+  .table--workers td.col--brigade::before {
+    content: none;
+  }
+
+  .table--workers td.col--status::before,
+  .table--workers td.col--testing::before {
+    content: none;
+  }
+
+  .table--workers tbody tr .person {
+    gap: var(--space-1);
+  }
+
   .table--brigades tbody tr td:first-child {
     grid-column: 1;
     grid-row: 1;
     box-shadow: none;
   }
 
-  .table--workers td:nth-child(5),
   .table--brigades td:nth-child(2) {
     grid-column: 2;
     grid-row: 1;
     justify-self: end;
   }
 
-  .table--workers td:nth-child(5)::before,
-  .table--brigades td:nth-child(2)::before,
-  .table--workers td:nth-child(2)::before {
+  .table--brigades td:nth-child(2)::before {
     content: none;
-  }
-
-  .table--workers td:nth-child(2) {
-    color: var(--text-secondary);
   }
 
   .num {
