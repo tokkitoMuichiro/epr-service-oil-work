@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { isEmbedPath } from '@shared/auth'
 import { useRoleStore, type RoleId } from '@/entities/role'
 import { errorMessage } from '@/shared/api'
 import { IconLogout, UiAvatar } from '@/shared/ui'
@@ -26,7 +27,7 @@ async function logout() {
   error.value = ''
   try {
     await session.logout()
-    await router.replace({ name: 'login' })
+    await router.replace({ name: isEmbedPath(router.currentRoute.value.path) ? 'embed-signin' : 'login' })
   } catch (e) {
     error.value = errorMessage(e, 'Не удалось выйти')
   }

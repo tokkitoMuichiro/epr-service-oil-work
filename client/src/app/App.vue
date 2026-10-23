@@ -14,7 +14,8 @@ const session = useRoleStore()
 const route = useRoute()
 const router = useRouter()
 
-const isEmbed = computed(() => route.matched.some((r) => r.meta.isEmbed))
+const isEmbed = computed(() => route.matched.some((r) => r.meta.isEmbed) || isEmbedPath(route.path))
+const useEmbedShell = computed(() => isEmbed.value && !route.path.startsWith('/e/equipment'))
 
 watch(
   () => session.status,
@@ -41,7 +42,7 @@ async function retry() {
       <UiButton variant="primary" @click="retry">Повторить</UiButton>
     </UiState>
   </main>
-  <EmbedShell v-else-if="session.isAuthenticated && isEmbed" />
+  <EmbedShell v-else-if="session.isAuthenticated && useEmbedShell" />
   <AppShell v-else-if="session.isAuthenticated" />
   <UiConfirmHost />
 </template>

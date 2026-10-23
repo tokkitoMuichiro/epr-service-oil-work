@@ -30,12 +30,13 @@ function prefetchRoute(to: RouteLocationNormalized) {
   }
 }
 
-function defaultEquipmentRoute() {
+function defaultEquipmentRoute(embed = false) {
   const equipment = useEquipmentStore()
   const auth = equipment.isReady
     ? equipment.auth
     : authFor(equipment.persona, equipmentPermissionsOf(useAccessStore().permissions))
-  return canViewAllList(auth) ? 'equipment-all' : 'equipment-mine'
+  const name = canViewAllList(auth) ? 'equipment-all' : 'equipment-mine'
+  return embed ? `embed-${name}` : name
 }
 
 declare module 'vue-router' {
@@ -50,7 +51,7 @@ declare module 'vue-router' {
     isPublic?: boolean
     /** Public page that never touches the ERP session (knowledge-check link). */
     isSessionless?: boolean
-    /** Bitrix24 iframe module: slim shell, no full ERP navigation. */
+    /** Bitrix24 iframe module (`/e/*`): no links to full-ERP routes (X-Frame-Options). */
     isEmbed?: boolean
   }
 }
@@ -146,24 +147,34 @@ export const router = createRouter({
       component: () => loadEquipment().then((m) => m.EquipmentShell),
       meta: { block: 'equipment', isEmbed: true },
       children: [
-        { path: '', name: 'embed-equipment', redirect: () => ({ name: 'embed-equipment-mine' }) },
+        { path: '', name: 'embed-equipment', redirect: () => ({ name: defaultEquipmentRoute(true) }) },
         {
           path: `mine/${CATEGORY}`,
           name: 'embed-equipment-mine',
           component: () => loadEquipment().then((m) => m.EquipmentListPage),
-          meta: { title: 'Моё оборудование', scope: 'mine', isEmbed: true },
+          meta: {
+            title: 'Моё оборудование',
+            description: 'Всё, что числится за вами, и входящие передачи, которые ждут вашего принятия.',
+            scope: 'mine',
+            isEmbed: true,
+          },
         },
         {
           path: `people/${CATEGORY}`,
           name: 'embed-equipment-people',
           component: () => loadEquipment().then((m) => m.EquipmentPeoplePage),
-          meta: { title: 'У сотрудников', isEmbed: true },
+          meta: { title: 'У сотрудников', description: 'Что числится за каждым сотрудником.', isEmbed: true },
         },
         {
           path: `all/${CATEGORY}`,
           name: 'embed-equipment-all',
           component: () => loadEquipment().then((m) => m.EquipmentListPage),
-          meta: { title: 'Всё оборудование', scope: 'all', isEmbed: true },
+          meta: {
+            title: 'Всё оборудование',
+            description: 'Полный учёт: сотрудники, базы и ремонт. Отмеченные карточки — первыми.',
+            scope: 'all',
+            isEmbed: true,
+          },
         },
         {
           path: 'warehouses',
@@ -181,7 +192,7 @@ export const router = createRouter({
           path: 'history',
           name: 'embed-equipment-history',
           component: () => loadEquipment().then((m) => m.TransferHistoryPage),
-          meta: { title: 'История передач', isEmbed: true },
+          meta: { title: 'История передач', description: 'Кто, что, откуда и куда передавал.', isEmbed: true },
         },
       ],
     },
