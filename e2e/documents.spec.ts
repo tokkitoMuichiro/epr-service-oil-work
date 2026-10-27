@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { downloadText, textFile } from './support/files'
+import { listRow } from './support/lists'
 import { openWorker } from './support/personnel'
 
 test('документ сотрудника загружается, скачивается и удаляется', async ({ page }) => {
@@ -31,8 +32,8 @@ test('документ сотрудника загружается, скачив
 
 test('документ оборудования загружается в папку позиции, скачивается и удаляется', async ({ page }) => {
   await page.goto('/equipment/all')
-  await page.getByRole('searchbox', { name: 'Поиск' }).fill('Насос')
-  await page.getByRole('listitem', { name: /Насос центробежный НЦ-80/ }).click()
+  await page.getByRole('searchbox', { name: 'Поиск' }).fill('НЦ-80')
+  await listRow(page, /Насос центробежный НЦ-80/).click()
   const card = page.getByRole('dialog', { name: /Насос центробежный НЦ-80/ })
 
   const passport = card.getByRole('button', { name: 'Паспорт НЦ-80.pdf', exact: true })
