@@ -2,9 +2,9 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import {
   CARD_KIND_OPTIONS,
-  CONDITION_LABEL,
   CONDITION_OPTIONS,
   ConditionBadge,
+  DocumentsMark,
   VEHICLE_KIND_OPTIONS,
   canAcceptTransfer,
   canCancelPendingTransfer,
@@ -15,10 +15,11 @@ import {
   pendingOfferLabel,
   positionsLabel,
   repairOrigin,
-  sortEquipment,
+  sortEquipmentBy,
   useEquipmentStore,
   type AssetCategory,
   type EquipmentItem,
+  type EquipmentSortKey,
 } from '@/entities/equipment'
 import { EquipmentFormDialog } from '@/features/equipment-form'
 import { FillRemarkDialog } from '@/features/equipment-fill-review'
@@ -26,7 +27,8 @@ import { TransferDialog } from '@/features/equipment-transfer'
 import { shortFullName } from '@shared/person-name'
 import { useIsMobile } from '@/shared/lib/media'
 import { useFitPagination, useInfiniteWindow } from '@/shared/lib/pagination'
-import { IconArrowUp, IconClose, UiButton, UiClipText, UiPagination, UiState } from '@/shared/ui'
+import { useColumnSort } from '@/shared/lib/sort'
+import { IconArrowUp, IconClose, UiButton, UiClipText, UiMobileSort, UiPagination, UiState } from '@/shared/ui'
 import EquipmentCardDialog from './EquipmentCardDialog.vue'
 
 const props = withDefaults(
@@ -83,10 +85,42 @@ const searchPlaceholder = computed(() => {
   return 'Поиск: название, заводской номер'
 })
 
+const { sortKey, sortDirection, toggleSort, ariaSort, arrow } = useColumnSort<EquipmentSortKey>('name')
+
+function origin(item: EquipmentItem) {
+  return repairOrigin(item, transfers.value)
+}
+
+function ownerText(item: EquipmentItem) {
+  const label = store.labelForOwner(item)
+  return item.ownerType === 'USER' ? shortFullName(label) : label
+}
+
+function ownerTip(item: EquipmentItem) {
+  const label = store.labelForOwner(item)
+  const sent = props.showRepairSender ? origin(item) : null
+  return sent ? `${label} · отправил: ${sent.by} (${sent.from})` : label
+}
+
+function idText(item: EquipmentItem) {
+  return item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)
+}
+
+const sortColumns = computed(() => {
+  const columns: { key: EquipmentSortKey; label: string }[] = [
+    { key: 'name', label: 'Наименование' },
+    { key: 'identity', label: '№ / кол-во' },
+    { key: 'condition', label: 'Состояние' },
+    { key: 'documents', label: 'Документы' },
+  ]
+  if (props.showOwner) columns.push({ key: 'owner', label: 'Владелец' })
+  return columns
+})
+
 const inCategory = computed(() => props.items.filter((i) => i.category === props.category))
 
 const visible = computed(() =>
-  sortEquipment(
+  sortEquipmentBy(
     inCategory.value.filter((item) => {
       if (!matchesEquipmentQuery(item, query.value)) return false
       if (!kindFilter.value) return true
@@ -94,10 +128,13 @@ const visible = computed(() =>
       if (props.category === 'CARD') return item.cardKind === kindFilter.value
       return item.condition === kindFilter.value
     }),
+    sortKey.value,
+    sortDirection.value,
+    { owner: ownerText, identity: idText },
   ),
 )
 
-const resetOn = [query, kindFilter, () => props.category, () => props.items]
+const resetOn = [query, kindFilter, sortKey, sortDirection, () => props.category, () => props.items]
 const pager = useFitPagination(visible, { resetOn })
 const infinite = useInfiniteWindow(visible, { enabled: isMobile, resetOn })
 const pageItems = computed(() => (isMobile.value ? infinite.pageItems : pager.pageItems))
@@ -205,25 +242,6 @@ function openTransfer(items: EquipmentItem[]) {
 function onTransferred() {
   selectedIds.value = []
 }
-
-function origin(item: EquipmentItem) {
-  return repairOrigin(item, transfers.value)
-}
-
-function ownerText(item: EquipmentItem) {
-  const label = store.labelForOwner(item)
-  return item.ownerType === 'USER' ? shortFullName(label) : label
-}
-
-function ownerTip(item: EquipmentItem) {
-  const label = store.labelForOwner(item)
-  const sent = props.showRepairSender ? origin(item) : null
-  return sent ? `${label} · отправил: ${sent.by} (${sent.from})` : label
-}
-
-function idText(item: EquipmentItem) {
-  return item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)
-}
 </script>
 
 <template>
@@ -237,6 +255,7 @@ function idText(item: EquipmentItem) {
           <option v-for="opt in kindOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
         </select>
         <span class="toolbar__count">{{ positionsLabel(visible.length) }}</span>
+        <UiMobileSort v-model:sort-key="sortKey" v-model:direction="sortDirection" :options="sortColumns" />
       </div>
     </div>
 
@@ -272,10 +291,45 @@ function idText(item: EquipmentItem) {
                 @change="toggleAll"
               />
             </span>
-            <span class="cell cell--name">Наименование</span>
-            <span class="cell cell--id">№ / кол-во</span>
-            <span class="cell cell--condition">Состояние</span>
-            <span v-if="showOwner" class="cell cell--owner">Владелец</span>
+            <span class="cell cell--name" :aria-sort="ariaSort('name')">
+              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'name' }" @click="toggleSort('name')">
+                Наименование<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('name') }}</span>
+              </button>
+            </span>
+            <span class="cell cell--id" :aria-sort="ariaSort('identity')">
+              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'identity' }" @click="toggleSort('identity')">
+                № / кол-во<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('identity') }}</span>
+              </button>
+            </span>
+            <span class="cell cell--condition" :aria-sort="ariaSort('condition')">
+              <button
+                type="button"
+                class="ui-sort"
+                :class="{ 'ui-sort--active': sortKey === 'condition' }"
+                title="Состояние"
+                aria-label="Состояние"
+                @click="toggleSort('condition')"
+              >
+                Сост.<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('condition') }}</span>
+              </button>
+            </span>
+            <span class="cell cell--docs" :aria-sort="ariaSort('documents')">
+              <button
+                type="button"
+                class="ui-sort"
+                :class="{ 'ui-sort--active': sortKey === 'documents' }"
+                title="Документы"
+                aria-label="Документы"
+                @click="toggleSort('documents')"
+              >
+                Док.<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('documents') }}</span>
+              </button>
+            </span>
+            <span v-if="showOwner" class="cell cell--owner" :aria-sort="ariaSort('owner')">
+              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'owner' }" @click="toggleSort('owner')">
+                Владелец<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('owner') }}</span>
+              </button>
+            </span>
             <span class="cell cell--actions" />
           </div>
           <ul class="rows__list">
@@ -308,11 +362,11 @@ function idText(item: EquipmentItem) {
                 <UiClipText class="mono" :text="idText(item)" />
               </span>
               <span class="cell cell--condition">
-                <template v-if="!isCard">
-                  <ConditionBadge compact :condition="item.condition" />
-                  <UiClipText :text="CONDITION_LABEL[item.condition]" />
-                </template>
+                <ConditionBadge v-if="!isCard" compact :condition="item.condition" />
                 <span v-else class="muted">—</span>
+              </span>
+              <span class="cell cell--docs">
+                <DocumentsMark :has-documents="item.hasDocuments" />
               </span>
               <span v-if="showOwner" class="cell cell--owner">
                 <UiClipText :text="ownerText(item)" :tip="ownerTip(item)" />
@@ -462,7 +516,8 @@ function idText(item: EquipmentItem) {
   --check-col: var(--tap-size);
   --name-col: minmax(6rem, 2.2fr);
   --id-col: minmax(3.5rem, 0.9fr);
-  --condition-col: minmax(4rem, 1fr);
+  --condition-col: 3.25rem;
+  --docs-col: 3.25rem;
   --owner-col: minmax(4rem, 1.05fr);
   --actions-col: 6.25rem;
   display: flex;
@@ -484,6 +539,7 @@ function idText(item: EquipmentItem) {
     var(--name-col)
     var(--id-col)
     var(--condition-col)
+    var(--docs-col)
     var(--owner-col)
     var(--actions-col);
   align-items: center;
@@ -492,7 +548,8 @@ function idText(item: EquipmentItem) {
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  max-height: var(--control-height);
+  min-height: var(--control-height-sm);
+  max-height: var(--control-height-sm);
   padding: 0 var(--space-3);
   overflow: hidden;
 }
@@ -503,6 +560,7 @@ function idText(item: EquipmentItem) {
     var(--name-col)
     var(--id-col)
     var(--condition-col)
+    var(--docs-col)
     var(--owner-col)
     var(--actions-col);
 }
@@ -518,6 +576,7 @@ function idText(item: EquipmentItem) {
     var(--name-col)
     var(--id-col)
     var(--condition-col)
+    var(--docs-col)
     var(--actions-col);
 }
 
@@ -527,6 +586,7 @@ function idText(item: EquipmentItem) {
     var(--name-col)
     var(--id-col)
     var(--condition-col)
+    var(--docs-col)
     var(--actions-col);
 }
 
@@ -535,7 +595,7 @@ function idText(item: EquipmentItem) {
   top: 0;
   z-index: 1;
   min-height: var(--control-height-sm);
-  max-height: var(--control-height);
+  max-height: var(--control-height-sm);
   border-bottom: 1px solid var(--border-subtle);
   background: var(--table-head-bg);
   color: var(--text-secondary);
@@ -554,7 +614,7 @@ function idText(item: EquipmentItem) {
 }
 
 .rows__item {
-  min-height: var(--control-height);
+  min-height: var(--control-height-sm);
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-card);
   cursor: pointer;
@@ -605,9 +665,11 @@ function idText(item: EquipmentItem) {
   max-width: 8rem;
 }
 
-.cell--condition {
-  min-width: 4rem;
-  max-width: 9rem;
+.cell--condition,
+.cell--docs {
+  justify-content: center;
+  min-width: 2.75rem;
+  max-width: 3.25rem;
 }
 
 .cell--owner {
@@ -660,7 +722,8 @@ function idText(item: EquipmentItem) {
 
 .link {
   max-width: 100%;
-  min-height: var(--control-height-sm);
+  min-height: calc(var(--control-height-sm) - 4px);
+  height: calc(var(--control-height-sm) - 4px);
   padding: 0 var(--space-2);
   border: 0;
   border-radius: var(--radius);
@@ -754,6 +817,7 @@ function idText(item: EquipmentItem) {
     --name-col: minmax(4.5rem, 2.2fr);
     --id-col: minmax(3rem, 0.9fr);
     --condition-col: 1.5rem;
+    --docs-col: 1.5rem;
     --owner-col: minmax(3rem, 1.05fr);
     --actions-col: 5.75rem;
     border: 0;
@@ -792,8 +856,10 @@ function idText(item: EquipmentItem) {
     display: none;
   }
 
-  .cell--condition :deep(.clip-text) {
-    display: none;
+  .rows__head,
+  .rows__item {
+    min-height: var(--control-height);
+    max-height: var(--control-height);
   }
 
   .cell--name {
@@ -805,15 +871,16 @@ function idText(item: EquipmentItem) {
     min-width: 3rem;
   }
 
-  .cell--condition {
+  .cell--condition,
+  .cell--docs {
     min-width: 1.5rem;
     max-width: 1.5rem;
-    justify-content: center;
   }
 
   .cell--actions :deep(.btn),
   .link {
     min-height: var(--tap-size);
+    height: auto;
   }
 }
 

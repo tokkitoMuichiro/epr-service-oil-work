@@ -745,6 +745,35 @@ export function sortEquipment(items: EquipmentItem[]): EquipmentItem[] {
   )
 }
 
+export type EquipmentSortKey = 'name' | 'identity' | 'condition' | 'documents' | 'owner'
+
+/** Column sort for equipment lists; flagged fill status is not applied. */
+export function sortEquipmentBy(
+  items: readonly EquipmentItem[],
+  key: EquipmentSortKey,
+  direction: 'asc' | 'desc',
+  labels: { owner: (item: EquipmentItem) => string; identity: (item: EquipmentItem) => string },
+): EquipmentItem[] {
+  const sign = direction === 'asc' ? 1 : -1
+  const collator = new Intl.Collator('ru', { numeric: true, sensitivity: 'base' })
+  function value(item: EquipmentItem): string | number {
+    if (key === 'identity') return labels.identity(item)
+    if (key === 'condition') return CONDITION_LABEL[item.condition]
+    if (key === 'documents') return item.hasDocuments ? 1 : 0
+    if (key === 'owner') return labels.owner(item)
+    return item.name
+  }
+  return [...items].sort((a, b) => {
+    const fill = fillRank(a.fillStatus) - fillRank(b.fillStatus)
+    if (fill) return fill
+    const left = value(a)
+    const right = value(b)
+    const cmp =
+      typeof left === 'number' && typeof right === 'number' ? left - right : collator.compare(String(left), String(right))
+    return sign * cmp || collator.compare(a.name, b.name) || a.id.localeCompare(b.id)
+  })
+}
+
 export function pendingOfferLabel(item: EquipmentItem, transfers: Transfer[]) {
   const pending = pendingTransfer(item, transfers)
   if (pending?.status !== 'PENDING') return ''

@@ -829,6 +829,46 @@ textarea::placeholder {
   white-space: nowrap;
 }
 
+.ui-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-height-sm);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ui-sort--active {
+  color: var(--text-primary);
+}
+
+.ui-sort__arrow {
+  flex: none;
+  font-size: var(--font-size-2xs);
+  opacity: 0.45;
+}
+
+.ui-sort--active .ui-sort__arrow {
+  color: var(--text-link);
+  opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ui-sort:hover {
+    color: var(--text-primary);
+  }
+}
+
 .ui-rows__sentinel {
   height: 1px;
 }

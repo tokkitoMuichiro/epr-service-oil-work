@@ -15,7 +15,6 @@ const range = computed(() => pageWindow(page.value, props.total, props.pageSize)
 const numbers = computed(() => compactPageNumbers(range.value.page, range.value.pageCount))
 const isFirst = computed(() => range.value.page <= 1)
 const isLast = computed(() => range.value.page >= range.value.pageCount)
-const showFirstJump = computed(() => range.value.page >= 3 && !numbers.value.includes(1))
 
 async function go(target: number) {
   const next = Math.min(Math.max(1, target), range.value.pageCount)
@@ -30,46 +29,46 @@ async function go(target: number) {
 
 <template>
   <nav v-if="range.pageCount > 1" ref="root" class="pager" :aria-label="label">
-    <button
-      v-if="showFirstJump"
-      type="button"
-      class="pager__btn"
-      aria-label="Первая страница"
-      @click="go(1)"
-    >
+    <button type="button" class="pager__btn" :disabled="isFirst" aria-label="Первая страница" @click="go(1)">
       <IconChevronsLeft :size="18" />
     </button>
     <button type="button" class="pager__btn" :disabled="isFirst" aria-label="Предыдущая страница" @click="go(range.page - 1)">
       <IconChevron class="pager__prev" :size="18" />
     </button>
 
-    <template v-for="(token, index) in numbers" :key="`${token}-${index}`">
-      <span v-if="token === 'ellipsis'" class="pager__ellipsis" aria-hidden="true">…</span>
-      <button
-        v-else
-        type="button"
-        class="pager__btn pager__num"
-        :class="{ 'pager__num--active': token === range.page }"
-        :aria-label="`Страница ${token}`"
-        :aria-current="token === range.page ? 'page' : undefined"
-        @click="go(token)"
-      >
-        {{ token }}
-      </button>
-    </template>
+    <span class="pager__nums">
+      <template v-for="(token, index) in numbers" :key="`${token}-${index}`">
+        <span v-if="token === 'ellipsis'" class="pager__ellipsis" aria-hidden="true">…</span>
+        <button
+          v-else
+          type="button"
+          class="pager__btn pager__num"
+          :class="{ 'pager__num--active': token === range.page }"
+          :aria-label="`Страница ${token}`"
+          :aria-current="token === range.page ? 'page' : undefined"
+          @click="go(token)"
+        >
+          {{ token }}
+        </button>
+      </template>
+    </span>
 
     <button type="button" class="pager__btn" :disabled="isLast" aria-label="Следующая страница" @click="go(range.page + 1)">
       <IconChevron class="pager__next" :size="18" />
+    </button>
+    <button type="button" class="pager__btn" :disabled="isLast" aria-label="Последняя страница" @click="go(range.pageCount)">
+      <IconChevronsLeft class="pager__last" :size="18" />
     </button>
   </nav>
 </template>
 
 <style scoped>
 .pager {
-  display: flex;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: var(--tap-size) var(--tap-size) minmax(calc(var(--tap-size) * 5), auto) var(--tap-size) var(--tap-size);
   align-items: center;
   justify-content: center;
+  justify-items: center;
   gap: var(--space-1);
   min-width: 0;
   padding: var(--space-1);
@@ -78,6 +77,15 @@ async function go(target: number) {
   background: var(--surface-card);
   overflow-x: auto;
   scrollbar-width: none;
+}
+
+.pager__nums {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: calc(var(--tap-size) * 5);
 }
 
 .pager::-webkit-scrollbar {
@@ -140,9 +148,19 @@ async function go(target: number) {
   transform: rotate(-90deg);
 }
 
+.pager__last {
+  transform: rotate(180deg);
+}
+
 @media (max-width: 860px) {
   .pager {
+    grid-template-columns: var(--control-height-sm) var(--control-height-sm) minmax(calc(var(--control-height-sm) * 5), auto) var(--control-height-sm) var(--control-height-sm);
     padding: 0;
+    gap: 2px;
+  }
+
+  .pager__nums {
+    min-width: calc(var(--control-height-sm) * 5);
     gap: 2px;
   }
 
