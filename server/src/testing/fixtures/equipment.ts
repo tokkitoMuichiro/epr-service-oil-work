@@ -2,11 +2,15 @@ import type { SeedFile } from '../../db.js'
 import { DEMO_STAFF_USERS } from '../../modules/auth/demo-staff.js'
 import { demoUserOf } from '../../modules/auth/repository.js'
 import { EQUIPMENT_FILES_BUCKET, repairWarehouse, type EquipmentData } from '../../modules/equipment/model.js'
-import type { EquipmentDocument, EquipmentItem } from '../../shared.js'
+import type { CardKind, EquipmentDocument, EquipmentItem, VehicleKind } from '../../shared.js'
 
 const ADMIN = demoUserOf('admin')
 const MASTER = demoUserOf('master')
 const KEEPER = demoUserOf('storekeeper')
+
+const EQUIPMENT_TARGET = 60
+const VEHICLE_TARGET = 40
+const CARD_TARGET = 40
 
 const EQUIPMENT_NAMES = [
   'Насос центробежный',
@@ -24,9 +28,42 @@ const EQUIPMENT_NAMES = [
   'Вентилятор промышленный',
   'Насос грязевой',
   'Газоанализатор',
+  'Тепловая пушка',
+  'Мотопомпа',
+  'Опрессовочный насос',
+  'Измеритель сопротивления изоляции',
+  'Комплект диэлектрических средств защиты до 1000 В',
 ]
 
-const WAREHOUSE_SLOTS = ['wh-north', 'wh-south', 'wh-east', 'wh-west', 'wh-central'] as const
+const CONSUMABLE_NAMES = [
+  'Перчатки нитриловые',
+  'Электроды МР-3',
+  'Диск отрезной 230',
+  'Кабель ВВГ 3×2.5',
+  'Изолента ПВХ',
+  'Болт М12×60',
+  'Смазка литиевая',
+  'Мешки для строительного мусора',
+]
+
+const VEHICLE_MODELS: { name: string; kind: VehicleKind }[] = [
+  { name: 'Lada Largus', kind: 'PASSENGER' },
+  { name: 'УАЗ Патриот', kind: 'PASSENGER' },
+  { name: 'Hyundai Solaris', kind: 'PASSENGER' },
+  { name: 'ГАЗон NEXT', kind: 'TRUCK' },
+  { name: 'КамАЗ-65115', kind: 'TRUCK' },
+  { name: 'МАЗ-6312', kind: 'TRUCK' },
+  { name: 'Экскаватор Hitachi ZX200', kind: 'SPECIAL' },
+  { name: 'Автовышка АГП-22', kind: 'SPECIAL' },
+  { name: 'Автокран КС-45717', kind: 'SPECIAL' },
+  { name: 'Мотоцикл Ирбис TTR 250', kind: 'MOTORCYCLE' },
+  { name: 'Прицеп СЗАП-83053', kind: 'TRAILER' },
+  { name: 'Прицеп-цистерна ПЦ-8', kind: 'TRAILER' },
+]
+
+const PLATE_LETTERS = 'ABEKMHOPCTYX'
+const WAREHOUSE_SLOTS = ['wh-north', 'wh-south', 'wh-east', 'wh-west', 'wh-central', 'wh-field', 'wh-tools'] as const
+const PEOPLE_IDS = [MASTER.id, KEEPER.id, ADMIN.id, ...DEMO_STAFF_USERS.map((person) => person.id)]
 
 function item(
   partial: Omit<EquipmentItem, 'documents' | 'category' | 'hasDocuments' | 'fillStatus'> & Partial<EquipmentItem>,
@@ -53,52 +90,125 @@ function doc(id: string, itemId: string, fileName: string, addedAt: string, adde
   }
 }
 
-function extraItems(): EquipmentItem[] {
-  const holders = DEMO_STAFF_USERS.slice(0, 20)
-  const result: EquipmentItem[] = []
-  let n = 100
+function stamp(n: number, hour = 10) {
+  const day = String((n % 28) + 1).padStart(2, '0')
+  const hh = String(hour).padStart(2, '0')
+  return `2026-04-${day}T${hh}:00:00.000Z`
+}
 
-  for (const person of holders) {
-    const name = EQUIPMENT_NAMES[n % EQUIPMENT_NAMES.length]
-    const id = `eq-${n}`
-    result.push(
+function ownerOf(n: number, inRepair = false) {
+  if (inRepair) return { ownerType: 'WAREHOUSE' as const, ownerWarehouseId: 'wh-repair' }
+  if (n % 3 === 0) {
+    return { ownerType: 'WAREHOUSE' as const, ownerWarehouseId: WAREHOUSE_SLOTS[n % WAREHOUSE_SLOTS.length] }
+  }
+  return { ownerType: 'USER' as const, ownerUserId: PEOPLE_IDS[n % PEOPLE_IDS.length] }
+}
+
+function carPlate(n: number) {
+  const letter = (offset: number) => PLATE_LETTERS[(n + offset) % PLATE_LETTERS.length]
+  const num = String((n * 17 + 13) % 900 + 100)
+  const region = String((n * 3) % 89 + 10)
+  return `${letter(0)}${num}${letter(3)}${letter(7)}${region}`
+}
+
+function trailerPlate(n: number) {
+  const letter = (offset: number) => PLATE_LETTERS[(n + offset) % PLATE_LETTERS.length]
+  const num = String((n * 41 + 1000) % 9000).padStart(4, '0')
+  const region = String((n * 5) % 89 + 10)
+  return `${letter(2)}${letter(8)}${num}${region}`
+}
+
+function extraItems(core: EquipmentItem[]): EquipmentItem[] {
+  const extra: EquipmentItem[] = []
+  const usedPlates = new Set(core.map((entry) => entry.plateNumber).filter((plate): plate is string => Boolean(plate)))
+  let plateSeq = 200
+
+  function count(category: EquipmentItem['category']) {
+    return core.filter((entry) => entry.category === category).length + extra.filter((entry) => entry.category === category).length
+  }
+
+  function nextPlate(kind: VehicleKind) {
+    let plate = ''
+    do {
+      plateSeq += 1
+      plate = kind === 'TRAILER' ? trailerPlate(plateSeq) : carPlate(plateSeq)
+    } while (usedPlates.has(plate))
+    usedPlates.add(plate)
+    return plate
+  }
+
+  for (let n = 100; count('EQUIPMENT') < EQUIPMENT_TARGET; n += 1) {
+    const isConsumable = n % 5 === 0
+    const inRepair = n % 19 === 0
+    const needsRepair = !inRepair && n % 8 === 0
+    extra.push(
       item({
-        id,
-        name: `${name} №${n - 99}`,
-        factoryNumber: `FN-${1000 + n}`,
+        id: `eq-${n}`,
+        name: isConsumable
+          ? CONSUMABLE_NAMES[n % CONSUMABLE_NAMES.length]
+          : `${EQUIPMENT_NAMES[n % EQUIPMENT_NAMES.length]} №${n - 99}`,
+        factoryNumber: isConsumable ? null : `FN-${1000 + n}`,
+        quantity: isConsumable ? 5 + (n % 20) : 1,
+        type: isConsumable ? 'CONSUMABLE' : 'SERIAL',
+        condition: inRepair ? 'IN_REPAIR' : needsRepair ? 'NEEDS_REPAIR' : 'OK',
+        conditionNote: inRepair ? 'Плановый ремонт' : needsRepair ? 'Требуется диагностика' : null,
+        fillStatus: n % 23 === 0 ? 'NEEDS_FIX' : n % 29 === 0 ? 'PENDING_REVIEW' : 'OK',
+        fillComment: n % 23 === 0 ? 'Проверьте заводской номер' : n % 29 === 0 ? 'Ожидает проверки карточки' : null,
+        ...ownerOf(n, inRepair),
+        createdAt: stamp(n),
+        updatedAt: stamp(n, 12),
+      }),
+    )
+  }
+
+  for (let n = 10; count('VEHICLE') < VEHICLE_TARGET; n += 1) {
+    const model = VEHICLE_MODELS[n % VEHICLE_MODELS.length]
+    const plate = nextPlate(model.kind)
+    const inRepair = n % 17 === 0
+    const needsRepair = !inRepair && n % 9 === 0
+    extra.push(
+      item({
+        id: `veh-${n}`,
+        category: 'VEHICLE',
+        name: model.name,
+        factoryNumber: plate,
+        plateNumber: plate,
+        vehicleKind: model.kind,
         quantity: 1,
         type: 'SERIAL',
-        condition: n % 7 === 0 ? 'NEEDS_REPAIR' : 'OK',
-        ownerType: 'USER',
-        ownerUserId: person.id,
-        createdAt: '2026-04-01T10:00:00.000Z',
-        updatedAt: '2026-04-15T10:00:00.000Z',
+        condition: inRepair ? 'IN_REPAIR' : needsRepair ? 'NEEDS_REPAIR' : 'OK',
+        conditionNote: inRepair ? 'ТО на базе ремонта' : needsRepair ? 'Замечание по узлу' : null,
+        ...ownerOf(n + 4, inRepair),
+        createdAt: stamp(n + 3),
+        updatedAt: stamp(n + 3, 11),
       }),
     )
-    n += 1
   }
 
-  while (result.length + 14 < 40) {
-    const id = `eq-${n}`
-    const warehouseId = WAREHOUSE_SLOTS[n % WAREHOUSE_SLOTS.length]
-    result.push(
+  const cardKinds: CardKind[] = ['FUEL', 'TRANSPONDER', 'BUSINESS']
+  for (let n = 10; count('CARD') < CARD_TARGET; n += 1) {
+    const kind = cardKinds[n % cardKinds.length]
+    const cardNumber =
+      kind === 'BUSINESS' ? String(1000 + (n % 9000)).slice(-4) : kind === 'FUEL' ? `7005 ${String(1000 + n).slice(-4)} ${String(2000 + n).slice(-4)}` : `T-${310000 + n}`
+    extra.push(
       item({
-        id,
-        name: `${EQUIPMENT_NAMES[n % EQUIPMENT_NAMES.length]} складской ${n}`,
-        factoryNumber: n % 3 === 0 ? null : `WH-${2000 + n}`,
-        quantity: n % 3 === 0 ? 5 + (n % 10) : 1,
-        type: n % 3 === 0 ? 'CONSUMABLE' : 'SERIAL',
+        id: `card-${n}`,
+        category: 'CARD',
+        name: kind === 'BUSINESS' ? `Бизнес-карта ****${cardNumber}` : kind === 'FUEL' ? `Топливная карта ${cardNumber}` : `Транспондер ${cardNumber}`,
+        factoryNumber: cardNumber,
+        cardNumber,
+        cardKind: kind,
+        quantity: 1,
+        type: 'SERIAL',
         condition: 'OK',
-        ownerType: 'WAREHOUSE',
-        ownerWarehouseId: warehouseId,
-        createdAt: '2026-04-02T10:00:00.000Z',
-        updatedAt: '2026-04-16T10:00:00.000Z',
+        ...ownerOf(n + 8),
+        createdAt: stamp(n + 5),
+        updatedAt: stamp(n + 5, 13),
       }),
     )
-    n += 1
   }
 
-  return result
+  return extra
 }
 
 export function demoEquipment(): EquipmentData {
@@ -360,7 +470,7 @@ export function demoEquipment(): EquipmentData {
         keeperIds: [DEMO_STAFF_USERS[4].id],
       },
     ],
-    items: [...coreItems, ...extraItems()],
+    items: [...coreItems, ...extraItems(coreItems)],
     transfers: [
       {
         id: 'tr-pending-1',

@@ -59,6 +59,7 @@ export function formatReportBitrixComment(report: {
     for (const item of report.workItems) {
       lines.push(`  • ${item.name}: ${item.volume} ${item.unit}`)
     }
+    if (report.volumes) lines.push(`  ${report.volumes}`)
   } else if (report.volumes) {
     lines.push(`Объёмы: ${report.volumes}`)
   }

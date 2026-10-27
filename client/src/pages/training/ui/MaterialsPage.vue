@@ -14,9 +14,10 @@ import { formatDateTimeRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
 import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { shortFullName } from '@shared/person-name'
-import { useMobilePagination } from '@/shared/lib/pagination'
+import { useScrollList } from '@/shared/lib/pagination'
 import {
   IconArchive,
+  IconArrowUp,
   IconPencil,
   IconTraining,
   IconTrash,
@@ -68,7 +69,7 @@ const visible = computed(() => {
     .filter((m) => !q || `${m.title} ${m.fileName}`.toLocaleLowerCase('ru').includes(q))
 })
 
-const pager = useMobilePagination(visible, { resetOn: [search, programFilter, showArchived] })
+const list = useScrollList(visible, { resetOn: [search, programFilter, showArchived] })
 
 function openNew() {
   formError.value = ''
@@ -163,6 +164,10 @@ async function remove(material: TrainingMaterial) {
 function openHref(material: TrainingMaterial) {
   return trainingApi.materialUrl(material.id)
 }
+
+function openMaterial(material: TrainingMaterial) {
+  window.open(openHref(material), '_blank', 'noopener')
+}
 </script>
 
 <template>
@@ -187,34 +192,39 @@ function openHref(material: TrainingMaterial) {
 
     <UiState v-if="!visible.length" title="Материалов нет" :icon="IconTraining" text="Загрузите файл или добавьте ссылку на файл в Битрикс." />
     <div v-else class="materials__list ui-fill-panel">
-      <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack ui-fill-scroll">
-        <table class="ui-table materials__table">
-          <thead>
-            <tr>
-              <th class="col-title">Материал</th>
-              <th class="col-programs">Программы</th>
-              <th class="col-updated hide-md">Изменён</th>
-              <th class="col-actions" />
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="m in pager.pageItems" :key="m.id" :class="{ 'is-archived': m.isArchived }">
-              <td class="col-title ui-cell--main" :title="m.title">
-                <a :href="openHref(m)" target="_blank" rel="noopener" class="materials__title"><UiClipText :text="m.title" /></a>
-                <small class="materials__sub">
-                  <UiClipText :text="`${m.fileName} · ${formatFileSize(m.size)} · ${m.source === 'upload' ? 'загружен' : 'ссылка на Битрикс'}`" />
-                </small>
-                <span v-if="m.isUnavailable" class="ui-badge ui-badge--bad">Файл недоступен в Битрикс</span>
-                <span v-if="m.isArchived" class="ui-badge">В архиве</span>
-              </td>
-              <td class="col-programs" data-label="Программы" :title="m.programIds.map((id) => store.labelOf(id)).join(', ')">
+      <div :ref="list.bindList" class="ui-fill-scroll" @scroll.passive="list.onListScroll">
+        <div
+          class="ui-rows materials-rows"
+          style="--ui-rows-columns: minmax(6rem, 1.6fr) minmax(5rem, 1.1fr) minmax(5.5rem, 8rem) 7.5rem"
+        >
+          <div class="ui-rows__head">
+            <span class="ui-rows__cell ui-rows__cell--name">Материал</span>
+            <span class="ui-rows__cell">Программы</span>
+            <span class="ui-rows__cell cell--updated">Изменён</span>
+            <span class="ui-rows__cell ui-rows__cell--actions" />
+          </div>
+          <ul class="ui-rows__list" aria-label="Материалы">
+            <li
+              v-for="m in list.pageItems"
+              :key="m.id"
+              class="ui-rows__item ui-rows__item--click"
+              :class="{ 'is-archived': m.isArchived }"
+              tabindex="0"
+              @click="openMaterial(m)"
+              @keydown.enter.prevent="openMaterial(m)"
+            >
+              <span class="ui-rows__cell ui-rows__cell--name">
+                <UiClipText tag="strong" class="materials__title" :text="m.title" />
+                <UiClipText class="materials__sub" :text="`${m.fileName} · ${formatFileSize(m.size)}`" />
+              </span>
+              <span class="ui-rows__cell">
                 <UiClipText :text="m.programIds.map((id) => store.labelOf(id)).join(', ') || '—'" />
-              </td>
-              <td class="col-updated hide-md">
-                {{ formatDateTimeRu(m.updatedAt) }}
-                <small class="materials__sub">{{ shortFullName(m.updatedBy) }}</small>
-              </td>
-              <td class="col-actions materials__actions ui-cell--actions">
+              </span>
+              <span class="ui-rows__cell cell--updated">
+                <UiClipText :text="formatDateTimeRu(m.updatedAt)" />
+                <UiClipText class="materials__sub" :text="shortFullName(m.updatedBy)" />
+              </span>
+              <span class="ui-rows__cell ui-rows__cell--actions" @click.stop>
                 <UiButton variant="ghost" size="icon" aria-label="Изменить" title="Изменить" @click="openEdit(m)">
                   <IconPencil :size="16" />
                 </UiButton>
@@ -231,18 +241,28 @@ function openHref(material: TrainingMaterial) {
                 <UiButton variant="ghost" size="icon" aria-label="Удалить" title="Удалить" @click="remove(m)">
                   <IconTrash :size="16" />
                 </UiButton>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </span>
+            </li>
+          </ul>
+        </div>
+        <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
       </div>
       <UiPagination
-        v-if="pager.isPaged"
-        v-model:page="pager.page"
+        v-if="!list.isMobile && list.pager.isPaged"
+        v-model:page="list.pager.page"
         class="ui-fill-chrome"
-        :total="pager.total"
-        :page-size="pager.pageSize"
+        :total="list.pager.total"
+        :page-size="list.pager.pageSize"
       />
+      <button
+        v-if="list.isMobile && list.showScrollTop"
+        type="button"
+        class="ui-scroll-top"
+        aria-label="Наверх"
+        @click="list.scrollToTop"
+      >
+        <IconArrowUp :size="20" />
+      </button>
     </div>
 
     <UiDialog
@@ -309,36 +329,16 @@ function openHref(material: TrainingMaterial) {
   gap: var(--space-3);
 }
 
-.materials .ui-table-wrap {
-  overflow-x: hidden;
+.cell--updated {
+  min-width: 5.5rem;
+  max-width: 9rem;
 }
 
-.materials__table {
-  table-layout: auto;
-  width: 100%;
-}
-
-.materials__table th,
-.materials__table td {
-  height: auto;
-  vertical-align: middle;
-}
-
-.col-title {
-  width: 100%;
-  overflow: hidden;
-}
-
-.col-programs,
-.col-updated {
-  width: 1%;
-  max-width: 12rem;
-  overflow: hidden;
-}
-
-.col-actions {
-  width: 1%;
-  white-space: nowrap;
+.materials-rows .ui-rows__cell--actions :deep(.btn--icon) {
+  width: calc(var(--control-height) - var(--space-2));
+  min-width: calc(var(--control-height) - var(--space-2));
+  height: calc(var(--control-height) - var(--space-2));
+  min-height: calc(var(--control-height) - var(--space-2));
 }
 
 .materials__toolbar {
@@ -368,34 +368,15 @@ function openHref(material: TrainingMaterial) {
 }
 
 .materials__title {
-  display: block;
   min-width: 0;
-  max-width: 100%;
   color: var(--text-link);
   font-weight: 600;
 }
 
 .materials__sub {
-  display: block;
   min-width: 0;
-  max-width: 100%;
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
-}
-
-.col-title,
-.col-programs {
-  overflow: hidden;
-}
-
-.materials__actions {
-  text-align: right;
-  white-space: nowrap;
-  vertical-align: middle;
-}
-
-.materials__actions :deep(.btn + .btn) {
-  margin-left: var(--space-1);
 }
 
 .materials__programs {
@@ -446,41 +427,12 @@ function openHref(material: TrainingMaterial) {
     grid-template-columns: 1fr;
   }
 
-  .hide-md {
+  .materials-rows {
+    --ui-rows-columns: minmax(4.5rem, 1.4fr) minmax(3.5rem, 1fr) 6.75rem;
+  }
+
+  .cell--updated {
     display: none;
-  }
-
-  .col-title,
-  .col-programs,
-  .col-actions,
-  .materials__title,
-  .materials__sub {
-    min-width: 0;
-    max-width: 100%;
-  }
-
-  .materials__sub {
-    overflow-wrap: anywhere;
-  }
-
-  .materials .ui-table-wrap--stack .ui-table tr {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .materials .ui-table-wrap--stack .ui-table td.col-title {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .materials .ui-table-wrap--stack .ui-table td.col-actions {
-    grid-column: 2;
-    grid-row: 1;
-    align-self: center;
-    margin-top: 0;
-  }
-
-  .materials .ui-table-wrap--stack .ui-table td.col-programs {
-    grid-column: 1 / -1;
   }
 }
 </style>

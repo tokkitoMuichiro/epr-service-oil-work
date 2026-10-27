@@ -185,46 +185,46 @@ function archiveProgram(program: TrainingProgram) {
         </div>
       </header>
 
-      <div v-if="programsOf(d).length" class="ui-table-wrap direction__table-wrap">
-        <table class="ui-table direction__table">
-          <thead>
-            <tr>
-              <th class="col-program">Программа</th>
-              <th class="col-period">Периодичность</th>
-              <th class="col-actions"><span class="visually-hidden">Действия</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="p in programsOf(d)" :key="p.id" :class="{ 'is-archived': p.isArchived }">
-              <td class="col-program" :title="`${store.labelOf(p.id)} · ${p.name}`">
-                <UiClipText tag="strong" class="direction__label" :text="store.labelOf(p.id)" />
-                <UiClipText tag="small" class="direction__sub" :text="p.name" />
-                <UiClipText v-if="p.storagePath" tag="small" class="direction__sub direction__path" :text="p.storagePath" :tip="p.storagePath" />
-              </td>
-              <td class="col-period">
-                {{ p.periodMonths }} мес.
-                <small class="direction__sub">предупреждать за {{ p.expiringDays }} дн.</small>
-              </td>
-              <td class="col-actions direction__cell-actions">
-                <div class="direction__row-actions">
-                  <UiButton variant="ghost" size="icon" aria-label="Изменить программу" title="Изменить" @click="editProgram(d, p)">
-                    <IconPencil :size="16" />
-                  </UiButton>
-                  <UiButton
-                    variant="ghost"
-                    size="icon"
-                    :aria-label="p.isArchived ? 'Вернуть программу из архива' : 'В архив'"
-                    :title="p.isArchived ? 'Вернуть из архива' : 'В архив'"
-                    @click="archiveProgram(p)"
-                  >
-                    <IconUndo v-if="p.isArchived" :size="16" />
-                    <IconArchive v-else :size="16" />
-                  </UiButton>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div v-if="programsOf(d).length" class="ui-rows direction-rows">
+        <div class="ui-rows__head">
+          <span class="ui-rows__cell ui-rows__cell--name">Программа</span>
+          <span class="ui-rows__cell cell--period">Периодичность</span>
+          <span class="ui-rows__cell ui-rows__cell--actions" />
+        </div>
+        <ul class="ui-rows__list" :aria-label="`Программы: ${d.name}`">
+          <li
+            v-for="p in programsOf(d)"
+            :key="p.id"
+            class="ui-rows__item ui-rows__item--click"
+            :class="{ 'is-archived': p.isArchived }"
+            tabindex="0"
+            @click="editProgram(d, p)"
+            @keydown.enter.prevent="editProgram(d, p)"
+          >
+            <span class="ui-rows__cell ui-rows__cell--name">
+              <UiClipText tag="strong" class="direction__label" :text="store.labelOf(p.id)" />
+              <UiClipText class="direction__sub" :text="p.name" />
+            </span>
+            <span class="ui-rows__cell cell--period">
+              <UiClipText :text="`${p.periodMonths} мес.`" />
+            </span>
+            <span class="ui-rows__cell ui-rows__cell--actions" @click.stop>
+              <UiButton variant="ghost" size="icon" aria-label="Изменить программу" title="Изменить" @click="editProgram(d, p)">
+                <IconPencil :size="16" />
+              </UiButton>
+              <UiButton
+                variant="ghost"
+                size="icon"
+                :aria-label="p.isArchived ? 'Вернуть программу из архива' : 'В архив'"
+                :title="p.isArchived ? 'Вернуть из архива' : 'В архив'"
+                @click="archiveProgram(p)"
+              >
+                <IconUndo v-if="p.isArchived" :size="16" />
+                <IconArchive v-else :size="16" />
+              </UiButton>
+            </span>
+          </li>
+        </ul>
       </div>
       <p v-else class="direction__empty">Программ пока нет.</p>
     </article>
@@ -350,33 +350,21 @@ function archiveProgram(program: TrainingProgram) {
   overflow-x: clip;
 }
 
-.direction__table-wrap {
-  min-width: 0;
-  max-width: 100%;
-  overflow-x: clip;
+.direction-rows {
+  --ui-rows-columns: minmax(6rem, 1.6fr) minmax(4.5rem, 8rem) 6.5rem;
+  border: 1px solid var(--border-subtle);
 }
 
-.direction__table {
-  table-layout: fixed;
-  width: 100%;
+.direction-rows .ui-rows__cell--actions :deep(.btn--icon) {
+  width: calc(var(--control-height) - var(--space-2));
+  min-width: calc(var(--control-height) - var(--space-2));
+  height: calc(var(--control-height) - var(--space-2));
+  min-height: calc(var(--control-height) - var(--space-2));
 }
 
-.col-program {
-  min-width: 8rem;
-  max-width: 28rem;
-  overflow: hidden;
-}
-
-.col-period {
-  width: 9rem;
-  min-width: 7rem;
-  max-width: 11rem;
-}
-
-.col-actions {
-  width: calc(2 * var(--tap-size) + var(--space-1));
-  min-width: calc(2 * var(--control-height-sm));
-  max-width: calc(2 * var(--tap-size) + var(--space-1));
+.cell--period {
+  min-width: 4.5rem;
+  max-width: 8rem;
 }
 
 .direction__label,
@@ -434,30 +422,11 @@ function archiveProgram(program: TrainingProgram) {
   font-size: var(--font-size-sm);
 }
 
-.direction__actions,
-.direction__row-actions {
+.direction__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1);
-}
-
-.direction__row-actions {
-  flex-wrap: nowrap;
-  justify-content: flex-end;
-}
-
-.direction__cell-actions {
-  white-space: nowrap;
-}
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 
 .direction__sub {
@@ -510,77 +479,13 @@ function archiveProgram(program: TrainingProgram) {
   .direction__title,
   .direction__name,
   .direction__label,
-  .direction__sub,
-  .direction__path,
-  .col-program {
+  .direction__sub {
     min-width: 0;
     max-width: 100%;
   }
 
-  .direction .ui-table-wrap {
-    overflow-x: clip;
-    overflow-y: visible;
-    border: 0;
-  }
-
-  .direction .ui-table,
-  .direction .ui-table tbody,
-  .direction .ui-table tr,
-  .direction .ui-table td,
-  .direction .col-program,
-  .direction .col-period,
-  .direction .col-actions {
-    display: block;
-    width: auto !important;
-    max-width: 100%;
-    min-width: 0;
-  }
-
-  .direction .ui-table thead {
-    display: none;
-  }
-
-  .direction .ui-table tr {
-    display: grid;
-    gap: 2px;
-    min-width: 0;
-    max-width: 100%;
-    padding: var(--space-2) 0;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .direction .ui-table tr:last-child {
-    border-bottom: 0;
-    padding-bottom: 0;
-  }
-
-  .direction .ui-table td {
-    height: auto;
-    padding: 0;
-    border: 0;
-    overflow: hidden;
-  }
-
-  .direction .col-program {
-    max-width: 100% !important;
-  }
-
-  .direction .ui-table td.hide-md {
-    display: none;
-  }
-
-  .direction__cell-actions {
-    white-space: normal;
-  }
-
-  .direction__row-actions {
-    justify-content: flex-start;
-    gap: var(--space-1);
-    padding-top: var(--space-1);
-  }
-
-  .direction__row-actions :deep(.btn--icon) {
-    flex: 0 0 auto;
+  .direction-rows {
+    --ui-rows-columns: minmax(4.5rem, 1.5fr) minmax(3.5rem, 6rem) 6.25rem;
   }
 }
 </style>

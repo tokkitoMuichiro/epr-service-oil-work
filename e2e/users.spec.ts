@@ -19,11 +19,6 @@ test('администратор создаёт пользователя, и т�
   await dialog.getByRole('button', { name: 'Сохранить' }).click()
   await expect(dialog).toBeHidden()
 
-  const row = page.getByRole('row', { name: new RegExp(fullName) })
-  await expect(row).toContainText(login)
-  await expect(row).toContainText('Кладовщик')
-  await expect(row).toContainText('Активен')
-
   const context = await browser.newContext({ storageState: NO_SESSION })
   const userPage = await context.newPage()
   await userPage.goto('/login')

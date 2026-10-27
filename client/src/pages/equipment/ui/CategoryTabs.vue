@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import type { AssetCategory, EquipmentItem } from '@/entities/equipment'
+import { useIsMobile } from '@/shared/lib/media'
 import { CATEGORY_TABS } from '../model/category'
 
 const props = defineProps<{ active: AssetCategory; items: EquipmentItem[] }>()
 
 const route = useRoute()
+const router = useRouter()
+const isMobile = useIsMobile()
 
 function countOf(category: AssetCategory) {
   return props.items.filter((i) => i.category === category).length
@@ -14,10 +17,28 @@ function countOf(category: AssetCategory) {
 function linkFor(slug: string) {
   return { name: route.name ?? undefined, params: { ...route.params, category: slug }, query: route.query }
 }
+
+function onSelect(event: Event) {
+  const value = (event.target as HTMLSelectElement).value as AssetCategory
+  const tab = CATEGORY_TABS.find((item) => item.value === value)
+  if (!tab) return
+  void router.replace(linkFor(tab.slug))
+}
 </script>
 
 <template>
-  <nav class="tabs" aria-label="Категории">
+  <select
+    v-if="isMobile"
+    class="tabs-select ui-control"
+    aria-label="Тип оборудования"
+    :value="active"
+    @change="onSelect"
+  >
+    <option v-for="tab in CATEGORY_TABS" :key="tab.value" :value="tab.value">
+      {{ tab.label }}
+    </option>
+  </select>
+  <nav v-else class="tabs" aria-label="Категории">
     <RouterLink
       v-for="tab in CATEGORY_TABS"
       :key="tab.value"
@@ -102,14 +123,9 @@ function linkFor(slug: string) {
   color: var(--text-link);
 }
 
-@media (max-width: 860px) {
-  .tabs {
-    width: 100%;
-  }
-
-  .tabs__btn {
-    min-height: var(--tap-size);
-  }
+.tabs-select {
+  width: 100%;
+  min-width: 0;
 }
 
 @media (forced-colors: active) {

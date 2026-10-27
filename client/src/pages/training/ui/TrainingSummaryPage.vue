@@ -12,8 +12,8 @@ import {
 import { AssignTestDialog } from '@/features/training-assign'
 import { shortFullName } from '@shared/person-name'
 import { formatDateRu } from '@/shared/lib/date'
-import { useMobilePagination } from '@/shared/lib/pagination'
-import { IconSearch, UiAvatar, UiButton, UiClipText, UiPagination, UiState } from '@/shared/ui'
+import { useScrollList } from '@/shared/lib/pagination'
+import { IconArrowUp, IconSearch, UiAvatar, UiButton, UiClipText, UiPagination, UiState } from '@/shared/ui'
 
 /** One row per worker × programme; a worker without trainings gets a single row with `status: null`. */
 interface SummaryItem {
@@ -78,7 +78,7 @@ const visible = computed(() => {
     )
 })
 
-const pager = useMobilePagination(visible, { resetOn: [search, programFilter, counter] })
+const list = useScrollList(visible, { resetOn: [search, programFilter, counter] })
 
 const selectable = computed(() => visible.value.filter((i) => !i.status?.activeAssignment))
 
@@ -159,23 +159,27 @@ function onAssigned() {
 
       <UiState v-if="!visible.length" title="Никого нет" :icon="IconSearch" text="По выбранным фильтрам сотрудников нет." />
       <div v-else class="summary__list ui-fill-panel">
-        <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack ui-fill-scroll">
-          <table class="ui-table summary__table">
-            <thead>
-              <tr>
-                <th v-if="canAssign" class="summary__check">
-                  <input type="checkbox" aria-label="Выбрать все" :checked="isAllSelected" @change="toggleAll" />
-                </th>
-                <th class="col-worker">Сотрудник</th>
-                <th class="col-program">Программа</th>
-                <th class="col-status">Статус</th>
-                <th class="col-due">Срок</th>
-                <th v-if="canAssign" class="col-action" />
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in pager.pageItems" :key="item.key">
-                <td v-if="canAssign" class="summary__check ui-cell--check">
+        <div :ref="list.bindList" class="ui-fill-scroll" @scroll.passive="list.onListScroll">
+          <div class="ui-rows summary-rows" :class="{ 'summary-rows--assign': canAssign }">
+            <div class="ui-rows__head">
+              <span v-if="canAssign" class="ui-rows__cell ui-rows__cell--check">
+                <input type="checkbox" aria-label="Выбрать все" :checked="isAllSelected" @change="toggleAll" />
+              </span>
+              <span class="ui-rows__cell ui-rows__cell--name">Сотрудник</span>
+              <span class="ui-rows__cell">Программа</span>
+              <span class="ui-rows__cell">Статус</span>
+              <span class="ui-rows__cell cell--due">Срок</span>
+              <span v-if="canAssign" class="ui-rows__cell ui-rows__cell--actions" />
+            </div>
+            <ul class="ui-rows__list" aria-label="Сводка обучения">
+              <li
+                v-for="item in list.pageItems"
+                :key="item.key"
+                class="ui-rows__item"
+                :class="{ 'ui-rows__item--click': canAssign && !item.status?.activeAssignment }"
+                @click="canAssign && !item.status?.activeAssignment ? openOne(item) : undefined"
+              >
+                <span v-if="canAssign" class="ui-rows__cell ui-rows__cell--check" @click.stop>
                   <input
                     type="checkbox"
                     :aria-label="`Выбрать: ${item.row.fullName}`"
@@ -183,24 +187,21 @@ function onAssigned() {
                     :checked="selectedSet.has(item.key)"
                     @change="toggle(item.key)"
                   />
-                </td>
-                <td class="col-worker summary__worker ui-cell--main" :title="item.row.fullName">
-                  <span class="summary__person">
-                    <UiAvatar :name="item.row.fullName" />
-                    <span class="summary__name">
-                      <strong>{{ shortFullName(item.row.fullName) }}</strong>
-                      <small class="summary__position"><UiClipText :text="item.row.position" /></small>
-                    </span>
-                  </span>
-                </td>
-                <td class="col-program summary__program" :class="{ 'ui-hide-mobile': !item.status }">
+                </span>
+                <span class="ui-rows__cell ui-rows__cell--name">
+                  <UiAvatar :name="item.row.fullName" />
+                  <UiClipText tag="strong" :text="shortFullName(item.row.fullName)" />
+                </span>
+                <span class="ui-rows__cell">
                   <UiClipText :text="item.status ? store.labelOf(item.status.programId) : '—'" />
-                </td>
-                <td class="col-status ui-cell--aside"><ProgramStateBadge :state="item.status?.state ?? null" /></td>
-                <td class="col-due summary__due nowrap" :class="{ 'ui-hide-mobile': !dueLabel(item.status) }">
-                  {{ dueLabel(item.status) || '—' }}
-                </td>
-                <td v-if="canAssign" class="col-action summary__action ui-cell--actions">
+                </span>
+                <span class="ui-rows__cell">
+                  <ProgramStateBadge :state="item.status?.state ?? null" />
+                </span>
+                <span class="ui-rows__cell cell--due">
+                  <UiClipText :text="dueLabel(item.status) || '—'" />
+                </span>
+                <span v-if="canAssign" class="ui-rows__cell ui-rows__cell--actions" @click.stop>
                   <UiButton
                     v-if="!item.status?.activeAssignment"
                     class="summary__assign"
@@ -210,18 +211,28 @@ function onAssigned() {
                   >
                     Назначить
                   </UiButton>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </span>
+              </li>
+            </ul>
+          </div>
+          <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
         </div>
         <UiPagination
-          v-if="pager.isPaged"
-          v-model:page="pager.page"
+          v-if="!list.isMobile && list.pager.isPaged"
+          v-model:page="list.pager.page"
           class="ui-fill-chrome"
-          :total="pager.total"
-          :page-size="pager.pageSize"
+          :total="list.pager.total"
+          :page-size="list.pager.pageSize"
         />
+        <button
+          v-if="list.isMobile && list.showScrollTop"
+          type="button"
+          class="ui-scroll-top"
+          aria-label="Наверх"
+          @click="list.scrollToTop"
+        >
+          <IconArrowUp :size="20" />
+        </button>
       </div>
     </template>
 
@@ -244,36 +255,18 @@ function onAssigned() {
   gap: var(--space-3);
 }
 
-.summary__table {
-  table-layout: auto;
-  width: 100%;
+.summary-rows {
+  --ui-rows-columns: minmax(6rem, 1.4fr) minmax(5rem, 1.1fr) minmax(5rem, 8rem) minmax(6rem, 10rem);
 }
 
-.summary__check {
-  width: 1%;
-  white-space: nowrap;
+.summary-rows--assign {
+  --ui-rows-columns: var(--tap-size) minmax(6rem, 1.4fr) minmax(5rem, 1.1fr) minmax(5rem, 8rem) minmax(6rem, 10rem)
+    minmax(5.5rem, 7rem);
 }
 
-.col-worker {
-  width: 100%;
-}
-
-.col-program,
-.col-status,
-.col-action {
-  width: 1%;
-  white-space: nowrap;
-}
-
-.col-due {
-  width: 1%;
-  min-width: 12rem;
-  white-space: nowrap;
-}
-
-.summary__program {
-  max-width: 14rem;
-  overflow: hidden;
+.cell--due {
+  min-width: 6rem;
+  max-width: 11rem;
 }
 
 .summary__counters {
@@ -355,29 +348,17 @@ function onAssigned() {
   display: none;
 }
 
-.summary__person {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
+.summary-rows .ui-rows__cell--check input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent-strong);
 }
 
-.summary__name {
-  min-width: 0;
-}
-
-.summary__position {
-  display: block;
-  color: var(--text-secondary);
+.summary__assign {
+  min-height: calc(var(--control-height) - var(--space-2));
+  padding: 0 var(--space-2);
   font-size: var(--font-size-xs);
-}
-
-.summary__action {
-  text-align: right;
-}
-
-.nowrap {
-  white-space: nowrap;
 }
 
 @media (max-width: 1279px) {
@@ -451,106 +432,16 @@ function onAssigned() {
     font-size: var(--font-size-sm);
   }
 
-  .summary .ui-table-wrap--stack .ui-table tr {
-    --person-block: calc(
-      var(--font-size-base) * var(--line-height-tight) + var(--font-size-xs) * var(--line-height-tight)
-    );
-    grid-template-columns: auto minmax(0, 1fr) 8.5rem;
-    grid-template-rows: auto auto;
-    align-items: center;
-    column-gap: var(--space-2);
-    row-gap: var(--space-1);
+  .summary-rows {
+    --ui-rows-columns: minmax(4.5rem, 1.3fr) minmax(3.5rem, 1fr) minmax(4.5rem, 7rem);
   }
 
-  .summary .ui-table-wrap--stack .ui-table td.summary__check {
-    grid-column: 1;
-    grid-row: 1 / span 2;
-    align-self: center;
-    display: flex;
-    align-items: center;
-    margin: 0;
+  .summary-rows--assign {
+    --ui-rows-columns: var(--tap-size) minmax(4.5rem, 1.3fr) minmax(3.5rem, 1fr) minmax(4.5rem, 7rem) minmax(5.5rem, 6.5rem);
   }
 
-  .summary .ui-table-wrap--stack .ui-table td.summary__worker {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    align-self: center;
-    min-width: 0;
-  }
-
-  .summary .ui-table-wrap--stack .ui-table td.col-status {
-    grid-column: 3;
-    grid-row: 1;
-    align-self: end;
-    justify-self: stretch;
-    margin: 0;
-  }
-
-  .summary .ui-table-wrap--stack .ui-table td.col-status :deep(.ui-badge) {
-    box-sizing: border-box;
-    width: 100%;
-    justify-content: center;
-  }
-
-  .summary .ui-table-wrap--stack .ui-table td.summary__action {
-    display: flex;
-    align-items: center;
-    grid-column: 3;
-    grid-row: 2;
-    justify-self: stretch;
-    margin: 0;
-  }
-
-  .summary .ui-table-wrap--stack .ui-table td.summary__action > :deep(*) {
-    flex: 0 0 auto;
-  }
-
-  .summary .ui-table-wrap--stack .ui-table td.summary__program,
-  .summary .ui-table-wrap--stack .ui-table td.summary__due {
+  .cell--due {
     display: none;
-  }
-
-  .summary__person {
-    display: grid;
-    grid-template-columns: var(--person-block) minmax(0, 1fr);
-    grid-template-rows: auto auto;
-    align-items: center;
-    gap: 0 var(--space-2);
-  }
-
-  .summary__person :deep(.avatar.avatar--sm) {
-    grid-row: 1 / span 2;
-    align-self: stretch;
-    box-sizing: border-box;
-    width: var(--person-block);
-    min-width: var(--person-block);
-    height: var(--person-block);
-  }
-
-  .summary__name {
-    display: contents;
-  }
-
-  .summary__name strong,
-  .summary__position {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    line-height: var(--line-height-tight);
-  }
-
-  .summary__check input {
-    width: var(--person-block);
-    height: var(--person-block);
-    margin: 0;
-  }
-
-  .summary__assign {
-    width: 100%;
-    min-height: var(--control-height-sm);
-    padding: 0 var(--space-2);
-    font-size: var(--font-size-xs);
   }
 }
 </style>

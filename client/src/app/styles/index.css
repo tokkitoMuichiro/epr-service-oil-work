@@ -333,8 +333,12 @@ html,
 body,
 #app {
   margin: 0;
+  width: 100%;
+  max-width: 100%;
   min-height: 100%;
   height: 100%;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
 }
 
 html {
@@ -719,9 +723,182 @@ textarea::placeholder {
 .ui-fill-scroll {
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 0;
+  min-height: calc(var(--control-height) * 6);
   overflow: auto;
+  overflow-x: clip;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: none;
+}
+
+/*
+ * Единый списочный формат (оборудование, персонал, обучение…):
+ * одна строка `--control-height`, ячейки с min/max шириной, без таблицы.
+ * Колонки задаются `--ui-rows-columns`.
+ */
+.ui-rows {
+  --ui-rows-columns: minmax(6rem, 1fr);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--surface-card);
+  overflow: hidden;
+}
+
+.ui-rows__head,
+.ui-rows__item {
+  display: grid;
+  grid-template-columns: var(--ui-rows-columns);
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--control-height);
+  max-height: var(--control-height);
+  padding: 0 var(--space-3);
+  overflow: hidden;
+}
+
+.ui-rows__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-height: var(--control-height-sm);
+  max-height: var(--control-height);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--table-head-bg);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+}
+
+.ui-rows__list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ui-rows__item {
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+}
+
+.ui-rows__list .ui-rows__item:first-child {
+  border-top: 0;
+}
+
+.ui-rows__item--click {
+  cursor: pointer;
+}
+
+.ui-rows__cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 3.5rem;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.ui-rows__cell--name {
+  min-width: 6rem;
+}
+
+.ui-rows__cell--check {
+  justify-content: center;
+  min-width: var(--tap-size);
+  max-width: var(--tap-size);
+}
+
+.ui-rows__cell--actions {
+  justify-content: flex-end;
+  min-width: 5.5rem;
+}
+
+.ui-rows__head .ui-rows__cell {
+  white-space: nowrap;
+}
+
+.ui-rows__sentinel {
+  height: 1px;
+}
+
+.ui-scroll-top {
+  position: fixed;
+  right: calc(var(--space-4) + var(--safe-right));
+  bottom: calc(var(--space-4) + var(--safe-bottom));
+  z-index: var(--z-header);
+  display: grid;
+  place-items: center;
+  width: var(--tap-size);
+  height: var(--tap-size);
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-raised);
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ui-rows__item--click:hover {
+    z-index: 2;
+    outline: 1px solid var(--border-strong);
+    outline-offset: -1px;
+    background: var(--row-hover-bg);
+  }
+
+  .ui-scroll-top:hover {
+    border-color: var(--border-strong);
+  }
+}
+
+@media (max-width: 860px) {
+  .ui-rows {
+    border: 0;
+    background: none;
+    overflow: visible;
+  }
+
+  .ui-rows__head {
+    display: none;
+  }
+
+  .ui-rows__item {
+    gap: var(--space-1);
+    margin-bottom: var(--space-1);
+    padding: 0 var(--space-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+  }
+
+  .ui-rows__list .ui-rows__item:first-child {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .ui-rows__item--wrap {
+    max-height: none;
+    height: auto;
+  }
+
+  .ui-rows__cell {
+    min-width: 3rem;
+  }
+
+  .ui-rows__cell--name {
+    min-width: 4.5rem;
+  }
 }
 
 /* Таблицы */

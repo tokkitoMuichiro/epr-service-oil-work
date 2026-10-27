@@ -3,8 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { ROLES, usersApi, useRoleStore, type User } from '@/entities/role'
 import { errorMessage } from '@/shared/api'
 import { formatDateRu } from '@/shared/lib/date'
-import { useMobilePagination } from '@/shared/lib/pagination'
-import { UiButton, UiPagination } from '@/shared/ui'
+import { useScrollList } from '@/shared/lib/pagination'
+import { IconArrowUp, UiButton, UiClipText, UiPagination } from '@/shared/ui'
 import UserDialog from './UserDialog.vue'
 
 const session = useRoleStore()
@@ -18,7 +18,7 @@ const sorted = computed(() =>
   [...users.value].sort((a, b) => Number(b.active) - Number(a.active) || a.fullName.localeCompare(b.fullName, 'ru')),
 )
 const inactiveBitrix = computed(() => users.value.filter((u) => !u.active && u.bitrixUserId).length)
-const pager = useMobilePagination(sorted)
+const list = useScrollList(sorted)
 
 function roleLabel(id: string) {
   return ROLES.find((r) => r.id === id)?.label ?? id
@@ -67,42 +67,68 @@ onMounted(load)
       <UiButton size="sm" variant="ghost" @click="load">Повторить</UiButton>
     </p>
     <template v-else>
-      <div :ref="pager.bindFit" class="users__table ui-table-wrap ui-table-wrap--stack">
-        <table class="ui-table">
-          <thead>
-            <tr>
-              <th>Пользователь</th>
-              <th>Логин</th>
-              <th>Роль</th>
-              <th class="hide-mobile">Создан</th>
-              <th>Статус</th>
-              <th aria-label="Действия" />
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="u in pager.pageItems"
+      <div :ref="list.bindList" class="users__list" @scroll.passive="list.onListScroll">
+        <div
+          class="ui-rows"
+          style="--ui-rows-columns: minmax(6rem, 1.4fr) minmax(4.5rem, 1fr) minmax(4.5rem, 0.8fr) minmax(5rem, 7rem) minmax(5rem, 6.5rem) minmax(5.5rem, 7rem)"
+        >
+          <div class="ui-rows__head">
+            <span class="ui-rows__cell ui-rows__cell--name">Пользователь</span>
+            <span class="ui-rows__cell">Логин</span>
+            <span class="ui-rows__cell cell--role">Роль</span>
+            <span class="ui-rows__cell cell--created">Создан</span>
+            <span class="ui-rows__cell">Статус</span>
+            <span class="ui-rows__cell ui-rows__cell--actions" />
+          </div>
+          <ul class="ui-rows__list" aria-label="Пользователи">
+            <li
+              v-for="u in list.pageItems"
               :key="u.id"
+              class="ui-rows__item ui-rows__item--click"
               :class="{ 'is-inactive': !u.active, 'is-current': u.id === session.user?.id }"
+              tabindex="0"
+              @click="open(u)"
+              @keydown.enter.prevent="open(u)"
             >
-              <td class="ui-cell--main"><strong>{{ u.fullName }}</strong></td>
-              <td class="users__login">
-                {{ u.login }}<span v-if="u.bitrixUserId" class="users__bitrix"> · Битрикс24</span
-                ><span class="users__role"> · {{ roleLabel(u.role) }}</span>
-              </td>
-              <td class="hide-mobile">{{ roleLabel(u.role) }}</td>
-              <td class="hide-mobile">{{ formatDateRu(u.createdAt.slice(0, 10)) }}</td>
-              <td class="ui-cell--aside">
+              <span class="ui-rows__cell ui-rows__cell--name">
+                <UiClipText tag="strong" :text="u.fullName" />
+              </span>
+              <span class="ui-rows__cell">
+                <UiClipText :text="u.login" />
+                <span v-if="u.bitrixUserId" class="users__bitrix">Битрикс24</span>
+              </span>
+              <span class="ui-rows__cell cell--role">
+                <UiClipText :text="roleLabel(u.role)" />
+              </span>
+              <span class="ui-rows__cell cell--created">
+                <UiClipText :text="formatDateRu(u.createdAt.slice(0, 10))" />
+              </span>
+              <span class="ui-rows__cell">
                 <span class="ui-badge" :class="u.active ? 'ui-badge--ok' : ''">{{ u.active ? 'Активен' : 'Отключён' }}</span>
-              </td>
-              <td class="actions">
+              </span>
+              <span class="ui-rows__cell ui-rows__cell--actions" @click.stop>
                 <UiButton size="sm" variant="ghost" @click="open(u)">Изменить</UiButton>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </span>
+            </li>
+          </ul>
+        </div>
+        <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
       </div>
-      <UiPagination v-if="pager.isPaged" v-model:page="pager.page" :total="pager.total" :page-size="pager.pageSize" />
+      <UiPagination
+        v-if="!list.isMobile && list.pager.isPaged"
+        v-model:page="list.pager.page"
+        :total="list.pager.total"
+        :page-size="list.pager.pageSize"
+      />
+      <button
+        v-if="list.isMobile && list.showScrollTop"
+        type="button"
+        class="ui-scroll-top"
+        aria-label="Наверх"
+        @click="list.scrollToTop"
+      >
+        <IconArrowUp :size="20" />
+      </button>
     </template>
 
     <UserDialog :open="isDialogOpen" :user="editing" @close="isDialogOpen = false" @saved="onSaved" />
@@ -115,8 +141,11 @@ onMounted(load)
   gap: var(--space-3);
 }
 
-.users__table {
+.users__list {
   max-height: min(52vh, 28rem);
+  min-height: 0;
+  overflow: auto;
+  overflow-x: clip;
 }
 
 .users__bar {
@@ -134,43 +163,27 @@ onMounted(load)
   font-size: var(--font-size-sm);
 }
 
-.users__table {
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
-}
-
-.ui-table th,
-.ui-table td {
-  text-align: left;
-  white-space: nowrap;
-}
-
-.ui-table td {
-  font-size: var(--font-size-sm);
-  background-color: var(--surface-card);
-}
-
-.ui-table td strong {
-  font-weight: 600;
-}
-
-.users__role {
-  display: none;
-}
-
 .users__bitrix {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.cell--created {
+  min-width: 5rem;
+  max-width: 7rem;
+}
+
+.cell--role {
+  min-width: 4.5rem;
+  max-width: 8rem;
+}
+
+.is-inactive {
   color: var(--text-secondary);
 }
 
-.actions {
-  text-align: right;
-}
-
-.is-inactive td {
-  color: var(--text-secondary);
-}
-
-.is-current td:first-child {
+.is-current {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
@@ -184,39 +197,12 @@ onMounted(load)
     flex: 1 1 auto;
   }
 
-  .users__table {
-    border: 0;
+  .users .ui-rows {
+    --ui-rows-columns: minmax(4.5rem, 1.3fr) minmax(3.25rem, 1fr) minmax(3.25rem, 0.8fr) minmax(4.5rem, 6.5rem) minmax(5.5rem, 7rem);
   }
 
-  .hide-mobile {
+  .cell--created {
     display: none;
-  }
-
-  .ui-table td {
-    white-space: normal;
-  }
-
-  .ui-table td.users__login {
-    grid-column: 2;
-    color: var(--text-secondary);
-  }
-
-  .users__role {
-    display: inline;
-  }
-
-  .ui-table td.actions {
-    grid-column: 3;
-    justify-self: end;
-    margin-left: var(--space-2);
-  }
-
-  .is-current {
-    box-shadow: inset 3px 0 0 var(--accent);
-  }
-
-  .is-current td:first-child {
-    box-shadow: none;
   }
 }
 </style>

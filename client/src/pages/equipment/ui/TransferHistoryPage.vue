@@ -2,8 +2,8 @@
 import { computed, ref } from 'vue'
 import { TRANSFER_STATUS_LABEL, pluralRu, useEquipmentStore, type TransferStatus } from '@/entities/equipment'
 import { formatDateTimeRu } from '@/shared/lib/date'
-import { useMobilePagination } from '@/shared/lib/pagination'
-import { IconEquipment, UiPagination, UiState } from '@/shared/ui'
+import { useScrollList } from '@/shared/lib/pagination'
+import { IconArrowUp, IconEquipment, UiClipText, UiPagination, UiState } from '@/shared/ui'
 import EquipmentExportMenu from './EquipmentExportMenu.vue'
 
 const store = useEquipmentStore()
@@ -27,7 +27,7 @@ const rows = computed(() => {
   return list.sort((a, b) => sign * a.createdAt.localeCompare(b.createdAt))
 })
 
-const pager = useMobilePagination(rows, { resetOn: [query, actor, status, order] })
+const list = useScrollList(rows, { resetOn: [query, actor, status, order] })
 
 function tone(value: TransferStatus) {
   if (value === 'PENDING') return 'warn'
@@ -62,44 +62,67 @@ function tone(value: TransferStatus) {
 
       <UiState v-if="!rows.length" title="Передач нет" :icon="IconEquipment" text="Измените фильтры или дождитесь первых передач." />
 
-      <div v-else :ref="pager.bindFit" class="table-wrap ui-table-wrap ui-table-wrap--stack ui-fill-scroll">
-        <table class="ui-table">
-          <thead>
-            <tr>
-              <th>Дата</th>
-              <th>Позиция</th>
-              <th>Откуда</th>
-              <th>Куда</th>
-              <th class="num">Кол-во</th>
-              <th>Кто передал</th>
-              <th>Статус</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="t in pager.pageItems" :key="t.id">
-              <td class="nowrap transfer__date">{{ formatDateTimeRu(t.createdAt) }}</td>
-              <td class="ui-cell--main">
-                <strong>{{ t.equipmentName }}</strong>
-                <small v-if="t.factoryNumber" class="muted"> · {{ t.factoryNumber }}</small>
-              </td>
-              <td class="transfer__route" data-label="Откуда">{{ t.fromLabel }}</td>
-              <td class="transfer__route" data-label="Куда">{{ t.toLabel }}</td>
-              <td class="num transfer__qty" data-label="Кол-во">{{ t.quantity }}</td>
-              <td class="transfer__route" data-label="Передал">{{ t.actorName }}</td>
-              <td class="ui-cell--aside">
-                <span class="ui-badge" :class="`ui-badge--${tone(t.status)}`" :data-tone="tone(t.status)">{{ TRANSFER_STATUS_LABEL[t.status] }}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div v-else :ref="list.bindList" class="ui-fill-scroll" @scroll.passive="list.onListScroll">
+        <div
+          class="ui-rows history-rows"
+          style="--ui-rows-columns: minmax(6.5rem, 0.9fr) minmax(6rem, 1.4fr) minmax(4.5rem, 1fr) minmax(4.5rem, 1fr) minmax(3.5rem, 4.5rem) minmax(4.5rem, 0.9fr) minmax(5.5rem, 7rem)"
+        >
+          <div class="ui-rows__head">
+            <span class="ui-rows__cell">Дата</span>
+            <span class="ui-rows__cell ui-rows__cell--name">Позиция</span>
+            <span class="ui-rows__cell">Откуда</span>
+            <span class="ui-rows__cell">Куда</span>
+            <span class="ui-rows__cell cell--qty">Кол-во</span>
+            <span class="ui-rows__cell">Кто передал</span>
+            <span class="ui-rows__cell">Статус</span>
+          </div>
+          <ul class="ui-rows__list" aria-label="История передач">
+            <li v-for="t in list.pageItems" :key="t.id" class="ui-rows__item">
+              <span class="ui-rows__cell cell--date">
+                <UiClipText :text="formatDateTimeRu(t.createdAt)" />
+              </span>
+              <span class="ui-rows__cell ui-rows__cell--name">
+                <UiClipText tag="strong" :text="t.equipmentName" />
+                <UiClipText v-if="t.factoryNumber" class="muted" :text="t.factoryNumber" />
+              </span>
+              <span class="ui-rows__cell">
+                <UiClipText :text="t.fromLabel" />
+              </span>
+              <span class="ui-rows__cell">
+                <UiClipText :text="t.toLabel" />
+              </span>
+              <span class="ui-rows__cell cell--qty">
+                <UiClipText :text="String(t.quantity)" />
+              </span>
+              <span class="ui-rows__cell">
+                <UiClipText :text="t.actorName" />
+              </span>
+              <span class="ui-rows__cell">
+                <span class="ui-badge" :class="`ui-badge--${tone(t.status)}`" :data-tone="tone(t.status)">{{
+                  TRANSFER_STATUS_LABEL[t.status]
+                }}</span>
+              </span>
+            </li>
+          </ul>
+        </div>
+        <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
       </div>
       <UiPagination
-        v-if="pager.isPaged"
-        v-model:page="pager.page"
+        v-if="!list.isMobile && list.pager.isPaged"
+        v-model:page="list.pager.page"
         class="pager ui-fill-chrome"
-        :total="pager.total"
-        :page-size="pager.pageSize"
+        :total="list.pager.total"
+        :page-size="list.pager.pageSize"
       />
+      <button
+        v-if="list.isMobile && list.showScrollTop"
+        type="button"
+        class="ui-scroll-top"
+        aria-label="Наверх"
+        @click="list.scrollToTop"
+      >
+        <IconArrowUp :size="20" />
+      </button>
     </div>
   </div>
 </template>
@@ -129,22 +152,22 @@ function tone(value: TransferStatus) {
   font-variant-numeric: tabular-nums;
 }
 
-.table-wrap {
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
+.cell--date {
+  min-width: 6.5rem;
+  max-width: 10rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.ui-table td {
-  font-size: var(--font-size-sm);
-}
-
-.ui-table td strong {
+.cell--qty {
+  min-width: 3.5rem;
+  max-width: 4.5rem;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
 
-.nowrap {
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+.muted {
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
 }
 
 @media (max-width: 860px) {
@@ -166,25 +189,8 @@ function tone(value: TransferStatus) {
     font-size: var(--font-size-xs);
   }
 
-  .table-wrap {
-    border: 0;
-  }
-
-  .ui-table td.transfer__date {
-    grid-column: 2;
-    color: var(--text-secondary);
-    font-size: var(--font-size-xs);
-  }
-
-  .ui-table td.transfer__qty {
-    grid-column: 3;
-    justify-self: end;
-    margin-left: var(--space-2);
-    white-space: nowrap;
-  }
-
-  .ui-table td.transfer__route {
-    order: 1;
+  .history-rows {
+    --ui-rows-columns: minmax(4.5rem, 0.8fr) minmax(4.5rem, 1.3fr) minmax(3.25rem, 0.8fr) minmax(3.25rem, 0.8fr) minmax(2.75rem, 3.5rem) minmax(3.25rem, 0.8fr) minmax(4.5rem, 6rem);
   }
 
   .pager {

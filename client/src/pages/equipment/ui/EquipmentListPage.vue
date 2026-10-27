@@ -25,17 +25,17 @@ const items = computed(() => (isAll.value ? store.items : store.myItems))
     <div class="page__bar ui-fill-chrome">
       <CategoryTabs :active="category" :items="items" />
       <div class="page__actions">
-        <EquipmentExportMenu />
         <UiButton v-if="canCreate(store.auth)" variant="primary" @click="isCreateOpen = true">
-          {{ addLabel(category) }}
+          <span class="ui-hide-mobile">{{ addLabel(category) }}</span>
+          <span class="page__add-short">Добавить</span>
         </UiButton>
+        <EquipmentExportMenu />
       </div>
     </div>
     <div class="panel ui-fill-panel">
       <EquipmentBoard
         :items="items"
         :category="category"
-        :show-owner="isAll"
         :empty-text="isAll ? 'В учёте пока нет позиций этой категории.' : 'За вами пока ничего не числится.'"
       />
     </div>

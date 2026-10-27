@@ -37,7 +37,7 @@ describe('bitrix-tasks', () => {
       staffWorkers: '4',
       workStage: 'Зачистка',
       techMeans: 'Керхер',
-      volumes: '',
+      volumes: 'Вывезли грунт',
       workItems: [{ name: 'Стенка', unit: 'м²', volume: 12 }],
       ppe: 'Каски',
       nextDay: 'Продолжение',
@@ -46,6 +46,7 @@ describe('bitrix-tasks', () => {
     })
     assert.match(text, /Ежедневный отчёт за 2026-10-20/)
     assert.match(text, /Стенка: 12 м²/)
+    assert.match(text, /Вывезли грунт/)
     assert.match(text, /Автор: Иванов/)
   })
 })

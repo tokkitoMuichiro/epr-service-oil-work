@@ -439,8 +439,12 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: var(--shell-sidebar) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
+  width: 100%;
+  max-width: 100%;
   min-height: 100%;
   height: 100%;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
   background: var(--surface-app);
 }
 
@@ -737,8 +741,11 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  max-width: 100%;
   min-height: 0;
   overflow: hidden;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
   scrollbar-gutter: stable;
   padding: var(--space-8) var(--space-8) 48px;
   padding-right: calc(var(--space-8) + var(--safe-right));

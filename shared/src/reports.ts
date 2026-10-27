@@ -1,5 +1,12 @@
 import { isIsoDate } from './dates.js'
 
+/** Вид работ объекта для выбора объёма в ежедневном отчёте. */
+export interface ReportWorkOption {
+  id: string
+  title: string
+  unit: string
+}
+
 /** Ссылка на объект из модуля контрактов (отчёт — только при активной задаче Битрикс). */
 export interface ReportObjectRef {
   id: string
@@ -9,6 +16,7 @@ export interface ReportObjectRef {
   contractName: string
   customer: string
   bitrixTaskId?: string | null
+  works: ReportWorkOption[]
 }
 
 export interface DronePeriod {
@@ -113,6 +121,35 @@ export function reportStoragePath(objectId: string, date: string): string {
   return `mock-disk/Ежедневные отчёты/${objectId}/${date}.txt`
 }
 
+export function parseReportVolume(value: unknown): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : Number.NaN
+  const text = String(value ?? '')
+    .trim()
+    .replace(/\s/g, '')
+    .replace(',', '.')
+  if (!text) return Number.NaN
+  const n = Number(text)
+  return Number.isFinite(n) ? n : Number.NaN
+}
+
+export function formatReportVolume(value: unknown): string {
+  const n = parseReportVolume(value)
+  if (!Number.isFinite(n)) return ''
+  const rounded = Math.round(n * 1000) / 1000
+  return String(rounded)
+}
+
+export function reportWorkItemsError(items: ReportWorkItem[] | undefined): string | null {
+  for (const [index, item] of (items ?? []).entries()) {
+    if (!item.itemId?.trim()) return `Строка ${index + 1}: выберите вид работ`
+    const volume = parseReportVolume(item.volume)
+    if (!Number.isFinite(volume) || volume < 0) {
+      return `Укажите объём по виду работ «${item.name || 'вид работ'}»`
+    }
+  }
+  return null
+}
+
 export function validateReportDraft(draft: Partial<DailyReportDraft>): string | null {
   if (!draft.objectId?.trim()) return 'Выберите объект'
   if (!isIsoDate(draft.date)) return 'Некорректная дата'
@@ -123,7 +160,9 @@ export function validateReportDraft(draft: Partial<DailyReportDraft>): string | 
   }
   if (!draft.workStage?.trim()) return 'Укажите этап работ'
   if (!draft.techMeans?.trim()) return 'Укажите технические средства'
-  if (!draft.volumes?.trim()) return 'Укажите выполненные объёмы работ'
+  const itemsError = reportWorkItemsError(draft.workItems)
+  if (itemsError) return itemsError
+  if (!(draft.workItems ?? []).length && !draft.volumes?.trim()) return 'Укажите выполненные объёмы работ'
   if (!draft.nextDay?.trim()) return 'Укажите работы на следующий день'
   return null
 }

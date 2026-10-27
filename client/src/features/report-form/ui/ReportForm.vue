@@ -1,18 +1,35 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { assignmentsApi, type CrewMember, type ObjectCrew } from '@/entities/brigade'
-import type { DailyReport, DailyReportDraft, DronePeriod } from '@/entities/daily-report'
+import {
+  formatReportVolume,
+  parseReportVolume,
+  type DailyReport,
+  type DailyReportDraft,
+  type DronePeriod,
+  type ReportWorkOption,
+} from '@/entities/daily-report'
 import { errorMessage } from '@/shared/api'
 import { IconClose, UiButton, UiInput, UiTextarea } from '@/shared/ui'
 import { isIsoDate, todayIso } from '@shared/dates'
 
-const props = defineProps<{
-  objectId: string
-  objectTitle: string
-  initial?: DailyReport | null
-  saving?: boolean
-  error?: string
-}>()
+interface WorkRow {
+  key: string
+  itemId: string
+  volume: string
+}
+
+const props = withDefaults(
+  defineProps<{
+    objectId: string
+    objectTitle: string
+    works?: ReportWorkOption[]
+    initial?: DailyReport | null
+    saving?: boolean
+    error?: string
+  }>(),
+  { works: () => [] },
+)
 
 const emit = defineEmits<{
   submit: [draft: DailyReportDraft]
@@ -46,11 +63,77 @@ function emptyDraft(): DailyReportDraft {
 }
 
 const draft = reactive<DailyReportDraft>(emptyDraft())
+const workRows = ref<WorkRow[]>([])
+let workRowSeq = 0
+
+function blankWorkRow(): WorkRow {
+  workRowSeq += 1
+  return { key: `w-${workRowSeq}`, itemId: '', volume: '' }
+}
+
+function applyWorkRows(items: DailyReport['workItems'] | undefined) {
+  const catalog = props.works
+  workRows.value = (items ?? [])
+    .map((row) => {
+      const item = catalog.find((entry) => entry.id === row.itemId) ?? catalog.find((entry) => entry.title === row.name)
+      if (!item) return null
+      return { key: blankWorkRow().key, itemId: item.id, volume: formatReportVolume(row.volume) }
+    })
+    .filter((row): row is WorkRow => Boolean(row))
+}
+
+function availableWorks(currentId: string) {
+  const taken = new Set(workRows.value.map((row) => row.itemId).filter((id) => id && id !== currentId))
+  return props.works.filter((item) => !taken.has(item.id))
+}
+
+function unitOf(itemId: string) {
+  return props.works.find((item) => item.id === itemId)?.unit ?? ''
+}
+
+const canAddWork = computed(() => props.works.length > 0 && workRows.value.length < props.works.length)
+
+function addWorkRow() {
+  if (!canAddWork.value) return
+  const leftover = availableWorks('')
+  workRows.value = [...workRows.value, { ...blankWorkRow(), itemId: leftover.length === 1 ? leftover[0]?.id ?? '' : '' }]
+}
+
+function removeWorkRow(key: string) {
+  workRows.value = workRows.value.filter((row) => row.key !== key)
+}
+
+function collectWorkItems() {
+  return workRows.value.flatMap((row) => {
+    const item = props.works.find((entry) => entry.id === row.itemId)
+    if (!item) return []
+    return [{ itemId: item.id, name: item.title, unit: item.unit, volume: parseReportVolume(row.volume) }]
+  })
+}
+
+function workRowsError(): string | null {
+  if (!props.works.length) {
+    return draft.volumes.trim() ? null : 'Укажите выполненные объёмы работ'
+  }
+  for (const [index, row] of workRows.value.entries()) {
+    if (!row.itemId) return `Строка ${index + 1}: выберите вид работ`
+    const volume = parseReportVolume(row.volume)
+    if (!Number.isFinite(volume) || volume < 0) {
+      const name = props.works.find((item) => item.id === row.itemId)?.title || 'вид работ'
+      return `Укажите объём по виду работ «${name}»`
+    }
+  }
+  if (!workRows.value.length && !draft.volumes.trim()) {
+    return 'Добавьте вид работ из графика или укажите неучтённые объёмы'
+  }
+  return null
+}
 
 function applyInitial(report: DailyReport | null | undefined) {
   const base = emptyDraft()
   if (!report) {
     Object.assign(draft, base)
+    applyWorkRows([])
     return
   }
   Object.assign(draft, {
@@ -75,6 +158,7 @@ function applyInitial(report: DailyReport | null | undefined) {
     nextDay: report.nextDay,
     problems: report.problems,
   })
+  applyWorkRows(report.workItems)
 }
 
 watch(
@@ -169,7 +253,8 @@ function validateStep(n: number): string | null {
   }
   if (n === 3) {
     if (!draft.techMeans.trim()) return 'Укажите технические средства'
-    if (!draft.volumes.trim()) return 'Укажите выполненные объёмы работ'
+    const volumesError = workRowsError()
+    if (volumesError) return volumesError
   }
   if (n === 4) {
     if (!draft.nextDay.trim()) return 'Укажите работы на следующий день'
@@ -206,7 +291,7 @@ function onSubmit() {
     ...draft,
     objectId: props.objectId,
     dronePeriods: draft.dronePeriods.map((p: DronePeriod) => ({ ...p })),
-    workItems: draft.workItems.map((w) => ({ ...w })),
+    workItems: collectWorkItems(),
   }
   emit('submit', payload)
 }
@@ -216,6 +301,7 @@ defineExpose({ applyInitial })
 
 <template>
   <form class="report-form" @submit.prevent="onSubmit">
+    <div class="report-form__body">
     <div class="report-form__object">
       <span class="ui-overline">Объект</span>
       <strong>{{ objectTitle }}</strong>
@@ -323,12 +409,39 @@ defineExpose({ applyInitial })
         placeholder="Крупные узлы, спецтехника, зав. номера…"
         :rows="4"
       />
+      <div v-if="works.length" class="works">
+        <div class="works__head">
+          <p class="block-title">6. Выполненные объёмы работ</p>
+          <UiButton v-if="canAddWork" type="button" variant="ghost" @click="addWorkRow">Добавить вид работ</UiButton>
+        </div>
+        <div v-for="row in workRows" :key="row.key" class="works__row">
+          <select v-model="row.itemId" class="ui-control" aria-label="Вид работ">
+            <option value="">Вид работ</option>
+            <option v-for="item in availableWorks(row.itemId)" :key="item.id" :value="item.id">
+              {{ item.title }}
+            </option>
+          </select>
+          <input
+            v-model="row.volume"
+            class="ui-control works__volume"
+            type="text"
+            inputmode="decimal"
+            aria-label="Объём"
+            placeholder="объём"
+          />
+          <span class="works__unit">{{ unitOf(row.itemId) }}</span>
+          <UiButton type="button" variant="ghost" size="icon" aria-label="Убрать вид работ" title="Убрать вид работ" @click="removeWorkRow(row.key)">
+            <IconClose :size="18" />
+          </UiButton>
+        </div>
+        <p v-if="!workRows.length" class="works__hint">Выберите виды работ из графика объекта и укажите выполненный объём.</p>
+      </div>
       <UiTextarea
         v-model="draft.volumes"
-        label="6. Выполненные объёмы работ"
-        required
-        placeholder="Факт: откачано м³, вывезено м³…"
-        :rows="4"
+        :label="works.length ? 'Неучтённые объёмы работ' : '6. Выполненные объёмы работ'"
+        :required="!works.length"
+        :placeholder="works.length ? 'Если какие-то объёмы не учтены в графике…' : 'Факт: откачано м³, вывезено м³…'"
+        :rows="works.length ? 3 : 4"
       />
     </div>
 
@@ -355,6 +468,7 @@ defineExpose({ applyInitial })
     </div>
 
     <p v-if="formError || error" class="error">{{ formError || error }}</p>
+    </div>
 
     <div class="nav">
       <UiButton v-if="step > 1" type="button" variant="ghost" @click="prevStep">Назад</UiButton>
@@ -369,8 +483,24 @@ defineExpose({ applyInitial })
 
 <style scoped>
 .report-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.report-form__body {
   display: grid;
+  flex: 1 1 auto;
   gap: var(--space-5);
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-bottom: var(--space-4);
 }
 
 .report-form__object {
@@ -492,6 +622,50 @@ defineExpose({ applyInitial })
   align-items: end;
 }
 
+.works {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.works__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.works__head .block-title {
+  flex: 1 1 100%;
+}
+
+.works__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5.5rem auto auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.works__volume {
+  font-variant-numeric: tabular-nums;
+}
+
+.works__unit {
+  min-width: 2rem;
+  max-width: 3.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.works__hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
 .error {
   margin: 0;
   padding: var(--space-3) var(--space-4);
@@ -521,14 +695,13 @@ defineExpose({ applyInitial })
 }
 
 .nav {
-  position: sticky;
-  bottom: 0;
+  flex: 0 0 auto;
   z-index: 1;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-  margin: 0 calc(-1 * var(--space-5)) calc(-1 * var(--space-5));
-  padding: var(--space-3) var(--space-5);
+  margin: 0 calc(-1 * var(--space-5)) 0;
+  padding: var(--space-3) var(--space-5) var(--space-1);
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-card);
 }
@@ -539,18 +712,50 @@ defineExpose({ applyInitial })
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .works__head :deep(.btn) {
+    width: 100%;
+  }
+
   .report-form__toolbar :deep(.btn) {
     width: 100%;
   }
 
   .nav {
-    margin: 0 calc(-1 * var(--space-3)) calc(-1 * var(--space-3));
-    padding: var(--space-2) var(--space-3);
+    margin: 0 calc(-1 * var(--space-3)) 0;
+    padding: var(--space-2) var(--space-3) var(--space-1);
     box-shadow: 0 -4px 12px var(--scroll-shadow);
   }
 
   .nav :deep(.btn) {
     flex: 1 1 40%;
+  }
+}
+
+@media (max-width: 560px) {
+  .works__row {
+    grid-template-columns: minmax(0, 1fr) 4.5rem auto;
+    grid-template-areas:
+      'select select remove'
+      'volume unit remove';
+  }
+
+  .works__row .ui-control:first-child {
+    grid-area: select;
+  }
+
+  .works__volume {
+    grid-area: volume;
+  }
+
+  .works__unit {
+    grid-area: unit;
+    justify-self: start;
+  }
+
+  .works__row :deep(.btn) {
+    grid-area: remove;
+    justify-self: end;
+    align-self: start;
   }
 }
 </style>

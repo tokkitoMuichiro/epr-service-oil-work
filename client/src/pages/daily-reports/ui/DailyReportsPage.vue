@@ -225,6 +225,7 @@ function changeObject() {
             v-else
             :object-id="selectedObject.id"
             :object-title="objectTitle"
+            :works="selectedObject.works ?? []"
             :initial="formSeed"
             :saving="saving"
             :error="saveError"
@@ -405,6 +406,7 @@ function changeObject() {
 
 .workspace__back {
   display: none;
+  flex: 0 0 auto;
 }
 
 .objects__meta {
@@ -429,12 +431,28 @@ function changeObject() {
 }
 
 .workspace {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   padding: var(--space-5);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--surface-card);
   box-shadow: var(--shadow-card);
+}
+
+.workspace:has(.report-form) {
+  padding-bottom: var(--space-1);
+}
+
+.workspace > :deep(.report-form),
+.workspace > .archive,
+.workspace > .success {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
 }
 
 .success {
@@ -468,8 +486,12 @@ function changeObject() {
 }
 
 .archive {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .archive__head {
@@ -645,7 +667,6 @@ function changeObject() {
 
 @media (max-width: 560px) {
   .workspace {
-    margin: 0 calc(-1 * var(--space-3));
     padding: var(--space-3);
     border-right: 0;
     border-left: 0;

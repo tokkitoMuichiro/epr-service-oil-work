@@ -16,8 +16,9 @@ import { useAccessStore, useRoleStore } from '@/entities/role'
 import { TestingMarkIcon, testingMark, useTrainingStore, type TestingMark } from '@/entities/training'
 import { WorkerFormDialog } from '@/features/worker-form'
 import { shortFullName } from '@shared/person-name'
-import { useMobilePagination } from '@/shared/lib/pagination'
+import { useScrollList } from '@/shared/lib/pagination'
 import {
+  IconArrowUp,
   IconClose,
   IconPersonnel,
   IconSearch,
@@ -86,13 +87,13 @@ function ariaSort(key: WorkerSortKey) {
   return sortDirection.value === 'asc' ? 'ascending' : 'descending'
 }
 
-const workerPager = useMobilePagination(rows, {
+const workerList = useScrollList(rows, {
   resetOn: [query, employmentFilter, statusFilter, brigadeFilter, testingFilter, sortKey, sortDirection],
 })
 
 const brigadeList = useBrigadeList(brigades, assignments, today, (id) => personnel.workerName(id))
 const { sortKey: brigadeSortKey, sortDirection: brigadeSortDirection, rows: brigadeRows } = brigadeList
-const brigadePager = useMobilePagination(brigadeRows, { resetOn: [brigadeSortKey, brigadeSortDirection] })
+const brigadeWindow = useScrollList(brigadeRows, { resetOn: [brigadeSortKey, brigadeSortDirection] })
 
 const BRIGADE_COLUMNS: { key: BrigadeSortKey; label: string }[] = [
   { key: 'name', label: 'Наименование' },
@@ -242,80 +243,90 @@ function openCreateBrigade() {
             <i class="legend__swatch legend__swatch--expiring" />Документ истекает<span class="ui-hide-mobile">&nbsp;в течение {{ TRAINING_EXPIRING_DAYS }} дней</span>
           </span>
           <span><i class="legend__swatch legend__swatch--expired" />Документ просрочен</span>
-          <span class="legend__count">Показано: {{ workerPager.pageItems.length }} из {{ rows.length }}</span>
+          <span class="legend__count">Показано: {{ workerList.pageItems.length }} из {{ rows.length }}</span>
           <MobileSort v-model:sort-key="sortKey" v-model:direction="sortDirection" class="legend__sort" :options="COLUMNS" />
         </div>
 
         <UiState v-if="!rows.length" title="Ничего не найдено" :icon="IconSearch" text="Измените поиск или фильтры." />
 
-        <div v-else :ref="workerPager.bindFit" class="table-wrap ui-table-wrap ui-fill-scroll">
-          <table class="table--workers">
-            <thead>
-              <tr>
-                <th
-                  v-for="column in COLUMNS"
-                  :key="column.key"
-                  :class="`col--${column.key}`"
-                  :aria-sort="ariaSort(column.key)"
+        <div v-else :ref="workerList.bindList" class="ui-fill-scroll" @scroll.passive="workerList.onListScroll">
+          <div class="ui-rows workers-rows" :class="{ 'workers-rows--testing': showTraining }">
+            <div class="ui-rows__head">
+              <span
+                v-for="column in COLUMNS"
+                :key="column.key"
+                class="ui-rows__cell"
+                :class="[`cell--${column.key}`, { 'ui-rows__cell--name': column.key === 'fullName' }]"
+                :aria-sort="ariaSort(column.key)"
+              >
+                <button
+                  type="button"
+                  class="sort"
+                  :class="{ 'sort--active': sortKey === column.key }"
+                  @click="list.toggleSort(column.key)"
                 >
-                  <button
-                    type="button"
-                    class="sort"
-                    :class="{ 'sort--active': sortKey === column.key }"
-                    @click="list.toggleSort(column.key)"
-                  >
-                    {{ column.label }}
-                    <span class="sort__arrow" aria-hidden="true">
-                      {{ sortKey === column.key ? (sortDirection === 'asc' ? '▲' : '▼') : '↕' }}
-                    </span>
-                  </button>
-                </th>
-                <th v-if="showTraining" class="col--testing"><span class="sort sort--static">Проверка знаний</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="w in workerPager.pageItems"
+                  {{ column.label }}
+                  <span class="sort__arrow" aria-hidden="true">
+                    {{ sortKey === column.key ? (sortDirection === 'asc' ? '▲' : '▼') : '↕' }}
+                  </span>
+                </button>
+              </span>
+              <span v-if="showTraining" class="ui-rows__cell cell--testing">Проверка</span>
+            </div>
+            <ul class="ui-rows__list" aria-label="Сотрудники">
+              <li
+                v-for="w in workerList.pageItems"
                 :key="w.id"
+                class="ui-rows__item ui-rows__item--click"
                 :class="workerAttention(w, today) ? `row--${workerAttention(w, today)}` : ''"
                 tabindex="0"
                 @click="personnel.openProfile(w.id)"
-                @keydown.enter="personnel.openProfile(w.id)"
+                @keydown.enter.prevent="personnel.openProfile(w.id)"
               >
-                <td class="col--fullName" data-label="ФИО" :title="w.fullName">
-                  <span class="person">
-                    <UiAvatar :name="w.fullName" />
-                    <strong>{{ shortFullName(w.fullName) }}</strong>
-                  </span>
-                </td>
-                <td class="col--position" data-label="Должность" :title="w.position">
-                  <span class="cell-key">Должность</span>
+                <span class="ui-rows__cell ui-rows__cell--name cell--fullName">
+                  <UiAvatar :name="w.fullName" />
+                  <UiClipText tag="strong" :text="shortFullName(w.fullName)" />
+                </span>
+                <span class="ui-rows__cell cell--position">
                   <UiClipText :text="w.position" />
-                </td>
-                <td class="col--brigade" data-label="Бригада" :title="brigadeName(w.brigadeId)">
-                  <span class="cell-key">Бригада</span>
+                </span>
+                <span class="ui-rows__cell cell--brigade">
                   <UiClipText :text="brigadeName(w.brigadeId)" />
-                </td>
-                <td class="nowrap col--phone" data-label="Телефон">{{ w.phone || '—' }}</td>
-                <td class="col--status" data-label="Занятость"><WorkerStatusBadge :status="w.status" /></td>
-                <td class="nowrap col--employment ui-hide-mobile" data-label="В компании">
-                  {{ EMPLOYMENT_STATUS_LABEL[w.employment] }}
-                </td>
-                <td v-if="showTraining" class="col--testing" data-label="Проверка знаний">
+                </span>
+                <span class="ui-rows__cell cell--phone">
+                  <UiClipText :text="w.phone || '—'" />
+                </span>
+                <span class="ui-rows__cell cell--status">
+                  <WorkerStatusBadge :compact="workerList.isMobile" :status="w.status" />
+                </span>
+                <span class="ui-rows__cell cell--employment">
+                  <UiClipText :text="EMPLOYMENT_STATUS_LABEL[w.employment]" />
+                </span>
+                <span v-if="showTraining" class="ui-rows__cell cell--testing">
                   <TestingMarkIcon :mark="testingOf(w.id)" />
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </span>
+              </li>
+            </ul>
+          </div>
+          <div v-if="workerList.infinite.hasMore" :ref="workerList.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
         </div>
         <UiPagination
-          v-if="workerPager.isPaged"
-          v-model:page="workerPager.page"
+          v-if="!workerList.isMobile && workerList.pager.isPaged"
+          v-model:page="workerList.pager.page"
           class="pager ui-fill-chrome"
-          :total="workerPager.total"
-          :page-size="workerPager.pageSize"
+          :total="workerList.pager.total"
+          :page-size="workerList.pager.pageSize"
           label="Страницы списка сотрудников"
         />
+        <button
+          v-if="workerList.isMobile && workerList.showScrollTop"
+          type="button"
+          class="ui-scroll-top"
+          aria-label="Наверх"
+          @click="workerList.scrollToTop"
+        >
+          <IconArrowUp :size="20" />
+        </button>
       </div>
     </template>
 
@@ -339,66 +350,76 @@ function openCreateBrigade() {
             :options="BRIGADE_COLUMNS"
           />
         </div>
-        <div :ref="brigadePager.bindFit" class="table-wrap ui-table-wrap ui-fill-scroll">
-          <table class="table--brigades">
-            <thead>
-              <tr>
-                <th
-                  v-for="column in BRIGADE_COLUMNS"
-                  :key="column.key"
-                  :class="`col--${column.key}`"
-                  :aria-sort="brigadeAriaSort(column.key)"
+        <div :ref="brigadeWindow.bindList" class="ui-fill-scroll" @scroll.passive="brigadeWindow.onListScroll">
+          <div class="ui-rows brigades-rows">
+            <div class="ui-rows__head">
+              <span
+                v-for="column in BRIGADE_COLUMNS"
+                :key="column.key"
+                class="ui-rows__cell"
+                :class="[`cell--${column.key}`, { 'ui-rows__cell--name': column.key === 'name' }]"
+                :aria-sort="brigadeAriaSort(column.key)"
+              >
+                <button
+                  type="button"
+                  class="sort"
+                  :class="{ 'sort--active': brigadeSortKey === column.key }"
+                  @click="brigadeList.toggleSort(column.key)"
                 >
-                  <button
-                    type="button"
-                    class="sort"
-                    :class="{ 'sort--active': brigadeSortKey === column.key }"
-                    @click="brigadeList.toggleSort(column.key)"
-                  >
-                    {{ column.label }}
-                    <span class="sort__arrow" aria-hidden="true">
-                      {{ brigadeSortKey === column.key ? (brigadeSortDirection === 'asc' ? '▲' : '▼') : '↕' }}
-                    </span>
-                  </button>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="row in brigadePager.pageItems"
+                  {{ column.label }}
+                  <span class="sort__arrow" aria-hidden="true">
+                    {{ brigadeSortKey === column.key ? (brigadeSortDirection === 'asc' ? '▲' : '▼') : '↕' }}
+                  </span>
+                </button>
+              </span>
+            </div>
+            <ul class="ui-rows__list" aria-label="Бригады">
+              <li
+                v-for="row in brigadeWindow.pageItems"
                 :key="row.brigade.id"
+                class="ui-rows__item ui-rows__item--click"
                 :class="{ 'row--archived': row.brigade.archived }"
                 tabindex="0"
                 @click="openBrigadeId = row.brigade.id"
-                @keydown.enter="openBrigadeId = row.brigade.id"
+                @keydown.enter.prevent="openBrigadeId = row.brigade.id"
               >
-                <td class="col--name" data-label="Наименование" :title="row.brigade.name">
+                <span class="ui-rows__cell ui-rows__cell--name cell--name">
                   <UiClipText tag="strong" :text="row.brigade.name" />
-                </td>
-                <td class="col--status" data-label="Статус">
+                </span>
+                <span class="ui-rows__cell cell--status">
                   <span v-if="row.brigade.archived" class="ui-badge ui-badge--neutral">Архив</span>
                   <BrigadeStatusBadge v-else :status="row.status" />
-                </td>
-                <td class="num col--size" data-label="Кол-во людей">{{ row.size }}</td>
-                <td class="col--leader" data-label="Руководитель" :title="row.leader || undefined">
+                </span>
+                <span class="ui-rows__cell cell--size">{{ row.size }}</span>
+                <span class="ui-rows__cell cell--leader">
                   <template v-if="row.leader">
                     <UiClipText :text="row.leader.split(', ').map(shortFullName).join(', ')" />
                     <span class="chip">{{ row.leaderRole }}</span>
                   </template>
                   <span v-else class="muted">не назначен</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </span>
+              </li>
+            </ul>
+          </div>
+          <div v-if="brigadeWindow.infinite.hasMore" :ref="brigadeWindow.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
         </div>
         <UiPagination
-          v-if="brigadePager.isPaged"
-          v-model:page="brigadePager.page"
+          v-if="!brigadeWindow.isMobile && brigadeWindow.pager.isPaged"
+          v-model:page="brigadeWindow.pager.page"
           class="pager ui-fill-chrome"
-          :total="brigadePager.total"
-          :page-size="brigadePager.pageSize"
+          :total="brigadeWindow.pager.total"
+          :page-size="brigadeWindow.pager.pageSize"
           label="Страницы списка бригад"
         />
+        <button
+          v-if="brigadeWindow.isMobile && brigadeWindow.showScrollTop"
+          type="button"
+          class="ui-scroll-top"
+          aria-label="Наверх"
+          @click="brigadeWindow.scrollToTop"
+        >
+          <IconArrowUp :size="20" />
+        </button>
       </div>
     </template>
 
@@ -433,8 +454,37 @@ function openCreateBrigade() {
   display: none;
 }
 
-.cell-key {
-  display: none;
+.workers-rows {
+  --ui-rows-columns: minmax(6rem, 1.4fr) minmax(4.5rem, 1fr) minmax(4.5rem, 1fr) minmax(5.5rem, 8rem) minmax(5rem, 8rem)
+    minmax(5rem, 7rem);
+}
+
+.workers-rows--testing {
+  --ui-rows-columns: minmax(6rem, 1.4fr) minmax(4.5rem, 1fr) minmax(4.5rem, 1fr) minmax(5.5rem, 8rem) minmax(5rem, 8rem)
+    minmax(5rem, 7rem) minmax(3.5rem, 5rem);
+}
+
+.brigades-rows {
+  --ui-rows-columns: minmax(6rem, 1.6fr) minmax(5rem, 8rem) minmax(4rem, 6rem) minmax(5rem, 1.1fr);
+}
+
+.cell--phone,
+.cell--employment {
+  min-width: 5rem;
+  max-width: 8rem;
+}
+
+.cell--testing {
+  justify-content: center;
+  min-width: 3.5rem;
+  max-width: 5rem;
+}
+
+.cell--size {
+  min-width: 4rem;
+  max-width: 6rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
 .tabs__badge {
@@ -568,110 +618,13 @@ function openCreateBrigade() {
   display: none;
 }
 
-.table-wrap {
-  overflow: auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
-}
-
-table {
-  table-layout: auto;
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-.table--workers {
-  table-layout: fixed;
-}
-
-.table--workers .col--fullName {
-  width: 22%;
-}
-
-.table--workers .col--position,
-.table--workers .col--brigade {
-  width: 15%;
-}
-
-.table--workers .col--phone,
-.table--workers .col--status,
-.table--workers .col--employment {
-  width: 12%;
-}
-
-.table--workers .col--testing {
-  width: 12%;
-}
-
-.table--brigades .col--name {
-  width: 100%;
-}
-
-.table--brigades .col--status,
-.table--brigades .col--size,
-.table--brigades .col--leader {
-  width: 1%;
-  white-space: nowrap;
-}
-
-.table--brigades .col--leader {
-  max-width: 14rem;
-}
-
-th,
-td {
-  text-align: left;
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border-subtle);
-  font-size: var(--font-size-sm);
-  vertical-align: middle;
-}
-
-td {
-  height: calc(var(--control-height) + 4px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.person {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.person strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-th {
-  padding: 0;
-  overflow: hidden;
-  background: var(--table-head-bg);
-  position: sticky;
-  top: 0;
-  z-index: 2;
-}
-
-.num {
-  text-align: right;
-}
-
 .sort {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   width: 100%;
-  min-height: var(--control-height);
-  padding: 0 12px;
+  min-height: var(--control-height-sm);
+  padding: 0;
   border: 0;
   background: transparent;
   overflow: hidden;
@@ -736,44 +689,21 @@ th {
   white-space: nowrap;
 }
 
-.col--testing,
-.col--testing .sort {
-  justify-content: center;
-  text-align: center;
-}
-
-tbody tr {
-  cursor: pointer;
-}
-
-tbody td {
-  background-color: var(--surface-card);
-}
-
-tbody tr:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-tbody tr.row--archived td {
+.row--archived {
   color: var(--text-secondary);
 }
 
-tbody tr.row--expiring td:first-child {
-  box-shadow: inset 4px 0 0 var(--status-warn-solid);
+.row--expiring {
+  box-shadow: inset 3px 0 0 var(--status-warn-solid);
 }
 
-tbody tr.row--expired td:first-child {
-  box-shadow: inset 4px 0 0 var(--status-bad-solid);
+.row--expired {
+  box-shadow: inset 3px 0 0 var(--status-bad-solid);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .sort:hover {
     color: var(--text-primary);
-  }
-
-  tbody tr:hover td {
-    background-color: var(--row-hover-bg);
   }
 }
 
@@ -864,189 +794,29 @@ tbody tr.row--expired td:first-child {
     margin-top: var(--space-2);
   }
 
-  .table--workers .col--phone,
-  .table--workers th.col--testing {
-    display: none;
-  }
-
   .legend__count {
     margin-left: 0;
   }
 
-  .table-wrap {
-    border: 0;
-    background: none;
-    overflow-x: clip;
-    overflow-y: auto;
+  .workers-rows,
+  .workers-rows--testing {
+    --ui-rows-columns: minmax(4.5rem, 1.3fr) minmax(3.5rem, 1fr) minmax(3.5rem, 1fr) 1.5rem;
   }
 
-  table,
-  tbody,
-  tr,
-  td {
-    display: block;
+  .brigades-rows {
+    --ui-rows-columns: minmax(4.5rem, 1.5fr) minmax(4.5rem, 7rem) minmax(3.25rem, 5rem) minmax(4.5rem, 1fr);
   }
 
-  thead {
+  .cell--phone,
+  .cell--employment,
+  .cell--testing {
     display: none;
   }
 
-  tbody {
-    display: grid;
-    gap: var(--space-2);
-  }
-
-  tbody tr {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 2px var(--space-3);
-    padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius);
-    background: var(--surface-card);
-  }
-
-  .table--workers tbody tr {
-    grid-template-areas:
-      'name status'
-      'position testing'
-      'brigade brigade';
-    align-items: center;
-  }
-
-  tbody tr.row--expiring {
-    box-shadow: inset 4px 0 0 var(--status-warn-solid);
-  }
-
-  tbody tr.row--expired {
-    box-shadow: inset 4px 0 0 var(--status-bad-solid);
-  }
-
-  .table--workers [class^='col--'],
-  .table--brigades [class^='col--'] {
-    width: auto !important;
-  }
-
-  td,
-  td:first-child,
-  tbody tr td,
-  tbody tr.row--expiring td,
-  tbody tr.row--expired td {
-    position: static;
-    width: auto !important;
-    height: auto;
-    max-width: none;
-    min-width: 0;
-    white-space: normal;
-    padding: 0;
-    border: 0;
-    background: none;
-    box-shadow: none;
-    grid-column: 1 / -1;
-    font-size: var(--font-size-sm);
-  }
-
-  td[data-label]:not(:first-child)::before {
-    content: attr(data-label) ': ';
-    color: var(--text-secondary);
-    font-size: var(--font-size-xs);
-  }
-
-  td:first-child {
-    font-size: var(--font-size-base);
-  }
-
-  .table--workers tbody tr td.col--fullName,
-  .table--workers tbody tr.row--expiring td.col--fullName,
-  .table--workers tbody tr.row--expired td.col--fullName {
-    grid-area: name;
-    box-shadow: none;
-  }
-
-  .table--workers tbody tr td.col--status,
-  .table--workers tbody tr.row--expiring td.col--status,
-  .table--workers tbody tr.row--expired td.col--status {
-    grid-area: status;
-    justify-self: end;
-  }
-
-  .table--workers tbody tr td.col--position,
-  .table--workers tbody tr.row--expiring td.col--position,
-  .table--workers tbody tr.row--expired td.col--position {
-    grid-area: position;
-  }
-
-  .table--workers tbody tr td.col--testing,
-  .table--workers tbody tr.row--expiring td.col--testing,
-  .table--workers tbody tr.row--expired td.col--testing {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    grid-area: testing;
-    justify-self: end;
-  }
-
-  .table--workers tbody tr td.col--brigade,
-  .table--workers tbody tr.row--expiring td.col--brigade,
-  .table--workers tbody tr.row--expired td.col--brigade {
-    grid-area: brigade;
-  }
-
-  .table--workers td.col--position,
-  .table--workers td.col--brigade {
-    display: grid;
-    grid-template-columns: 7.5em minmax(0, 1fr);
-    align-items: center;
-    column-gap: var(--space-2);
-    min-width: 0;
-  }
-
-  .table--workers td.col--position .cell-key,
-  .table--workers td.col--brigade .cell-key {
-    display: block;
-    color: var(--text-secondary);
-    font-size: var(--font-size-xs);
-    line-height: var(--line-height-tight);
-    white-space: nowrap;
-  }
-
-  .table--workers td.col--position :deep(.clip-text),
-  .table--workers td.col--brigade :deep(.clip-text) {
-    min-width: 0;
-  }
-
-  .table--workers td.col--position::before,
-  .table--workers td.col--brigade::before {
-    content: none;
-  }
-
-  .table--workers td.col--status::before,
-  .table--workers td.col--testing::before {
-    content: none;
-  }
-
-  .table--workers tbody tr .person {
-    gap: var(--space-1);
-  }
-
-  .table--brigades tbody tr td:first-child {
-    grid-column: 1;
-    grid-row: 1;
-    box-shadow: none;
-  }
-
-  .table--brigades td:nth-child(2) {
-    grid-column: 2;
-    grid-row: 1;
-    justify-self: end;
-  }
-
-  .table--brigades td:nth-child(2)::before {
-    content: none;
-  }
-
-  .num {
-    text-align: left;
+  .workers-rows .cell--status {
+    min-width: 1.5rem;
+    max-width: 1.5rem;
+    justify-content: center;
   }
 }
 </style>
