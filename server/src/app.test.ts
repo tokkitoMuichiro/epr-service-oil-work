@@ -407,6 +407,62 @@ describe('api', () => {
     assert.equal((await call('GET', `/api/reports/${objectId}/2026-09-29`)).json.item.id, saved.json.item.id)
   })
 
+  it('saves report volumes from the object works and free-text extras', async () => {
+    const objects = (await call('GET', '/api/reports/objects')).json.items as {
+      id: string
+      works: { id: string; title: string; unit: string }[]
+    }[]
+    const object = objects.find((item) => item.works.length >= 2)
+    assert.ok(object)
+    const [first, second] = object.works
+    const saved = await call('POST', '/api/reports', 'admin', {
+      objectId: object.id,
+      date: '2026-09-26',
+      authorName: 'Тест',
+      workStartFrom: '08:00',
+      workStartTo: '08:30',
+      estimatedCompletion: '2026-10-30',
+      dronePeriods: [],
+      staffItr: '1',
+      staffForemen: '1',
+      staffWorkers: '5',
+      workStage: 'Дегазация',
+      techMeans: 'Насос',
+      volumes: 'Дополнительно вывезли грунт',
+      workItems: [
+        { itemId: first.id, name: 'wrong', unit: 'x', volume: 12.5 },
+        { itemId: second.id, volume: '3,2' },
+      ],
+      ppe: '',
+      nextDay: 'Продолжение',
+      problems: '',
+    })
+    assert.equal(saved.status, 200)
+    const item = saved.json.item as DailyReport
+    assert.equal(item.workItems[0]?.name, first.title)
+    assert.equal(item.workItems[0]?.unit, first.unit)
+    assert.equal(item.workItems[0]?.volume, 12.5)
+    assert.equal(item.workItems[1]?.volume, 3.2)
+    assert.equal(item.volumes, 'Дополнительно вывезли грунт')
+    const missing = await call('POST', '/api/reports', 'admin', {
+      objectId: object.id,
+      date: '2026-09-25',
+      authorName: 'Тест',
+      workStartFrom: '08:00',
+      workStartTo: '08:30',
+      estimatedCompletion: '2026-10-30',
+      staffItr: '1',
+      staffForemen: '1',
+      staffWorkers: '5',
+      workStage: 'Дегазация',
+      techMeans: 'Насос',
+      volumes: '',
+      workItems: [{ itemId: 'w-missing', name: 'Нет', unit: 'м³', volume: 1 }],
+      nextDay: 'Продолжение',
+    })
+    assert.equal(missing.status, 400)
+  })
+
   it('lets every viewer browse equipment and hides fill remarks from strangers', async () => {
     const admin = (await call('GET', '/api/equipment/state', 'admin')).json as EquipmentState
     const master = (await call('GET', '/api/equipment/state', 'master')).json as EquipmentState

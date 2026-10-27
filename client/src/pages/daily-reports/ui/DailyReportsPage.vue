@@ -225,6 +225,7 @@ function changeObject() {
             v-else
             :object-id="selectedObject.id"
             :object-title="objectTitle"
+            :works="selectedObject.works ?? []"
             :initial="formSeed"
             :saving="saving"
             :error="saveError"
@@ -440,6 +441,10 @@ function changeObject() {
   border-radius: var(--radius);
   background: var(--surface-card);
   box-shadow: var(--shadow-card);
+}
+
+.workspace:has(.report-form) {
+  padding-bottom: var(--space-1);
 }
 
 .workspace > :deep(.report-form),

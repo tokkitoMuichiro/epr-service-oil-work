@@ -1,6 +1,7 @@
 import { persisted, type Database, type Storage } from '../../db.js'
 import { badRequest, notFound, nowIso, trimmed, uid } from '../../http.js'
 import {
+  parseReportVolume,
   reportStoragePath,
   validateReportDraft,
   type DailyReport,
@@ -33,12 +34,14 @@ function parseDraft(body: Partial<DailyReportDraft>): DailyReportDraft {
     workStage: trimmed(body.workStage),
     techMeans: trimmed(body.techMeans),
     volumes: trimmed(body.volumes),
-    workItems: workItems.map((w) => ({
-      itemId: trimmed(w?.itemId),
-      name: trimmed(w?.name),
-      unit: trimmed(w?.unit),
-      volume: Number(w?.volume) || 0,
-    })),
+    workItems: workItems
+      .map((w) => ({
+        itemId: trimmed(w?.itemId),
+        name: trimmed(w?.name),
+        unit: trimmed(w?.unit),
+        volume: parseReportVolume(w?.volume),
+      }))
+      .filter((w) => w.itemId),
     ppe: trimmed(body.ppe),
     nextDay: trimmed(body.nextDay),
     problems: trimmed(body.problems),
@@ -119,7 +122,13 @@ export function createReportsRepository(contracts: ContractsRepository, storage:
 
     save(body: Partial<DailyReportDraft>): DailyReport {
       const draft = parseDraft(body)
-      if (!contracts.findObject(draft.objectId)) notFound('Объект не найден')
+      const found = contracts.findObject(draft.objectId)
+      if (!found) notFound('Объект не найден')
+      draft.workItems = draft.workItems.map((item) => {
+        const work = found.object.works.find((entry) => entry.id === item.itemId)
+        if (!work) badRequest(`Вид работ «${item.name || item.itemId}» не найден на объекте`)
+        return { itemId: work.id, name: work.title, unit: work.unit, volume: item.volume }
+      })
       const now = nowIso()
       const existingRow = selectOne.get(draft.objectId, draft.date) as { payload: string } | undefined
       const existing = existingRow ? parsePayload(existingRow.payload) : undefined

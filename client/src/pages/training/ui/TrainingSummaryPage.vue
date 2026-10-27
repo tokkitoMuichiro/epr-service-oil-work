@@ -355,6 +355,12 @@ function onAssigned() {
   accent-color: var(--accent-strong);
 }
 
+.summary__assign {
+  min-height: calc(var(--control-height) - var(--space-2));
+  padding: 0 var(--space-2);
+  font-size: var(--font-size-xs);
+}
+
 @media (max-width: 1279px) {
   .summary__counters {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -436,12 +442,6 @@ function onAssigned() {
 
   .cell--due {
     display: none;
-  }
-
-  .summary__assign {
-    min-height: var(--tap-size);
-    padding: 0 var(--space-2);
-    font-size: var(--font-size-xs);
   }
 }
 </style>

@@ -296,7 +296,9 @@ function openCreateBrigade() {
                 <span class="ui-rows__cell cell--phone">
                   <UiClipText :text="w.phone || '—'" />
                 </span>
-                <span class="ui-rows__cell cell--status"><WorkerStatusBadge :status="w.status" /></span>
+                <span class="ui-rows__cell cell--status">
+                  <WorkerStatusBadge :compact="workerList.isMobile" :status="w.status" />
+                </span>
                 <span class="ui-rows__cell cell--employment">
                   <UiClipText :text="EMPLOYMENT_STATUS_LABEL[w.employment]" />
                 </span>
@@ -796,12 +798,9 @@ function openCreateBrigade() {
     margin-left: 0;
   }
 
-  .workers-rows {
-    --ui-rows-columns: minmax(4.5rem, 1.3fr) minmax(3.5rem, 1fr) minmax(3.5rem, 1fr) minmax(5rem, 7.5rem);
-  }
-
+  .workers-rows,
   .workers-rows--testing {
-    --ui-rows-columns: minmax(4.5rem, 1.3fr) minmax(3.5rem, 1fr) minmax(3.5rem, 1fr) minmax(5rem, 7.5rem) minmax(2.5rem, 3.5rem);
+    --ui-rows-columns: minmax(4.5rem, 1.3fr) minmax(3.5rem, 1fr) minmax(3.5rem, 1fr) 1.5rem;
   }
 
   .brigades-rows {
@@ -809,8 +808,15 @@ function openCreateBrigade() {
   }
 
   .cell--phone,
-  .cell--employment {
+  .cell--employment,
+  .cell--testing {
     display: none;
+  }
+
+  .workers-rows .cell--status {
+    min-width: 1.5rem;
+    max-width: 1.5rem;
+    justify-content: center;
   }
 }
 </style>

@@ -112,6 +112,7 @@ export function createContractsRepository(storage: Storage, deps: { today?: () =
             contractName: c.name,
             customer: c.customer,
             bitrixTaskId: o.bitrixTaskId ?? null,
+            works: o.works.map((w) => ({ id: w.id, title: w.title, unit: w.unit })),
           })),
       )
       if (!q) return refs

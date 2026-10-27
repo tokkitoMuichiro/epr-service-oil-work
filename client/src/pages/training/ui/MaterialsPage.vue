@@ -334,6 +334,13 @@ function openMaterial(material: TrainingMaterial) {
   max-width: 9rem;
 }
 
+.materials-rows .ui-rows__cell--actions :deep(.btn--icon) {
+  width: calc(var(--control-height) - var(--space-2));
+  min-width: calc(var(--control-height) - var(--space-2));
+  height: calc(var(--control-height) - var(--space-2));
+  min-height: calc(var(--control-height) - var(--space-2));
+}
+
 .materials__toolbar {
   display: flex;
   flex-wrap: wrap;

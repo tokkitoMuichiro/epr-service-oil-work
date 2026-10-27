@@ -355,6 +355,13 @@ function archiveProgram(program: TrainingProgram) {
   border: 1px solid var(--border-subtle);
 }
 
+.direction-rows .ui-rows__cell--actions :deep(.btn--icon) {
+  width: calc(var(--control-height) - var(--space-2));
+  min-width: calc(var(--control-height) - var(--space-2));
+  height: calc(var(--control-height) - var(--space-2));
+  min-height: calc(var(--control-height) - var(--space-2));
+}
+
 .cell--period {
   min-width: 4.5rem;
   max-width: 8rem;
