@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import {
   ELECTRICAL_GROUPS,
   PERSONNEL_KIND_LABEL,
@@ -12,12 +12,13 @@ import {
 } from '@/entities/training'
 import { shortFullName } from '@shared/person-name'
 import { formatDateTimeRu } from '@/shared/lib/date'
-import { useMobilePagination } from '@/shared/lib/pagination'
-import { IconTraining, UiClipText, UiPagination, UiState } from '@/shared/ui'
+import { useScrollList } from '@/shared/lib/pagination'
+import { IconArrowUp, IconTraining, UiClipText, UiPagination, UiState } from '@/shared/ui'
 
 const STATUS_TONE: Record<TestStatus, string> = { draft: 'warn', published: 'ok', archived: '' }
 
 const store = useTrainingStore()
+const router = useRouter()
 
 const search = ref('')
 const programFilter = ref('')
@@ -39,7 +40,11 @@ const visible = computed(() => {
     .filter((t) => !q || t.title.toLocaleLowerCase('ru').includes(q))
 })
 
-const pager = useMobilePagination(visible, { resetOn: [search, programFilter, statusFilter, elKind, elGroup, elVoltage] })
+const list = useScrollList(visible, { resetOn: [search, programFilter, statusFilter, elKind, elGroup, elVoltage] })
+
+function openTest(id: string) {
+  void router.push(`/training/tests/${id}`)
+}
 </script>
 
 <template>
@@ -73,49 +78,66 @@ const pager = useMobilePagination(visible, { resetOn: [search, programFilter, st
 
     <UiState v-if="!visible.length" title="Тестов нет" :icon="IconTraining" text="Создайте тест: добавьте вопросы и опубликуйте его." />
     <div v-else class="tests__list ui-fill-panel">
-      <div :ref="pager.bindFit" class="ui-table-wrap ui-table-wrap--stack ui-fill-scroll">
-        <table class="ui-table tests__table">
-          <thead>
-            <tr>
-              <th class="col-title">Тест</th>
-              <th class="col-program">Программа</th>
-              <th class="col-status">Статус</th>
-              <th class="col-questions hide-md">Вопросов</th>
-              <th class="col-updated hide-md">Изменён</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="t in pager.pageItems" :key="t.id">
-              <td class="col-title ui-cell--main">
-                <RouterLink :to="`/training/tests/${t.id}`" class="tests__title">{{ t.title }}</RouterLink>
-                <small v-if="t.electrical" class="tests__sub">{{ describeElectricalScope(t.electrical) }}</small>
-              </td>
-              <td class="col-program tests__program" :title="store.labelOf(t.programId)">
+      <div :ref="list.bindList" class="ui-fill-scroll" @scroll.passive="list.onListScroll">
+        <div
+          class="ui-rows tests-rows"
+          style="--ui-rows-columns: minmax(6rem, 1.6fr) minmax(5rem, 1fr) minmax(5rem, 8rem) minmax(4rem, 6rem) minmax(5.5rem, 8rem)"
+        >
+          <div class="ui-rows__head">
+            <span class="ui-rows__cell ui-rows__cell--name">Тест</span>
+            <span class="ui-rows__cell">Программа</span>
+            <span class="ui-rows__cell">Статус</span>
+            <span class="ui-rows__cell cell--questions">Вопросов</span>
+            <span class="ui-rows__cell cell--updated">Изменён</span>
+          </div>
+          <ul class="ui-rows__list" aria-label="Тесты">
+            <li
+              v-for="t in list.pageItems"
+              :key="t.id"
+              class="ui-rows__item ui-rows__item--click"
+              tabindex="0"
+              @click="openTest(t.id)"
+              @keydown.enter.prevent="openTest(t.id)"
+            >
+              <span class="ui-rows__cell ui-rows__cell--name">
+                <UiClipText tag="strong" class="tests__title" :text="t.title" />
+                <UiClipText v-if="t.electrical" class="tests__sub" :text="describeElectricalScope(t.electrical)" />
+              </span>
+              <span class="ui-rows__cell">
                 <UiClipText :text="store.labelOf(t.programId)" />
-                <span class="tests__meta">· вопросов: {{ t.questionCount }}</span>
-              </td>
-              <td class="col-status ui-cell--aside">
+                <span class="tests__meta">{{ t.questionCount }} вопр.</span>
+              </span>
+              <span class="ui-rows__cell">
                 <span class="ui-badge" :class="STATUS_TONE[t.status] ? `ui-badge--${STATUS_TONE[t.status]}` : ''">
                   {{ TEST_STATUS_LABEL[t.status] }}
                 </span>
-                <small v-if="t.status !== 'draft'" class="tests__sub">версия {{ t.version }}</small>
-              </td>
-              <td class="col-questions hide-md">{{ t.questionCount }}</td>
-              <td class="col-updated hide-md">
-                {{ formatDateTimeRu(t.updatedAt) }}
-                <small class="tests__sub">{{ shortFullName(t.updatedBy) }}</small>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </span>
+              <span class="ui-rows__cell cell--questions">{{ t.questionCount }}</span>
+              <span class="ui-rows__cell cell--updated">
+                <UiClipText :text="formatDateTimeRu(t.updatedAt)" />
+                <UiClipText class="tests__sub" :text="shortFullName(t.updatedBy)" />
+              </span>
+            </li>
+          </ul>
+        </div>
+        <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
       </div>
       <UiPagination
-        v-if="pager.isPaged"
-        v-model:page="pager.page"
+        v-if="!list.isMobile && list.pager.isPaged"
+        v-model:page="list.pager.page"
         class="ui-fill-chrome"
-        :total="pager.total"
-        :page-size="pager.pageSize"
+        :total="list.pager.total"
+        :page-size="list.pager.pageSize"
       />
+      <button
+        v-if="list.isMobile && list.showScrollTop"
+        type="button"
+        class="ui-scroll-top"
+        aria-label="Наверх"
+        @click="list.scrollToTop"
+      >
+        <IconArrowUp :size="20" />
+      </button>
     </div>
   </div>
 </template>
@@ -129,44 +151,15 @@ const pager = useMobilePagination(visible, { resetOn: [search, programFilter, st
   gap: var(--space-3);
 }
 
-.tests .ui-table-wrap {
-  overflow-x: clip;
+.cell--questions {
+  min-width: 4rem;
+  max-width: 6rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.tests__table {
-  table-layout: fixed;
-  width: 100%;
-}
-
-.col-title {
-  width: auto;
-}
-
-.col-program {
-  width: 12rem;
-}
-
-.col-status {
-  width: 8.5rem;
-}
-
-.col-questions {
-  width: 6.5rem;
-}
-
-.col-updated {
-  width: 9rem;
-}
-
-.col-program,
-.col-questions,
-.col-status,
-.col-updated {
-  white-space: nowrap;
-}
-
-.tests__program {
-  overflow: hidden;
+.cell--updated {
+  min-width: 5.5rem;
+  max-width: 9rem;
 }
 
 .tests__toolbar {
@@ -195,16 +188,12 @@ const pager = useMobilePagination(visible, { resetOn: [search, programFilter, st
 }
 
 .tests__title {
-  display: block;
-  max-width: 28rem;
+  min-width: 0;
   color: var(--text-link);
   font-weight: 600;
-  white-space: normal;
-  overflow-wrap: anywhere;
 }
 
 .tests__sub {
-  display: block;
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
 }
@@ -212,6 +201,7 @@ const pager = useMobilePagination(visible, { resetOn: [search, programFilter, st
 .tests__meta {
   display: none;
   color: var(--text-secondary);
+  font-size: var(--font-size-xs);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -248,16 +238,13 @@ const pager = useMobilePagination(visible, { resetOn: [search, programFilter, st
     display: inline;
   }
 
-  .hide-md {
-    display: none;
+  .tests-rows {
+    --ui-rows-columns: minmax(4.5rem, 1.5fr) minmax(3.5rem, 1fr) minmax(4.5rem, 7rem);
   }
 
-  .col-title,
-  .col-program,
-  .col-status,
-  .tests__title {
-    max-width: 100%;
-    white-space: normal;
+  .cell--questions,
+  .cell--updated {
+    display: none;
   }
 }
 </style>

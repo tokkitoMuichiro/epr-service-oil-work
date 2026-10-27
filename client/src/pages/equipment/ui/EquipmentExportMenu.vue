@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { canExport, useEquipmentStore } from '@/entities/equipment'
+import { useIsMobile } from '@/shared/lib/media'
 import { IconDownload, UiMenu, type UiMenuSection } from '@/shared/ui'
 
 const store = useEquipmentStore()
+const isMobile = useIsMobile()
 
 const isVisible = computed(() => store.isReady && canExport(store.auth))
 
@@ -26,7 +28,7 @@ function onSelect(id: string) {
   <UiMenu
     v-if="isVisible"
     label="Экспорт оборудования"
-    text="Экспорт"
+    :text="isMobile ? '' : 'Экспорт'"
     :sections="sections"
     @select="onSelect"
   >

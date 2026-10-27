@@ -216,6 +216,7 @@ defineExpose({ applyInitial })
 
 <template>
   <form class="report-form" @submit.prevent="onSubmit">
+    <div class="report-form__body">
     <div class="report-form__object">
       <span class="ui-overline">Объект</span>
       <strong>{{ objectTitle }}</strong>
@@ -355,6 +356,7 @@ defineExpose({ applyInitial })
     </div>
 
     <p v-if="formError || error" class="error">{{ formError || error }}</p>
+    </div>
 
     <div class="nav">
       <UiButton v-if="step > 1" type="button" variant="ghost" @click="prevStep">Назад</UiButton>
@@ -369,8 +371,24 @@ defineExpose({ applyInitial })
 
 <style scoped>
 .report-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.report-form__body {
   display: grid;
+  flex: 1 1 auto;
   gap: var(--space-5);
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-bottom: var(--space-4);
 }
 
 .report-form__object {
@@ -521,8 +539,7 @@ defineExpose({ applyInitial })
 }
 
 .nav {
-  position: sticky;
-  bottom: 0;
+  flex: 0 0 auto;
   z-index: 1;
   display: flex;
   flex-wrap: wrap;

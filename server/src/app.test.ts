@@ -411,8 +411,9 @@ describe('api', () => {
     const admin = (await call('GET', '/api/equipment/state', 'admin')).json as EquipmentState
     const master = (await call('GET', '/api/equipment/state', 'master')).json as EquipmentState
     assert.equal(master.items.length, admin.items.length)
-    assert.ok(admin.items.some((i) => i.category === 'VEHICLE'))
-    assert.ok(admin.items.some((i) => i.category === 'CARD'))
+    assert.equal(admin.items.filter((i) => i.category === 'EQUIPMENT').length, 60)
+    assert.equal(admin.items.filter((i) => i.category === 'VEHICLE').length, 40)
+    assert.equal(admin.items.filter((i) => i.category === 'CARD').length, 40)
     assert.ok(admin.items.some((i) => i.fillComment))
     assert.ok(master.items.every((i) => !i.fillComment))
     assert.ok(master.transfers.length < admin.transfers.length)

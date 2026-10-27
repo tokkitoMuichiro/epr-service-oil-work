@@ -12,7 +12,7 @@ test('передача оборудования: отправитель пере
 
   await page.goto('/equipment/all')
   await page.getByRole('searchbox', { name: 'Поиск' }).fill('Рукав')
-  const row = page.getByRole('row', { name: new RegExp(ITEM) })
+  const row = page.getByRole('listitem', { name: new RegExp(ITEM) })
   await row.getByRole('button', { name: 'Передать' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'Передача' })
@@ -32,7 +32,7 @@ test('передача оборудования: отправитель пере
   await expect(incoming).toContainText(ITEM)
   await incoming.getByRole('button', { name: 'Принять' }).click()
   await expect(incoming).toHaveCount(0)
-  await expect(keeperPage.getByRole('row', { name: new RegExp(ITEM) })).toContainText('24 шт.')
+  await expect(keeperPage.getByRole('listitem', { name: new RegExp(ITEM) })).toContainText('24 шт.')
   await context.close()
 
   await page.reload()

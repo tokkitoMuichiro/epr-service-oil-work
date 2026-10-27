@@ -45,6 +45,8 @@ onMounted(() => {
   min-width: 0;
   min-height: 0;
   overflow: auto;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
 }
 
 @media (max-width: 860px) {

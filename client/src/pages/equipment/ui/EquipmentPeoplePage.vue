@@ -78,8 +78,11 @@ function personLabel(id: string, fullName: string, short = false) {
     <div class="page__bar ui-fill-chrome">
       <CategoryTabs :active="category" :items="items" />
       <div class="page__actions">
+        <UiButton v-if="canAddHere" variant="primary" @click="isCreateOpen = true">
+          <span class="ui-hide-mobile">{{ addLabel(category) }}</span>
+          <span class="page__add-short">Добавить</span>
+        </UiButton>
         <EquipmentExportMenu />
-        <UiButton v-if="canAddHere" variant="primary" @click="isCreateOpen = true">{{ addLabel(category) }}</UiButton>
       </div>
     </div>
 
@@ -128,7 +131,7 @@ function personLabel(id: string, fullName: string, short = false) {
         text="Слева список сотрудников с числом позиций."
       />
       <div v-else class="panel">
-        <EquipmentBoard :items="items" :category="category" :show-owner="false" empty-text="За сотрудником ничего не числится.">
+        <EquipmentBoard :items="items" :category="category" empty-text="За сотрудником ничего не числится.">
           <template #sticky>
             <div class="person-head">
               <h2 class="panel__title">{{ person.fullName }}</h2>
@@ -337,7 +340,7 @@ function personLabel(id: string, fullName: string, short = false) {
     display: none;
   }
 
-  .person-head .panel__text {
+  .person-head {
     display: none;
   }
 }

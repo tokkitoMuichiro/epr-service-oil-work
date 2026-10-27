@@ -39,9 +39,16 @@ const title = computed(() => {
 
 <style scoped>
 .embed {
-  min-height: 100%;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  height: 100%;
+  overflow: hidden;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
   background: var(--surface-app);
   color: var(--text-primary);
 }
@@ -100,10 +107,19 @@ const title = computed(() => {
 }
 
 .embed__main {
-  flex: 1;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   padding: var(--space-4);
+}
+
+.embed__main :deep(.shell) {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
 }
 
 @media (max-width: 860px) {

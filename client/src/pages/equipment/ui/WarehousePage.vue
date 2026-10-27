@@ -52,8 +52,11 @@ const canStock = computed(() => !isRepair.value && canStockWarehouse(store.auth,
     <div class="page__bar ui-fill-chrome">
       <CategoryTabs :active="category" :items="items" />
       <div class="page__actions">
+        <UiButton v-if="canStock" variant="primary" @click="isCreateOpen = true">
+          <span class="ui-hide-mobile">Внести на базу</span>
+          <span class="page__add-short">Добавить</span>
+        </UiButton>
         <EquipmentExportMenu />
-        <UiButton v-if="canStock" variant="primary" @click="isCreateOpen = true">Внести на базу</UiButton>
       </div>
     </div>
 
@@ -61,7 +64,6 @@ const canStock = computed(() => !isRepair.value && canStockWarehouse(store.auth,
       <EquipmentBoard
         :items="items"
         :category="category"
-        :show-owner="false"
         :show-repair-sender="isRepair"
         empty-title="На базе пусто"
         empty-text="Передайте оборудование на эту базу или внесите новую позицию."

@@ -156,7 +156,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPoin
   z-index: var(--z-header);
   display: grid;
   min-width: 220px;
-  max-width: min(320px, calc(100vw - 2 * var(--space-4)));
+  max-width: min(320px, 18rem);
   padding: var(--space-1) 0;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);

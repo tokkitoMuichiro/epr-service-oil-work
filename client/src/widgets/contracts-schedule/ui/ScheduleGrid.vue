@@ -161,6 +161,8 @@ function onBarClick(event: MouseEvent, row: T, bar: GridBar) {
 .grid-scroll {
   overflow-x: auto;
   overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
 }
 
 .grid {

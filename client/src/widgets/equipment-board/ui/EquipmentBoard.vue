@@ -1,18 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import {
   CARD_KIND_OPTIONS,
+  CONDITION_LABEL,
   CONDITION_OPTIONS,
   ConditionBadge,
-  FILL_STATUS_LABEL,
   VEHICLE_KIND_OPTIONS,
-  assetDisplayName,
   canAcceptTransfer,
   canCancelPendingTransfer,
   canTransferItem,
-  equipmentTypeLabel,
   identityLabel,
-  identityTitle,
   isPendingAccept,
   matchesEquipmentQuery,
   pendingOfferLabel,
@@ -27,9 +24,9 @@ import { EquipmentFormDialog } from '@/features/equipment-form'
 import { FillRemarkDialog } from '@/features/equipment-fill-review'
 import { TransferDialog } from '@/features/equipment-transfer'
 import { shortFullName } from '@shared/person-name'
-import { formatDateTimeRu } from '@/shared/lib/date'
-import { useFitPagination } from '@/shared/lib/pagination'
-import { IconClose, UiButton, UiClipText, UiPagination, UiState } from '@/shared/ui'
+import { useIsMobile } from '@/shared/lib/media'
+import { useFitPagination, useInfiniteWindow } from '@/shared/lib/pagination'
+import { IconArrowUp, IconClose, UiButton, UiClipText, UiPagination, UiState } from '@/shared/ui'
 import EquipmentCardDialog from './EquipmentCardDialog.vue'
 
 const props = withDefaults(
@@ -50,6 +47,7 @@ const props = withDefaults(
 )
 
 const store = useEquipmentStore()
+const isMobile = useIsMobile()
 
 const query = ref('')
 const kindFilter = ref('')
@@ -59,6 +57,9 @@ const transferItems = ref<EquipmentItem[]>([])
 const isTransferOpen = ref(false)
 const editItem = ref<EquipmentItem | null>(null)
 const remarkItem = ref<EquipmentItem | null>(null)
+const listRef = ref<HTMLElement | null>(null)
+const sentinelEl = ref<HTMLElement | null>(null)
+const showScrollTop = ref(false)
 
 const auth = computed(() => store.auth)
 const transfers = computed(() => store.transfers)
@@ -96,7 +97,10 @@ const visible = computed(() =>
   ),
 )
 
-const pager = useFitPagination(visible, { resetOn: [query, kindFilter, () => props.category] })
+const resetOn = [query, kindFilter, () => props.category, () => props.items]
+const pager = useFitPagination(visible, { resetOn })
+const infinite = useInfiniteWindow(visible, { enabled: isMobile, resetOn })
+const pageItems = computed(() => (isMobile.value ? infinite.pageItems : pager.pageItems))
 
 const selectable = computed(() => visible.value.filter((i) => canTransferItem(auth.value, i, transfers.value)))
 const selectedItems = computed(() => store.items.filter((i) => selectedIds.value.includes(i.id)))
@@ -106,6 +110,56 @@ const isAllSelected = computed(
 const isAnyDialogOpen = computed(
   () => Boolean(detailId.value || isTransferOpen.value || editItem.value || remarkItem.value),
 )
+
+let observer: IntersectionObserver | null = null
+
+function bindList(el: unknown) {
+  const node = el instanceof HTMLElement ? el : null
+  listRef.value = node
+  pager.bindFit(isMobile.value ? null : node)
+}
+
+function bindSentinel(el: unknown) {
+  sentinelEl.value = el instanceof HTMLElement ? el : null
+}
+
+function observeSentinel() {
+  observer?.disconnect()
+  observer = null
+  const root = listRef.value
+  const target = sentinelEl.value
+  if (!root || !target || !infinite.hasMore) return
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) infinite.loadMore()
+    },
+    { root, rootMargin: '160px' },
+  )
+  observer.observe(target)
+}
+
+function onListScroll() {
+  const el = listRef.value
+  showScrollTop.value = Boolean(isMobile.value && el && el.scrollTop > 240)
+}
+
+function scrollToTop() {
+  listRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+watch([listRef, sentinelEl, () => infinite.hasMore, isMobile], observeSentinel, { flush: 'post' })
+
+watch(isMobile, () => {
+  pager.bindFit(isMobile.value ? null : listRef.value)
+  showScrollTop.value = false
+})
+
+watch([query, kindFilter, () => props.category, () => props.items], () => {
+  if (listRef.value) listRef.value.scrollTop = 0
+  showScrollTop.value = false
+})
+
+onBeforeUnmount(() => observer?.disconnect())
 
 watch(
   () => [props.category, props.items] as const,
@@ -160,6 +214,16 @@ function ownerText(item: EquipmentItem) {
   const label = store.labelForOwner(item)
   return item.ownerType === 'USER' ? shortFullName(label) : label
 }
+
+function ownerTip(item: EquipmentItem) {
+  const label = store.labelForOwner(item)
+  const sent = props.showRepairSender ? origin(item) : null
+  return sent ? `${label} · отправил: ${sent.by} (${sent.from})` : label
+}
+
+function idText(item: EquipmentItem) {
+  return item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)
+}
 </script>
 
 <template>
@@ -196,180 +260,112 @@ function ownerText(item: EquipmentItem) {
     />
 
     <template v-else>
-      <div :ref="pager.bindFit" class="list ui-fill-scroll">
-        <div class="table-wrap ui-table-wrap">
-          <table class="ui-table">
-            <thead>
-              <tr>
-                <th class="col-check">
-                  <input
-                    v-if="selectable.length"
-                    type="checkbox"
-                    :checked="isAllSelected"
-                    aria-label="Выбрать все доступные для передачи"
-                    @change="toggleAll"
-                  />
-                </th>
-                <th class="col-name">Наименование</th>
-                <th class="col-type">{{ category === 'EQUIPMENT' ? 'Тип' : category === 'VEHICLE' ? 'Вид' : 'Тип карты' }}</th>
-                <th class="col-id">{{ category === 'EQUIPMENT' ? '№ / кол-во' : identityTitle(category) }}</th>
-                <th v-if="!isCard" class="col-condition">Сост.</th>
-                <th v-if="showOwner" class="col-owner">Владелец</th>
-                <th v-if="showRepairSender" class="col-origin">Отправил в ремонт</th>
-                <th class="col-actions"><span class="sr-only">Действия</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in pager.pageItems" :key="item.id" :data-state="rowState(item)" @click="detailId = item.id">
-                <td class="col-check" @click.stop>
-                  <input
-                    v-if="canTransferItem(auth, item, transfers)"
-                    type="checkbox"
-                    :checked="isSelected(item)"
-                    :aria-label="`Выбрать ${item.name}`"
-                    @change="toggle(item)"
-                  />
-                </td>
-                <td class="col-name">
-                  <div class="name">
-                    <UiClipText tag="strong" class="name__title" :text="item.name" />
-                    <span v-if="item.fillStatus !== 'OK'" class="chip ui-badge" :class="item.fillStatus === 'NEEDS_FIX' ? 'ui-badge--bad' : 'ui-badge--info'" :data-tone="item.fillStatus">
-                      {{ FILL_STATUS_LABEL[item.fillStatus] }}
-                    </span>
-                    <span
-                      v-if="pendingOfferLabel(item, transfers)"
-                      class="chip ui-badge ui-badge--warn"
-                      data-tone="pending"
-                    >
-                      {{ pendingOfferLabel(item, transfers) }}
-                    </span>
-                    <span
-                      v-else
-                      class="chip ui-badge"
-                      :class="item.hasDocuments ? 'ui-badge--ok' : 'ui-badge--neutral'"
-                      data-tone="docs"
-                      :title="item.hasDocuments ? 'Есть документы' : 'Нет документов'"
-                    >Док.</span>
-                  </div>
-                </td>
-                <td class="col-type">
-                  <UiClipText :text="equipmentTypeLabel(item)" />
-                </td>
-                <td class="col-id">
-                  <UiClipText
-                    class="mono"
-                    :text="item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)"
-                  />
-                </td>
-                <td v-if="!isCard" class="col-condition"><ConditionBadge compact :condition="item.condition" /></td>
-                <td v-if="showOwner" class="col-owner" :title="store.labelForOwner(item)">
-                  <UiClipText :text="ownerText(item)" />
-                </td>
-                <td v-if="showRepairSender">
-                  <template v-if="origin(item)">
-                    <div>{{ origin(item)?.by }}</div>
-                    <small class="note">{{ origin(item)?.from }} · {{ formatDateTimeRu(origin(item)?.at) }}</small>
-                  </template>
-                  <span v-else class="note">—</span>
-                </td>
-                <td class="col-actions" @click.stop>
-                  <button
-                    v-if="canAcceptTransfer(auth, item, transfers)"
-                    type="button"
-                    class="link link--accent"
-                    :disabled="store.busy"
-                    @click="store.acceptTransfer(item.id)"
-                  >
-                    Принять
-                  </button>
-                  <button
-                    v-else-if="canCancelPendingTransfer(auth, item, transfers)"
-                    type="button"
-                    class="link"
-                    :disabled="store.busy"
-                    @click="store.cancelTransfer(item.id)"
-                  >
-                    Отменить
-                  </button>
-                  <button
-                    v-else-if="canTransferItem(auth, item, transfers)"
-                    type="button"
-                    class="link"
-                    @click="openTransfer([item])"
-                  >
-                    Передать
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <ul class="cards">
-          <li v-for="item in pager.pageItems" :key="item.id" class="cards__item" :data-state="rowState(item)" @click="detailId = item.id">
-            <label v-if="canTransferItem(auth, item, transfers)" class="check" @click.stop>
-              <input type="checkbox" :checked="isSelected(item)" :aria-label="`Выбрать ${item.name}`" @change="toggle(item)" />
-            </label>
-            <div class="cards__body">
-              <div class="cards__title">
-                <ConditionBadge v-if="!isCard" compact :condition="item.condition" />
-                <UiClipText tag="strong" class="cards__name" :text="assetDisplayName(item)" />
-              </div>
-              <div class="cards__meta">
-                <span>{{ equipmentTypeLabel(item) }}</span>
-                <UiClipText
-                  class="mono"
-                  :text="item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)"
+      <div :ref="bindList" class="list ui-fill-scroll" @scroll.passive="onListScroll">
+        <div class="rows" :class="{ 'rows--plain': !selectable.length, 'rows--no-owner': !showOwner }">
+          <div class="rows__head">
+            <span class="cell cell--check">
+              <input
+                v-if="selectable.length"
+                type="checkbox"
+                :checked="isAllSelected"
+                aria-label="Выбрать все доступные для передачи"
+                @change="toggleAll"
+              />
+            </span>
+            <span class="cell cell--name">Наименование</span>
+            <span class="cell cell--id">№ / кол-во</span>
+            <span class="cell cell--condition">Состояние</span>
+            <span v-if="showOwner" class="cell cell--owner">Владелец</span>
+            <span class="cell cell--actions" />
+          </div>
+          <ul class="rows__list">
+            <li
+              v-for="item in pageItems"
+              :key="item.id"
+              class="rows__item"
+              :class="{ 'rows__item--selected': isSelected(item) }"
+              :data-state="rowState(item)"
+              @click="detailId = item.id"
+            >
+              <span class="cell cell--check" @click.stop>
+                <input
+                  v-if="canTransferItem(auth, item, transfers)"
+                  type="checkbox"
+                  :checked="isSelected(item)"
+                  :aria-label="`Выбрать ${item.name}`"
+                  @change="toggle(item)"
                 />
-                <UiClipText v-if="showOwner" :text="ownerText(item)" :tip="store.labelForOwner(item)" />
-              </div>
-              <div class="cards__flags">
-                <span v-if="item.fillStatus !== 'OK'" class="chip ui-badge" :class="item.fillStatus === 'NEEDS_FIX' ? 'ui-badge--bad' : 'ui-badge--info'">
-                  {{ FILL_STATUS_LABEL[item.fillStatus] }}
-                </span>
-                <span v-if="pendingOfferLabel(item, transfers)" class="chip ui-badge ui-badge--warn">
-                  {{ pendingOfferLabel(item, transfers) }}
-                </span>
-                <span
-                  v-else
-                  class="chip ui-badge"
-                  :class="item.hasDocuments ? 'ui-badge--ok' : 'ui-badge--neutral'"
-                  :title="item.hasDocuments ? 'Есть документы' : 'Нет документов'"
-                >Док.</span>
-              </div>
-              <small v-if="showRepairSender && origin(item)" class="note">
-                Отправил: {{ origin(item)?.by }} ({{ origin(item)?.from }})
-              </small>
-            </div>
-            <div class="cards__actions" @click.stop>
-              <UiButton
-                v-if="canAcceptTransfer(auth, item, transfers)"
-                size="sm"
-                variant="primary"
-                :disabled="store.busy"
-                @click="store.acceptTransfer(item.id)"
-              >
-                Принять
-              </UiButton>
-              <UiButton
-                v-else-if="canTransferItem(auth, item, transfers)"
-                size="sm"
-                variant="ghost"
-                @click="openTransfer([item])"
-              >
-                Передать
-              </UiButton>
-            </div>
-          </li>
-        </ul>
+              </span>
+              <span class="cell cell--name">
+                <UiClipText tag="strong" class="name" :text="item.name" />
+                <UiClipText
+                  v-if="pendingOfferLabel(item, transfers)"
+                  class="pending"
+                  :text="pendingOfferLabel(item, transfers)"
+                />
+              </span>
+              <span class="cell cell--id">
+                <UiClipText class="mono" :text="idText(item)" />
+              </span>
+              <span class="cell cell--condition">
+                <template v-if="!isCard">
+                  <ConditionBadge compact :condition="item.condition" />
+                  <UiClipText :text="CONDITION_LABEL[item.condition]" />
+                </template>
+                <span v-else class="muted">—</span>
+              </span>
+              <span v-if="showOwner" class="cell cell--owner">
+                <UiClipText :text="ownerText(item)" :tip="ownerTip(item)" />
+              </span>
+              <span class="cell cell--actions" @click.stop>
+                <button
+                  v-if="canAcceptTransfer(auth, item, transfers)"
+                  type="button"
+                  class="link link--accent"
+                  :disabled="store.busy"
+                  @click="store.acceptTransfer(item.id)"
+                >
+                  Принять
+                </button>
+                <button
+                  v-else-if="canCancelPendingTransfer(auth, item, transfers)"
+                  type="button"
+                  class="link"
+                  :disabled="store.busy"
+                  @click="store.cancelTransfer(item.id)"
+                >
+                  Отменить
+                </button>
+                <button
+                  v-else-if="canTransferItem(auth, item, transfers)"
+                  type="button"
+                  class="link"
+                  @click="openTransfer([item])"
+                >
+                  Передать
+                </button>
+              </span>
+            </li>
+          </ul>
+        </div>
+        <div v-if="infinite.hasMore" :ref="bindSentinel" class="list__sentinel" aria-hidden="true" />
       </div>
       <UiPagination
-        v-if="pager.isPaged"
+        v-if="!isMobile && pager.isPaged"
         v-model:page="pager.page"
         class="ui-fill-chrome"
         :total="pager.total"
         :page-size="pager.pageSize"
       />
+      <button
+        v-if="isMobile && showScrollTop"
+        type="button"
+        class="scroll-top"
+        aria-label="Наверх"
+        @click="scrollToTop"
+      >
+        <IconArrowUp :size="20" />
+      </button>
     </template>
 
     <EquipmentCardDialog
@@ -457,111 +453,181 @@ function ownerText(item: EquipmentItem) {
 .list {
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 0;
+  min-height: calc(var(--control-height) * 6);
   max-width: 100%;
+  overflow-x: clip;
 }
 
-.table-wrap {
+.rows {
+  --check-col: var(--tap-size);
+  --name-col: minmax(6rem, 2.2fr);
+  --id-col: minmax(3.5rem, 0.9fr);
+  --condition-col: minmax(4rem, 1fr);
+  --owner-col: minmax(4rem, 1.05fr);
+  --actions-col: 6.25rem;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  overflow: visible;
-}
-
-.ui-table {
-  table-layout: auto;
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-.ui-table th,
-.ui-table td {
+  background: var(--surface-card);
   overflow: hidden;
-  vertical-align: middle;
 }
 
-.ui-table td {
-  font-size: var(--font-size-sm);
-  background-color: var(--surface-card);
-}
-
-.col-name {
+.rows__head,
+.rows__item {
+  display: grid;
+  grid-template-columns:
+    var(--check-col)
+    var(--name-col)
+    var(--id-col)
+    var(--condition-col)
+    var(--owner-col)
+    var(--actions-col);
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  max-height: var(--control-height);
+  padding: 0 var(--space-3);
+  overflow: hidden;
 }
 
-.col-type,
-.col-id,
-.col-condition,
-.col-owner,
-.col-origin,
-.col-check,
-.col-actions {
-  width: 1%;
-  white-space: nowrap;
+.rows--plain .rows__head,
+.rows--plain .rows__item {
+  grid-template-columns:
+    var(--name-col)
+    var(--id-col)
+    var(--condition-col)
+    var(--owner-col)
+    var(--actions-col);
 }
 
-.col-condition {
-  text-align: center;
+.rows--plain .cell--check {
+  display: none;
 }
 
-.col-check {
-  padding-right: 0;
+.rows--no-owner .rows__head,
+.rows--no-owner .rows__item {
+  grid-template-columns:
+    var(--check-col)
+    var(--name-col)
+    var(--id-col)
+    var(--condition-col)
+    var(--actions-col);
 }
 
-.col-type,
-.col-owner,
-.col-origin {
-  max-width: 10rem;
+.rows--plain.rows--no-owner .rows__head,
+.rows--plain.rows--no-owner .rows__item {
+  grid-template-columns:
+    var(--name-col)
+    var(--id-col)
+    var(--condition-col)
+    var(--actions-col);
 }
 
-.col-id {
-  max-width: 9rem;
+.rows__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-height: var(--control-height-sm);
+  max-height: var(--control-height);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--table-head-bg);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
 }
 
-.col-actions {
-  text-align: right;
+.rows__list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-tbody tr {
-  position: relative;
+.rows__item {
+  min-height: var(--control-height);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-card);
   cursor: pointer;
 }
 
-tr[data-state='pending'] td:first-child,
-.cards__item[data-state='pending'] {
+.rows__list .rows__item:first-child {
+  border-top: 0;
+}
+
+.rows__item[data-state='pending'] {
   box-shadow: inset 3px 0 0 var(--status-warn-solid);
 }
 
-tr[data-state='fix'] td:first-child,
-.cards__item[data-state='fix'] {
+.rows__item[data-state='fix'] {
+  background: var(--status-bad-bg);
   box-shadow: inset 3px 0 0 var(--status-bad-solid);
 }
 
-tr[data-state='review'] td:first-child,
-.cards__item[data-state='review'] {
+.rows__item[data-state='review'] {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .table-wrap :deep(tbody tr:hover > td) {
-    background-color: var(--row-hover-bg);
-  }
-
-  .table-wrap :deep(tbody tr:hover) {
-    z-index: 4;
-    outline: 1px solid var(--border-strong);
-    outline-offset: -1px;
-  }
-
-  .cards__item:hover {
-    z-index: 4;
-    outline: 1px solid var(--border-strong);
-    outline-offset: -1px;
-  }
+.rows__item--selected:not([data-state='fix']) {
+  background: var(--row-selected-bg);
 }
 
-.col-check input,
-.check input {
+.cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 3.5rem;
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.cell--name {
+  min-width: 6rem;
+  max-width: 100%;
+}
+
+.rows__head .cell {
+  white-space: nowrap;
+}
+
+.cell--id {
+  min-width: 3.5rem;
+  max-width: 8rem;
+}
+
+.cell--condition {
+  min-width: 4rem;
+  max-width: 9rem;
+}
+
+.cell--owner {
+  min-width: 4rem;
+  max-width: 10rem;
+}
+
+.cell--check {
+  justify-content: center;
+  min-width: var(--check-col);
+  max-width: var(--check-col);
+}
+
+.cell--actions {
+  justify-content: flex-end;
+  min-width: 5.5rem;
+  max-width: var(--actions-col);
+}
+
+.cell--check input {
   width: 20px;
   height: 20px;
   margin: 0;
@@ -570,33 +636,31 @@ tr[data-state='review'] td:first-child,
 }
 
 .name {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.name__title {
-  flex: 1 1 6rem;
+  flex: 1 1 auto;
   min-width: 0;
   font-weight: 600;
 }
 
-.note {
-  display: block;
-  margin-top: 2px;
-  color: var(--text-secondary);
+.pending {
+  flex: 0 1 8rem;
+  min-width: 0;
+  max-width: 8rem;
+  color: var(--status-warn-fg);
   font-size: var(--font-size-xs);
+  font-weight: 600;
 }
 
 .mono {
   font-variant-numeric: tabular-nums;
 }
 
+.muted {
+  color: var(--text-secondary);
+}
+
 .link {
   max-width: 100%;
-  min-height: var(--control-height);
+  min-height: var(--control-height-sm);
   padding: 0 var(--space-2);
   border: 0;
   border-radius: var(--radius);
@@ -605,6 +669,7 @@ tr[data-state='review'] td:first-child,
   font-size: var(--font-size-sm);
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .link--accent {
@@ -621,7 +686,39 @@ tr[data-state='review'] td:first-child,
   background: var(--surface-sunken);
 }
 
+.list__sentinel {
+  height: 1px;
+}
+
+.scroll-top {
+  position: fixed;
+  right: calc(var(--space-4) + var(--safe-right));
+  bottom: calc(var(--space-4) + var(--safe-bottom));
+  z-index: var(--z-header);
+  display: grid;
+  place-items: center;
+  width: var(--tap-size);
+  height: var(--tap-size);
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-raised);
+  cursor: pointer;
+}
+
 @media (hover: hover) and (pointer: fine) {
+  .rows__item:hover {
+    z-index: 2;
+    outline: 1px solid var(--border-strong);
+    outline-offset: -1px;
+  }
+
+  .rows__item:hover:not([data-state='fix']):not(.rows__item--selected) {
+    background: var(--row-hover-bg);
+  }
+
   .link:not(:disabled):hover {
     background: var(--accent-subtle);
   }
@@ -634,140 +731,97 @@ tr[data-state='review'] td:first-child,
     background: var(--surface-inverse-hover);
     color: var(--text-on-inverse);
   }
-}
 
-.cards {
-  display: none;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.cards__item {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  max-width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
-  background: var(--surface-card);
-  cursor: pointer;
-}
-
-.cards__item:not(:has(.check)) {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
-.cards__body {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.cards__title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.cards__name {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-}
-
-.check {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  width: var(--tap-size);
-  height: var(--tap-size);
-  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2)) calc(-1 * var(--space-1)) calc(-1 * var(--space-3));
-  cursor: pointer;
-}
-
-.cards__meta {
-  display: grid;
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
-  gap: 0 var(--space-2);
-  font-size: var(--font-size-xs);
-  color: var(--text-secondary);
-  min-width: 0;
-}
-
-.cards__meta > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cards__flags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  min-width: 0;
-}
-
-.cards__actions {
-  display: flex;
-  flex: none;
-  align-items: center;
-  max-width: 100%;
-}
-
-.cards__actions:empty {
-  display: none;
-}
-
-.cards__actions :deep(.btn) {
-  flex: none;
-  max-width: 100%;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
+  .scroll-top:hover {
+    border-color: var(--border-strong);
+  }
 }
 
 @media (max-width: 860px) {
-  .board__sticky {
-    background: var(--surface-app);
-  }
-
   .toolbar {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .toolbar__search {
-    grid-column: 1 / -1;
+  .toolbar__select {
+    order: -1;
   }
 
   .toolbar__count {
-    font-size: var(--font-size-xs);
-  }
-
-  .table-wrap {
     display: none;
   }
 
-  .cards {
-    display: grid;
+  .rows {
+    --name-col: minmax(4.5rem, 2.2fr);
+    --id-col: minmax(3rem, 0.9fr);
+    --condition-col: 1.5rem;
+    --owner-col: minmax(3rem, 1.05fr);
+    --actions-col: 5.75rem;
+    border: 0;
+    background: none;
+    overflow: visible;
+  }
+
+  .rows__head {
+    display: none;
+  }
+
+  .rows__head,
+  .rows__item {
+    gap: var(--space-1);
+    padding: 0 var(--space-2);
+  }
+
+  .rows__item {
+    margin-bottom: var(--space-1);
+    border: 1px solid var(--border-subtle);
+    border-top-color: var(--border-subtle);
+    border-radius: var(--radius);
+    background: var(--surface-card);
+  }
+
+  .rows__list .rows__item:first-child {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .rows__head {
+    padding-left: var(--space-2);
+    background: var(--surface-app);
+  }
+
+  .pending {
+    display: none;
+  }
+
+  .cell--condition :deep(.clip-text) {
+    display: none;
+  }
+
+  .cell--name {
+    min-width: 4.5rem;
+  }
+
+  .cell--id,
+  .cell--owner {
+    min-width: 3rem;
+  }
+
+  .cell--condition {
+    min-width: 1.5rem;
+    max-width: 1.5rem;
+    justify-content: center;
+  }
+
+  .cell--actions :deep(.btn),
+  .link {
+    min-height: var(--tap-size);
   }
 }
 
 @media (max-width: 560px) {
+  .rows {
+    --actions-col: 5.5rem;
+  }
+
   .selection {
     padding: var(--space-2) var(--space-3);
   }
@@ -779,10 +833,6 @@ tr[data-state='review'] td:first-child,
   .selection__actions :deep(.btn) {
     flex: 1 1 auto;
     min-height: var(--tap-size);
-  }
-
-  .cards__item {
-    padding: var(--space-2);
   }
 }
 

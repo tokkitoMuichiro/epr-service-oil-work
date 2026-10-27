@@ -32,7 +32,7 @@ test('документ сотрудника загружается, скачив
 test('документ оборудования загружается в папку позиции, скачивается и удаляется', async ({ page }) => {
   await page.goto('/equipment/all')
   await page.getByRole('searchbox', { name: 'Поиск' }).fill('Насос')
-  await page.getByRole('row', { name: /Насос центробежный НЦ-80/ }).click()
+  await page.getByRole('listitem', { name: /Насос центробежный НЦ-80/ }).click()
   const card = page.getByRole('dialog', { name: /Насос центробежный НЦ-80/ })
 
   const passport = card.getByRole('button', { name: 'Паспорт НЦ-80.pdf', exact: true })

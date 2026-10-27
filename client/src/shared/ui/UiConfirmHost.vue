@@ -59,7 +59,7 @@ watch(isOpen, async (open) => {
 }
 
 .confirm {
-  width: min(440px, calc(100vw - 2 * var(--space-4)));
+  width: min(440px, 100%);
   max-width: none;
 }
 

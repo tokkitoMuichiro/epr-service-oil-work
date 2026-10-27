@@ -91,6 +91,8 @@ watch(
   gap: var(--space-4);
   width: 100%;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
 }
 
 .shell :deep(.page-header) {
@@ -113,7 +115,7 @@ watch(
   width: 100%;
   min-width: 0;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .embed-nav {
