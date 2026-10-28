@@ -85,10 +85,21 @@ const selectable = computed(() => visible.value.filter((i) => !i.status?.activeA
 const selectedSet = computed(() => new Set(selected.value))
 const isAllSelected = computed(() => selectable.value.length > 0 && selectable.value.every((i) => selectedSet.value.has(i.key)))
 
+function dueAt(status: ProgramStatus | null): string {
+  if (status?.activeAssignment) return status.activeAssignment.dueDate
+  return status?.nextDueAt ?? ''
+}
+
+function dueDate(status: ProgramStatus | null): string {
+  const date = dueAt(status)
+  return date ? formatDateRu(date) : '—'
+}
+
 function dueLabel(status: ProgramStatus | null): string {
-  if (status?.activeAssignment) return `пройти до ${formatDateRu(status.activeAssignment.dueDate)}`
-  if (status?.nextDueAt) return `действует до ${formatDateRu(status.nextDueAt)}`
-  return ''
+  const date = dueAt(status)
+  if (!date) return '—'
+  const formatted = formatDateRu(date)
+  return status?.activeAssignment ? `пройти до ${formatted}` : `действует до ${formatted}`
 }
 
 function toggle(key: string) {
@@ -175,7 +186,7 @@ function onAssigned() {
               <li
                 v-for="item in list.pageItems"
                 :key="item.key"
-                class="ui-rows__item"
+                class="ui-rows__item ui-rows__item--wrap"
                 :class="{ 'ui-rows__item--click': canAssign && !item.status?.activeAssignment }"
                 @click="canAssign && !item.status?.activeAssignment ? openOne(item) : undefined"
               >
@@ -188,20 +199,21 @@ function onAssigned() {
                     @change="toggle(item.key)"
                   />
                 </span>
-                <span class="ui-rows__cell ui-rows__cell--name">
-                  <UiAvatar :name="item.row.fullName" />
+                <span class="ui-rows__cell ui-rows__cell--name cell--name">
+                  <UiAvatar v-if="!list.isMobile" :name="item.row.fullName" />
                   <UiClipText tag="strong" :text="shortFullName(item.row.fullName)" />
                 </span>
-                <span class="ui-rows__cell">
+                <span class="ui-rows__cell cell--program">
                   <UiClipText :text="item.status ? store.labelOf(item.status.programId) : '—'" />
                 </span>
-                <span class="ui-rows__cell">
+                <span class="ui-rows__cell cell--status">
                   <ProgramStateBadge :state="item.status?.state ?? null" />
                 </span>
                 <span class="ui-rows__cell cell--due">
-                  <UiClipText :text="dueLabel(item.status) || '—'" />
+                  <UiClipText class="due__full" :text="dueLabel(item.status)" />
+                  <UiClipText class="due__short" :text="dueDate(item.status)" />
                 </span>
-                <span v-if="canAssign" class="ui-rows__cell ui-rows__cell--actions" @click.stop>
+                <span v-if="canAssign" class="ui-rows__cell ui-rows__cell--actions cell--actions" @click.stop>
                   <UiButton
                     v-if="!item.status?.activeAssignment"
                     class="summary__assign"
@@ -267,6 +279,10 @@ function onAssigned() {
 .cell--due {
   min-width: 6rem;
   max-width: 11rem;
+}
+
+.due__short {
+  display: none;
 }
 
 .summary__counters {
@@ -432,16 +448,79 @@ function onAssigned() {
     font-size: var(--font-size-sm);
   }
 
-  .summary-rows {
-    --ui-rows-columns: minmax(4.5rem, 1.3fr) minmax(3.5rem, 1fr) minmax(4.5rem, 7rem);
+  .summary-rows .ui-rows__item {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    grid-template-areas:
+      'name program'
+      'status due';
+    align-items: stretch;
+    min-height: var(--control-height);
+    padding-block: var(--space-2);
   }
 
-  .summary-rows--assign {
-    --ui-rows-columns: var(--tap-size) minmax(4.5rem, 1.3fr) minmax(3.5rem, 1fr) minmax(4.5rem, 7rem) minmax(5.5rem, 6.5rem);
+  .summary-rows--assign .ui-rows__item {
+    position: relative;
+    grid-template-columns: var(--tap-size) minmax(0, 1.2fr) minmax(0, 1fr);
+    grid-template-areas:
+      'check name program'
+      'check status due';
+    padding-right: calc(5.5rem + var(--space-2));
   }
 
-  .cell--due {
+  .summary-rows .ui-rows__cell--check {
+    grid-area: check;
+  }
+
+  .summary-rows .cell--name {
+    grid-area: name;
+  }
+
+  .summary-rows .cell--program {
+    grid-area: program;
+    justify-content: flex-end;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  .summary-rows .cell--status {
+    grid-area: status;
+  }
+
+  .summary-rows .cell--due {
+    grid-area: due;
+    justify-content: flex-end;
+    min-width: 0;
+    max-width: none;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .due__full {
     display: none;
+  }
+
+  .due__short {
+    display: block;
+    min-width: 0;
+  }
+
+  .summary-rows .cell--actions {
+    position: absolute;
+    inset: var(--space-1) var(--space-1) var(--space-1) auto;
+    align-items: stretch;
+    width: 5.5rem;
+    min-width: 0;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+  }
+
+  .summary-rows .summary__assign {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 0 var(--space-2);
   }
 }
 </style>

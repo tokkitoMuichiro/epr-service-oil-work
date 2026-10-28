@@ -7,6 +7,7 @@ import {
   EMPLOYMENT_STATUS_LABEL,
   TRAINING_EXPIRING_DAYS,
   WorkerStatusBadge,
+  personnelApi,
   usePersonnelStore,
   workerAttention,
   type WorkerDraft,
@@ -34,7 +35,6 @@ import { WorkerCertifications } from '@/widgets/worker-certifications'
 import { WorkerProfileDialog } from '@/widgets/worker-profile'
 import { useBrigadeList, type BrigadeSortKey } from '../model/use-brigade-list'
 import { useWorkerList } from '../model/use-worker-list'
-import MobileSort from './MobileSort.vue'
 import WorkerFilters from './WorkerFilters.vue'
 
 type TabId = 'workers' | 'brigades'
@@ -244,7 +244,6 @@ function openCreateBrigade() {
           </span>
           <span><i class="legend__swatch legend__swatch--expired" />Документ просрочен</span>
           <span class="legend__count">Показано: {{ workerList.pageItems.length }} из {{ rows.length }}</span>
-          <MobileSort v-model:sort-key="sortKey" v-model:direction="sortDirection" class="legend__sort" :options="COLUMNS" />
         </div>
 
         <UiState v-if="!rows.length" title="Ничего не найдено" :icon="IconSearch" text="Измените поиск или фильтры." />
@@ -277,14 +276,14 @@ function openCreateBrigade() {
               <li
                 v-for="w in workerList.pageItems"
                 :key="w.id"
-                class="ui-rows__item ui-rows__item--click"
+                class="ui-rows__item ui-rows__item--click ui-rows__item--wrap"
                 :class="workerAttention(w, today) ? `row--${workerAttention(w, today)}` : ''"
                 tabindex="0"
                 @click="personnel.openProfile(w.id)"
                 @keydown.enter.prevent="personnel.openProfile(w.id)"
               >
                 <span class="ui-rows__cell ui-rows__cell--name cell--fullName">
-                  <UiAvatar :name="w.fullName" />
+                  <UiAvatar v-if="!workerList.isMobile" :name="w.fullName" :src="personnelApi.photoUrl(w)" />
                   <UiClipText tag="strong" :text="shortFullName(w.fullName)" />
                 </span>
                 <span class="ui-rows__cell cell--position">
@@ -297,7 +296,7 @@ function openCreateBrigade() {
                   <UiClipText :text="w.phone || '—'" />
                 </span>
                 <span class="ui-rows__cell cell--status">
-                  <WorkerStatusBadge :compact="workerList.isMobile" :status="w.status" />
+                  <WorkerStatusBadge :status="w.status" />
                 </span>
                 <span class="ui-rows__cell cell--employment">
                   <UiClipText :text="EMPLOYMENT_STATUS_LABEL[w.employment]" />
@@ -343,12 +342,6 @@ function openCreateBrigade() {
       <div v-else class="panel ui-fill-panel">
         <div class="legend legend--brigades ui-fill-chrome">
           <span class="legend__count">Бригад: {{ brigadeRows.length }}</span>
-          <MobileSort
-            v-model:sort-key="brigadeSortKey"
-            v-model:direction="brigadeSortDirection"
-            class="legend__sort"
-            :options="BRIGADE_COLUMNS"
-          />
         </div>
         <div :ref="brigadeWindow.bindList" class="ui-fill-scroll" @scroll.passive="brigadeWindow.onListScroll">
           <div class="ui-rows brigades-rows">
@@ -377,7 +370,7 @@ function openCreateBrigade() {
               <li
                 v-for="row in brigadeWindow.pageItems"
                 :key="row.brigade.id"
-                class="ui-rows__item ui-rows__item--click"
+                class="ui-rows__item ui-rows__item--click ui-rows__item--wrap"
                 :class="{ 'row--archived': row.brigade.archived }"
                 tabindex="0"
                 @click="openBrigadeId = row.brigade.id"
@@ -786,10 +779,6 @@ function openCreateBrigade() {
     margin-top: 0;
   }
 
-  .legend__sort {
-    margin-left: auto;
-  }
-
   .pager {
     margin-top: var(--space-2);
   }
@@ -798,25 +787,96 @@ function openCreateBrigade() {
     margin-left: 0;
   }
 
-  .workers-rows,
-  .workers-rows--testing {
-    --ui-rows-columns: minmax(4.5rem, 1.3fr) minmax(3.5rem, 1fr) minmax(3.5rem, 1fr) 1.5rem;
+  .workers-rows .ui-rows__item {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    grid-template-areas:
+      'name position'
+      'status brigade';
+    align-items: center;
+    min-height: var(--control-height);
+    padding-block: var(--space-2);
   }
 
-  .brigades-rows {
-    --ui-rows-columns: minmax(4.5rem, 1.5fr) minmax(4.5rem, 7rem) minmax(3.25rem, 5rem) minmax(4.5rem, 1fr);
+  .workers-rows .cell--fullName {
+    grid-area: name;
+  }
+
+  .workers-rows .cell--position {
+    grid-area: position;
+    justify-content: flex-end;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  .workers-rows .cell--status {
+    grid-area: status;
+    min-width: 0;
+    max-width: none;
+    justify-content: flex-start;
+  }
+
+  .workers-rows .cell--brigade {
+    grid-area: brigade;
+    justify-content: flex-end;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  .brigades-rows .ui-rows__item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name status'
+      'leader size';
+    align-items: center;
+    min-height: var(--control-height);
+    padding-block: var(--space-2);
+  }
+
+  .brigades-rows .cell--name {
+    grid-area: name;
+    min-width: 0;
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .brigades-rows .cell--name :deep(.clip-text__label) {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .brigades-rows .cell--status {
+    grid-area: status;
+    min-width: 0;
+    max-width: none;
+    justify-content: flex-end;
+  }
+
+  .brigades-rows .cell--leader {
+    grid-area: leader;
+    min-width: 0;
+    max-width: none;
+    justify-content: flex-start;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  .brigades-rows .cell--size {
+    grid-area: size;
+    min-width: 0;
+    max-width: none;
+    justify-content: flex-end;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
   }
 
   .cell--phone,
   .cell--employment,
   .cell--testing {
     display: none;
-  }
-
-  .workers-rows .cell--status {
-    min-width: 1.5rem;
-    max-width: 1.5rem;
-    justify-content: center;
   }
 }
 </style>

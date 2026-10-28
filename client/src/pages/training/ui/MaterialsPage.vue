@@ -13,7 +13,6 @@ import { errorMessage } from '@/shared/api'
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
 import { useDialogDirty } from '@/shared/lib/dialog-dirty'
-import { shortFullName } from '@shared/person-name'
 import { useScrollList } from '@/shared/lib/pagination'
 import {
   IconArchive,
@@ -193,38 +192,35 @@ function openMaterial(material: TrainingMaterial) {
     <UiState v-if="!visible.length" title="Материалов нет" :icon="IconTraining" text="Загрузите файл или добавьте ссылку на файл в Битрикс." />
     <div v-else class="materials__list ui-fill-panel">
       <div :ref="list.bindList" class="ui-fill-scroll" @scroll.passive="list.onListScroll">
-        <div
-          class="ui-rows materials-rows"
-          style="--ui-rows-columns: minmax(6rem, 1.6fr) minmax(5rem, 1.1fr) minmax(5.5rem, 8rem) 7.5rem"
-        >
+        <div class="ui-rows materials-rows">
           <div class="ui-rows__head">
-            <span class="ui-rows__cell ui-rows__cell--name">Материал</span>
-            <span class="ui-rows__cell">Программы</span>
-            <span class="ui-rows__cell cell--updated">Изменён</span>
-            <span class="ui-rows__cell ui-rows__cell--actions" />
+            <span class="ui-rows__cell cell--title">Материал</span>
+            <span class="ui-rows__cell cell--program">Программы</span>
+            <span class="ui-rows__cell ui-rows__cell--actions cell--actions" />
           </div>
           <ul class="ui-rows__list" aria-label="Материалы">
             <li
               v-for="m in list.pageItems"
               :key="m.id"
-              class="ui-rows__item ui-rows__item--click"
-              :class="{ 'is-archived': m.isArchived }"
+              class="ui-rows__item ui-rows__item--click ui-rows__item--wrap"
+              :class="{ 'is-archived': m.isArchived, 'has-desc': Boolean(m.description.trim()) }"
               tabindex="0"
               @click="openMaterial(m)"
               @keydown.enter.prevent="openMaterial(m)"
             >
-              <span class="ui-rows__cell ui-rows__cell--name">
-                <UiClipText tag="strong" class="materials__title" :text="m.title" />
-                <UiClipText class="materials__sub" :text="`${m.fileName} · ${formatFileSize(m.size)}`" />
+              <span class="ui-rows__cell cell--title">
+                <strong class="materials__title">{{ m.title }}</strong>
               </span>
-              <span class="ui-rows__cell">
+              <span class="ui-rows__cell cell--program">
                 <UiClipText :text="m.programIds.map((id) => store.labelOf(id)).join(', ') || '—'" />
+              </span>
+              <span class="ui-rows__cell cell--desc">
+                <UiClipText class="materials__sub" :text="m.description.trim() || '—'" />
               </span>
               <span class="ui-rows__cell cell--updated">
                 <UiClipText :text="formatDateTimeRu(m.updatedAt)" />
-                <UiClipText class="materials__sub" :text="shortFullName(m.updatedBy)" />
               </span>
-              <span class="ui-rows__cell ui-rows__cell--actions" @click.stop>
+              <span class="ui-rows__cell ui-rows__cell--actions cell--actions" @click.stop>
                 <UiButton variant="ghost" size="icon" aria-label="Изменить" title="Изменить" @click="openEdit(m)">
                   <IconPencil :size="16" />
                 </UiButton>
@@ -329,9 +325,55 @@ function openMaterial(material: TrainingMaterial) {
   gap: var(--space-3);
 }
 
+.materials-rows {
+  --ui-rows-columns: minmax(8rem, 1.6fr) minmax(6rem, 1.1fr) auto;
+}
+
+.materials-rows .ui-rows__head {
+  grid-template-areas: 'title program actions';
+}
+
+.materials-rows .ui-rows__item {
+  grid-template-areas:
+    'title program actions'
+    'desc date actions';
+  align-items: start;
+  max-height: none;
+  height: auto;
+  padding-block: var(--space-2);
+}
+
+.cell--title {
+  grid-area: title;
+  min-width: 0;
+  max-height: none;
+  overflow: visible;
+}
+
+.cell--program {
+  grid-area: program;
+  min-width: 0;
+  max-width: none;
+}
+
+.cell--desc {
+  grid-area: desc;
+  min-width: 0;
+  max-width: none;
+}
+
 .cell--updated {
-  min-width: 5.5rem;
-  max-width: 9rem;
+  grid-area: date;
+  min-width: 0;
+  max-width: none;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.cell--actions {
+  grid-area: actions;
+  align-self: stretch;
+  align-items: center;
 }
 
 .materials-rows .ui-rows__cell--actions :deep(.btn--icon) {
@@ -368,9 +410,13 @@ function openMaterial(material: TrainingMaterial) {
 }
 
 .materials__title {
+  display: block;
   min-width: 0;
+  max-width: 100%;
   color: var(--text-link);
   font-weight: 600;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .materials__sub {
@@ -428,11 +474,78 @@ function openMaterial(material: TrainingMaterial) {
   }
 
   .materials-rows {
-    --ui-rows-columns: minmax(4.5rem, 1.4fr) minmax(3.5rem, 1fr) 6.75rem;
+    --ui-rows-columns: minmax(0, 1fr) auto;
+  }
+
+  .materials-rows .ui-rows__item {
+    grid-template-areas:
+      'title title'
+      'program date'
+      'actions actions';
+    align-items: start;
+    padding-block: var(--space-2);
+  }
+
+  .materials-rows .ui-rows__item.has-desc {
+    grid-template-areas:
+      'title title'
+      'program program'
+      'desc date'
+      'actions actions';
+  }
+
+  .materials-rows .ui-rows__item:not(.has-desc) .cell--desc {
+    display: none;
+  }
+
+  .cell--title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .cell--program {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  .cell--program :deep(.clip-text__label) {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: anywhere;
+  }
+
+  .cell--desc {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .cell--desc :deep(.clip-text__label) {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: anywhere;
   }
 
   .cell--updated {
-    display: none;
+    justify-content: flex-end;
+    align-self: start;
+    font-size: var(--font-size-sm);
+  }
+
+  .cell--actions {
+    justify-content: flex-end;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    padding-top: var(--space-1);
+  }
+
+  .materials-rows .ui-rows__cell--actions :deep(.btn--icon) {
+    width: var(--tap-size);
+    min-width: var(--tap-size);
+    height: var(--tap-size);
+    min-height: var(--tap-size);
   }
 }
 </style>

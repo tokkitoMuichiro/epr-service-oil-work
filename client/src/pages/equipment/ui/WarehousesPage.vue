@@ -16,7 +16,6 @@ import {
   IconTrash,
   UiButton,
   UiClipText,
-  UiMobileSort,
   UiPagination,
   UiState,
   askConfirm,
@@ -36,13 +35,6 @@ const showScrollTop = ref(false)
 const canManage = computed(() => canManageWarehouses(store.auth))
 
 type WarehouseSortKey = 'name' | 'address' | 'keepers' | 'total'
-
-const SORT_COLUMNS: { key: WarehouseSortKey; label: string }[] = [
-  { key: 'name', label: 'Название' },
-  { key: 'address', label: 'Адрес' },
-  { key: 'keepers', label: 'Кладовщики' },
-  { key: 'total', label: 'Всего' },
-]
 
 const { sortKey, sortDirection, toggleSort, ariaSort, arrow } = useColumnSort<WarehouseSortKey>('name')
 
@@ -167,7 +159,6 @@ async function remove(w: Warehouse) {
         попадает всё со статусом «В ремонте».
       </p>
       <div class="page__actions">
-        <UiMobileSort v-model:sort-key="sortKey" v-model:direction="sortDirection" :options="SORT_COLUMNS" />
         <UiButton v-if="canManage" variant="primary" @click="openForm(null)">
           <span class="ui-hide-mobile">Новая база</span>
           <span class="page__add-short">Добавить</span>
@@ -213,7 +204,7 @@ async function remove(w: Warehouse) {
             <li
               v-for="w in pageItems"
               :key="w.id"
-              class="rows__item"
+              class="rows__item rows__item--wrap"
               tabindex="0"
               :data-state="rowState(w)"
               :title="itemTip(w)"
@@ -521,14 +512,27 @@ async function remove(w: Warehouse) {
     display: none;
   }
 
-  .rows__item {
+  .rows .rows__item,
+  .rows--manage .rows__item {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'name total actions'
+      'address keepers actions';
+    align-items: start;
     gap: var(--space-1);
+    max-height: none;
+    height: auto;
     margin-bottom: var(--space-1);
-    min-height: var(--control-height);
-    max-height: var(--control-height);
-    padding: 0 var(--space-2);
+    padding: var(--space-2);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius);
+  }
+
+  .rows:not(.rows--manage) .rows__item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name total'
+      'address keepers';
   }
 
   .rows__list .rows__item:first-child {
@@ -536,22 +540,57 @@ async function remove(w: Warehouse) {
   }
 
   .cell {
-    min-width: 3.25rem;
+    min-width: 0;
+    max-height: none;
   }
 
   .cell--name {
-    min-width: 4.5rem;
+    grid-area: name;
+    min-width: 0;
+    max-width: none;
+    overflow: visible;
   }
 
-  .cell--address,
-  .cell--keepers {
-    min-width: 3.25rem;
-    max-width: 7rem;
+  .name :deep(.clip-text__label),
+  .cell--address :deep(.clip-text__label),
+  .cell--keepers :deep(.clip-text__label) {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .cell--total {
-    min-width: 3.5rem;
-    max-width: 5.25rem;
+    grid-area: total;
+    min-width: 0;
+    max-width: none;
+    justify-content: flex-end;
+  }
+
+  .cell--address {
+    grid-area: address;
+    min-width: 0;
+    max-width: none;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  .cell--keepers {
+    grid-area: keepers;
+    min-width: 0;
+    max-width: none;
+    justify-content: flex-end;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  .cell--actions {
+    grid-area: actions;
+    align-self: stretch;
+    align-items: center;
+    min-width: 0;
+    max-width: none;
   }
 
   .action-text {

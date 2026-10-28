@@ -88,16 +88,16 @@ function openTest(id: string) {
             <li
               v-for="t in list.pageItems"
               :key="t.id"
-              class="ui-rows__item ui-rows__item--click"
+              class="ui-rows__item ui-rows__item--click ui-rows__item--wrap"
               tabindex="0"
               @click="openTest(t.id)"
               @keydown.enter.prevent="openTest(t.id)"
             >
-              <span class="ui-rows__cell ui-rows__cell--name">
-                <UiClipText tag="strong" class="tests__title" :text="t.title" />
+              <span class="ui-rows__cell ui-rows__cell--name cell--name">
+                <strong class="tests__title">{{ t.title }}</strong>
                 <UiClipText v-if="t.electrical" class="tests__sub" :text="describeElectricalScope(t.electrical)" />
               </span>
-              <span class="ui-rows__cell">
+              <span class="ui-rows__cell cell--program">
                 <UiClipText :text="store.labelOf(t.programId)" />
               </span>
               <span class="ui-rows__cell cell--status">
@@ -183,8 +183,11 @@ function openTest(id: string) {
 
 .tests__title {
   min-width: 0;
+  overflow: hidden;
   color: var(--text-link);
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tests__sub {
@@ -223,7 +226,17 @@ function openTest(id: string) {
   }
 
   .tests-rows {
-    --ui-rows-columns: minmax(0, 1.6fr) minmax(0, 1.1fr) max-content;
+    --ui-rows-columns: minmax(0, 1fr) auto;
+  }
+
+  .tests-rows .ui-rows__item {
+    grid-template-areas:
+      'name name'
+      'program questions';
+    align-items: start;
+    max-height: none;
+    height: auto;
+    padding-block: var(--space-2);
   }
 
   .tests-rows .ui-rows__cell,
@@ -231,11 +244,27 @@ function openTest(id: string) {
     min-width: 0;
   }
 
+  .cell--name {
+    grid-area: name;
+    flex-direction: column;
+    align-items: flex-start;
+    overflow: visible;
+    max-height: none;
+  }
+
+  .cell--program {
+    grid-area: program;
+    min-width: 0;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
   .cell--status {
     display: none;
   }
 
   .cell--questions {
+    grid-area: questions;
     min-width: 0;
     max-width: none;
     justify-content: flex-end;
@@ -243,6 +272,16 @@ function openTest(id: string) {
     font-size: var(--font-size-sm);
     font-weight: 600;
     white-space: nowrap;
+  }
+
+  .tests__title {
+    display: block;
+    width: 100%;
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .tests__q-suffix {
