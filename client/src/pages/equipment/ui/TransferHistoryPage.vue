@@ -4,22 +4,12 @@ import { TRANSFER_STATUS_LABEL, pluralRu, useEquipmentStore, type TransferStatus
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { useScrollList } from '@/shared/lib/pagination'
 import { compareLocale, compareNumber, useColumnSort } from '@/shared/lib/sort'
-import { IconArrowUp, IconEquipment, UiClipText, UiMobileSort, UiPagination, UiState } from '@/shared/ui'
+import { IconArrowUp, IconEquipment, UiClipText, UiPagination, UiState } from '@/shared/ui'
 import EquipmentExportMenu from './EquipmentExportMenu.vue'
 
 const store = useEquipmentStore()
 
 type HistorySortKey = 'date' | 'name' | 'from' | 'to' | 'qty' | 'actor' | 'status'
-
-const SORT_COLUMNS: { key: HistorySortKey; label: string }[] = [
-  { key: 'date', label: 'Дата' },
-  { key: 'name', label: 'Позиция' },
-  { key: 'from', label: 'Откуда' },
-  { key: 'to', label: 'Куда' },
-  { key: 'qty', label: 'Кол-во' },
-  { key: 'actor', label: 'Кто передал' },
-  { key: 'status', label: 'Статус' },
-]
 
 const query = ref('')
 const actor = ref('')
@@ -69,7 +59,6 @@ function tone(value: TransferStatus) {
           <option value="">Все статусы</option>
           <option v-for="(label, value) in TRANSFER_STATUS_LABEL" :key="value" :value="value">{{ label }}</option>
         </select>
-        <UiMobileSort v-model:sort-key="sortKey" v-model:direction="sortDirection" :options="SORT_COLUMNS" />
         <div class="filters__export">
           <EquipmentExportMenu />
         </div>
@@ -80,10 +69,7 @@ function tone(value: TransferStatus) {
       <UiState v-if="!rows.length" title="Передач нет" :icon="IconEquipment" text="Измените фильтры или дождитесь первых передач." />
 
       <div v-else :ref="list.bindList" class="ui-fill-scroll" @scroll.passive="list.onListScroll">
-        <div
-          class="ui-rows history-rows"
-          style="--ui-rows-columns: minmax(6.5rem, 0.9fr) minmax(6rem, 1.4fr) minmax(4.5rem, 1fr) minmax(4.5rem, 1fr) minmax(3.5rem, 4.5rem) minmax(4.5rem, 0.9fr) minmax(5.5rem, 7rem)"
-        >
+        <div class="ui-rows history-rows">
           <div class="ui-rows__head">
             <span class="ui-rows__cell" :aria-sort="ariaSort('date')">
               <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'date' }" @click="toggleSort('date')">
@@ -122,27 +108,30 @@ function tone(value: TransferStatus) {
             </span>
           </div>
           <ul class="ui-rows__list" aria-label="История передач">
-            <li v-for="t in list.pageItems" :key="t.id" class="ui-rows__item">
+            <li v-for="t in list.pageItems" :key="t.id" class="ui-rows__item ui-rows__item--wrap">
               <span class="ui-rows__cell cell--date">
                 <UiClipText :text="formatDateTimeRu(t.createdAt)" />
               </span>
-              <span class="ui-rows__cell ui-rows__cell--name">
+              <span class="ui-rows__cell ui-rows__cell--name cell--name">
                 <UiClipText tag="strong" :text="t.equipmentName" />
                 <UiClipText v-if="t.factoryNumber" class="muted" :text="t.factoryNumber" />
               </span>
-              <span class="ui-rows__cell">
+              <span class="ui-rows__cell cell--from">
                 <UiClipText :text="t.fromLabel" />
               </span>
-              <span class="ui-rows__cell">
+              <span class="ui-rows__cell cell--to">
                 <UiClipText :text="t.toLabel" />
+              </span>
+              <span class="ui-rows__cell cell--route">
+                <UiClipText :text="`${t.fromLabel} → ${t.toLabel}`" />
               </span>
               <span class="ui-rows__cell cell--qty">
                 <UiClipText :text="String(t.quantity)" />
               </span>
-              <span class="ui-rows__cell">
+              <span class="ui-rows__cell cell--actor">
                 <UiClipText :text="t.actorName" />
               </span>
-              <span class="ui-rows__cell">
+              <span class="ui-rows__cell cell--status">
                 <span class="ui-badge" :class="`ui-badge--${tone(t.status)}`" :data-tone="tone(t.status)">{{
                   TRANSFER_STATUS_LABEL[t.status]
                 }}</span>
@@ -197,6 +186,10 @@ function tone(value: TransferStatus) {
   font-variant-numeric: tabular-nums;
 }
 
+.history-rows {
+  --ui-rows-columns: minmax(6.5rem, 0.9fr) minmax(6rem, 1.4fr) minmax(4.5rem, 1fr) minmax(4.5rem, 1fr) minmax(3.5rem, 4.5rem) minmax(4.5rem, 0.9fr) minmax(5.5rem, 7rem);
+}
+
 .cell--date {
   min-width: 6.5rem;
   max-width: 10rem;
@@ -208,6 +201,10 @@ function tone(value: TransferStatus) {
   max-width: 4.5rem;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+.cell--route {
+  display: none;
 }
 
 .muted {
@@ -235,7 +232,80 @@ function tone(value: TransferStatus) {
   }
 
   .history-rows {
-    --ui-rows-columns: minmax(4.5rem, 0.8fr) minmax(4.5rem, 1.3fr) minmax(3.25rem, 0.8fr) minmax(3.25rem, 0.8fr) minmax(2.75rem, 3.5rem) minmax(3.25rem, 0.8fr) minmax(4.5rem, 6rem);
+    --ui-rows-columns: minmax(0, 1fr) max-content;
+  }
+
+  .history-rows .ui-rows__item {
+    grid-template-areas:
+      'name date'
+      'route status';
+    align-items: start;
+    max-height: none;
+    height: auto;
+    padding-block: var(--space-2);
+  }
+
+  .cell--name {
+    grid-area: name;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .cell--name :deep(.clip-text__label) {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .cell--name .muted {
+    display: none;
+  }
+
+  .cell--status {
+    grid-area: status;
+    justify-content: flex-end;
+  }
+
+  .cell--route {
+    display: flex;
+    grid-area: route;
+    min-width: 0;
+    max-width: none;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  .cell--route :deep(.clip-text__label) {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: anywhere;
+  }
+
+  .cell--date {
+    grid-area: date;
+    min-width: 0;
+    max-width: none;
+    justify-content: flex-end;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  .cell--date :deep(.clip-text__label) {
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  .cell--from,
+  .cell--to,
+  .cell--qty,
+  .cell--actor {
+    display: none;
   }
 
   .pager {

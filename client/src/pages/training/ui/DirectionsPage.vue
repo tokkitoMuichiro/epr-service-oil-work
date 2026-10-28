@@ -195,20 +195,23 @@ function archiveProgram(program: TrainingProgram) {
           <li
             v-for="p in programsOf(d)"
             :key="p.id"
-            class="ui-rows__item ui-rows__item--click"
+            class="ui-rows__item ui-rows__item--click ui-rows__item--wrap"
             :class="{ 'is-archived': p.isArchived }"
             tabindex="0"
             @click="editProgram(d, p)"
             @keydown.enter.prevent="editProgram(d, p)"
           >
-            <span class="ui-rows__cell ui-rows__cell--name">
-              <UiClipText tag="strong" class="direction__label" :text="store.labelOf(p.id)" />
-              <UiClipText class="direction__sub" :text="p.name" />
+            <span class="ui-rows__cell ui-rows__cell--name cell--name">
+              <strong class="direction__label">{{ store.labelOf(p.id) }}</strong>
+              <span class="direction__sub direction__sub--desktop">{{ p.name }}</span>
+            </span>
+            <span class="ui-rows__cell cell--sub">
+              <span class="direction__sub">{{ p.name }}</span>
             </span>
             <span class="ui-rows__cell cell--period">
-              <UiClipText :text="`${p.periodMonths} мес.`" />
+              {{ p.periodMonths }} мес.
             </span>
-            <span class="ui-rows__cell ui-rows__cell--actions" @click.stop>
+            <span class="ui-rows__cell ui-rows__cell--actions cell--actions" @click.stop>
               <UiButton variant="ghost" size="icon" aria-label="Изменить программу" title="Изменить" @click="editProgram(d, p)">
                 <IconPencil :size="16" />
               </UiButton>
@@ -367,11 +370,18 @@ function archiveProgram(program: TrainingProgram) {
   max-width: 8rem;
 }
 
+.cell--sub {
+  display: none;
+}
+
 .direction__label,
 .direction__sub {
   display: block;
   min-width: 8rem;
   max-width: min(28rem, 100%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .direction__head {
@@ -485,7 +495,64 @@ function archiveProgram(program: TrainingProgram) {
   }
 
   .direction-rows {
-    --ui-rows-columns: minmax(4.5rem, 1.5fr) minmax(3.5rem, 6rem) 6.25rem;
+    --ui-rows-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .direction-rows .ui-rows__item {
+    grid-template-areas:
+      'name period actions'
+      'sub sub actions';
+    align-items: start;
+    max-height: none;
+    height: auto;
+    padding-block: var(--space-2);
+  }
+
+  .cell--name {
+    grid-area: name;
+    min-width: 0;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .cell--sub {
+    display: flex;
+    grid-area: sub;
+    min-width: 0;
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .cell--period {
+    grid-area: period;
+    min-width: 0;
+    max-width: none;
+    justify-content: flex-end;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+  }
+
+  .cell--actions {
+    grid-area: actions;
+    align-self: stretch;
+    align-items: center;
+  }
+
+  .direction__sub--desktop {
+    display: none;
+  }
+
+  .direction__label,
+  .direction__sub {
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 }
 </style>

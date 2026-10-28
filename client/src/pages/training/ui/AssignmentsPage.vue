@@ -20,7 +20,20 @@ import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { useScrollList } from '@/shared/lib/pagination'
 import { todayIso } from '@shared/dates'
 import { shortFullName } from '@shared/person-name'
-import { IconArrowUp, IconTraining, UiButton, UiClipText, UiDialog, UiPagination, UiState, askConfirm } from '@/shared/ui'
+import {
+  IconArrowUp,
+  IconCopy,
+  IconLink,
+  IconRefresh,
+  IconTraining,
+  IconTrash,
+  UiButton,
+  UiClipText,
+  UiDialog,
+  UiPagination,
+  UiState,
+  askConfirm,
+} from '@/shared/ui'
 
 const store = useTrainingStore()
 const access = useAccessStore()
@@ -170,25 +183,21 @@ function onAssigned() {
       <div :ref="list.bindList" class="ui-fill-scroll" @scroll.passive="list.onListScroll">
         <div class="ui-rows assignments-rows" :class="{ 'assignments-rows--manage': canAssign }">
           <div class="ui-rows__head">
-            <span class="ui-rows__cell ui-rows__cell--name">Сотрудник</span>
-            <span class="ui-rows__cell">Тест</span>
+            <span class="ui-rows__cell ui-rows__cell--name cell--name">Сотрудник</span>
+            <span class="ui-rows__cell cell--test">Тест</span>
             <span class="ui-rows__cell cell--kind">Тип</span>
-            <span class="ui-rows__cell cell--due">Срок</span>
-            <span class="ui-rows__cell">Статус</span>
-            <span class="ui-rows__cell cell--attempts">Попытки</span>
-            <span v-if="canAssign" class="ui-rows__cell ui-rows__cell--actions" />
           </div>
           <ul class="ui-rows__list" aria-label="Назначения">
             <li
               v-for="a in list.pageItems"
               :key="a.id"
-              class="ui-rows__item"
-              :class="{ 'ui-rows__item--wrap': canAssign && isActiveAssignment(a, today) }"
+              class="ui-rows__item ui-rows__item--wrap"
+              :class="{ 'is-active': canAssign && isActiveAssignment(a, today) }"
             >
-              <span class="ui-rows__cell ui-rows__cell--name">
+              <span class="ui-rows__cell ui-rows__cell--name cell--name">
                 <UiClipText tag="strong" :text="shortFullName(a.workerName)" />
               </span>
-              <span class="ui-rows__cell">
+              <span class="ui-rows__cell cell--test">
                 <UiClipText :text="a.testTitle" />
               </span>
               <span class="ui-rows__cell cell--kind">
@@ -197,19 +206,64 @@ function onAssigned() {
               <span class="ui-rows__cell cell--due">
                 <UiClipText :text="formatDateRu(a.dueDate)" />
               </span>
-              <span class="ui-rows__cell">
+              <span class="ui-rows__cell cell--status">
                 <AssignmentStatusBadge :status="a.status" />
               </span>
               <span class="ui-rows__cell cell--attempts">
                 <UiClipText :text="`${a.attemptsUsed} из ${a.attemptsAllowed}`" />
               </span>
-              <span v-if="canAssign" class="ui-rows__cell ui-rows__cell--actions assignments__actions" @click.stop>
-                <template v-if="isActiveAssignment(a, today)">
-                  <UiButton variant="ghost" size="sm" :disabled="busyId === a.id" @click="copyLink(a, false)">Ссылка</UiButton>
-                  <UiButton variant="ghost" size="sm" :disabled="busyId === a.id" @click="copyLink(a, true)">С текстом</UiButton>
-                  <UiButton variant="ghost" size="sm" :disabled="busyId === a.id" @click="reissue(a)">Перевыпустить</UiButton>
-                  <UiButton variant="ghost" size="sm" :disabled="busyId === a.id" @click="openCancel(a)">Отозвать</UiButton>
-                </template>
+              <span
+                v-if="canAssign && isActiveAssignment(a, today)"
+                class="ui-rows__cell ui-rows__cell--actions cell--actions assignments__actions"
+              >
+                <UiButton
+                  variant="ghost"
+                  size="sm"
+                  class="assignments__action"
+                  aria-label="Ссылка"
+                  title="Ссылка"
+                  :disabled="busyId === a.id"
+                  @click="copyLink(a, false)"
+                >
+                  <IconLink class="assignments__action-icon" :size="18" />
+                  <span class="assignments__action-label">Ссылка</span>
+                </UiButton>
+                <UiButton
+                  variant="ghost"
+                  size="sm"
+                  class="assignments__action"
+                  aria-label="С текстом"
+                  title="С текстом"
+                  :disabled="busyId === a.id"
+                  @click="copyLink(a, true)"
+                >
+                  <IconCopy class="assignments__action-icon" :size="18" />
+                  <span class="assignments__action-label">С текстом</span>
+                </UiButton>
+                <UiButton
+                  variant="ghost"
+                  size="sm"
+                  class="assignments__action"
+                  aria-label="Перевыпустить"
+                  title="Перевыпустить"
+                  :disabled="busyId === a.id"
+                  @click="reissue(a)"
+                >
+                  <IconRefresh class="assignments__action-icon" :size="18" />
+                  <span class="assignments__action-label">Перевыпустить</span>
+                </UiButton>
+                <UiButton
+                  variant="ghost"
+                  size="sm"
+                  class="assignments__action"
+                  aria-label="Отозвать"
+                  title="Отозвать"
+                  :disabled="busyId === a.id"
+                  @click="openCancel(a)"
+                >
+                  <IconTrash class="assignments__action-icon" :size="18" />
+                  <span class="assignments__action-label">Отозвать</span>
+                </UiButton>
               </span>
             </li>
           </ul>
@@ -268,29 +322,68 @@ function onAssigned() {
   gap: var(--space-3);
 }
 
-.assignments-rows {
-  --ui-rows-columns: minmax(6rem, 1.1fr) minmax(6rem, 1.4fr) minmax(4.5rem, 7rem) minmax(4.5rem, 6.5rem) minmax(5rem, 8rem)
-    minmax(4rem, 6rem);
+.assignments-rows,
+.assignments-rows--manage {
+  --ui-rows-columns: minmax(6rem, 1.1fr) minmax(8rem, 1.8fr) minmax(5.5rem, 9rem);
 }
 
-.assignments-rows--manage {
-  --ui-rows-columns: minmax(6rem, 1.1fr) minmax(6rem, 1.4fr) minmax(4.5rem, 7rem) minmax(4.5rem, 6.5rem) minmax(5rem, 8rem)
-    minmax(4rem, 6rem) minmax(8rem, 14rem);
+.assignments-rows .ui-rows__head,
+.assignments-rows .ui-rows__item {
+  grid-template-areas: 'name test kind';
+}
+
+.assignments-rows .ui-rows__item {
+  grid-template-areas:
+    'name test kind'
+    'due status attempts';
+  max-height: none;
+  height: auto;
+  padding-block: var(--space-2);
+}
+
+.assignments-rows .ui-rows__item.is-active {
+  grid-template-areas:
+    'name test kind'
+    'due status attempts'
+    'actions actions actions';
+}
+
+.cell--name {
+  grid-area: name;
+}
+
+.cell--test {
+  grid-area: test;
 }
 
 .cell--kind {
-  min-width: 4.5rem;
-  max-width: 8rem;
+  grid-area: kind;
+  min-width: 0;
+  max-width: none;
 }
 
 .cell--due {
-  min-width: 4.5rem;
-  max-width: 7rem;
+  grid-area: due;
+  min-width: 0;
+  max-width: none;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.cell--status {
+  grid-area: status;
 }
 
 .cell--attempts {
-  min-width: 4rem;
-  max-width: 6rem;
+  grid-area: attempts;
+  min-width: 0;
+  max-width: none;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.cell--actions {
+  grid-area: actions;
 }
 
 .assignments__toolbar,
@@ -325,9 +418,16 @@ function onAssigned() {
 }
 
 .assignments__actions {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
+  min-width: 0;
+  max-width: none;
   gap: var(--space-1);
+  padding-top: var(--space-1);
+}
+
+.assignments__action-icon {
+  display: none;
 }
 
 @media (max-width: 860px) {
@@ -350,29 +450,73 @@ function onAssigned() {
   }
 
   .assignments__toolbar :deep(.btn) {
+    grid-column: 1 / -1;
     margin-left: 0;
   }
 
-  .assignments-rows {
-    --ui-rows-columns: minmax(4.5rem, 1.1fr) minmax(4.5rem, 1.3fr) minmax(4.5rem, 7rem) minmax(3.5rem, 5rem);
+  .assignments-rows .ui-rows__item,
+  .assignments-rows .ui-rows__item.is-active {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      'name name'
+      'test test'
+      'status due';
+    align-items: center;
+    padding-block: var(--space-2);
   }
 
-  .assignments-rows--manage {
-    --ui-rows-columns: minmax(4.5rem, 1.1fr) minmax(4.5rem, 1.3fr) minmax(4.5rem, 7rem) minmax(3.5rem, 5rem) minmax(0, 1fr);
+  .assignments-rows .ui-rows__item.is-active {
+    grid-template-areas:
+      'name name'
+      'test test'
+      'status due'
+      'actions actions';
+  }
+
+  .assignments-rows .cell--test {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  .assignments-rows .cell--due {
+    justify-content: flex-end;
+    min-width: 0;
+    max-width: none;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .assignments-rows .cell--status {
+    min-width: 0;
+    max-width: none;
   }
 
   .cell--kind,
-  .cell--due {
+  .cell--attempts {
     display: none;
   }
 
-  .assignments__actions:not(:empty) {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .assignments__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-1);
+    padding-top: var(--space-1);
+  }
+
+  .assignments__action-label {
+    display: none;
+  }
+
+  .assignments__action-icon {
+    display: block;
   }
 
   .assignments__actions :deep(.btn) {
+    width: var(--tap-size);
+    min-width: var(--tap-size);
     min-height: var(--tap-size);
+    padding: 0;
   }
 }
 </style>

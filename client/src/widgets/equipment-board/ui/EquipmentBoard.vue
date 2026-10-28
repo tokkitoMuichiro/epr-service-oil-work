@@ -28,7 +28,7 @@ import { shortFullName } from '@shared/person-name'
 import { useIsMobile } from '@/shared/lib/media'
 import { useFitPagination, useInfiniteWindow } from '@/shared/lib/pagination'
 import { useColumnSort } from '@/shared/lib/sort'
-import { IconArrowUp, IconClose, UiButton, UiClipText, UiMobileSort, UiPagination, UiState } from '@/shared/ui'
+import { IconArrowUp, IconClose, UiButton, UiClipText, UiPagination, UiState } from '@/shared/ui'
 import EquipmentCardDialog from './EquipmentCardDialog.vue'
 
 const props = withDefaults(
@@ -105,17 +105,6 @@ function ownerTip(item: EquipmentItem) {
 function idText(item: EquipmentItem) {
   return item.type === 'CONSUMABLE' ? `${item.quantity} шт.` : identityLabel(item)
 }
-
-const sortColumns = computed(() => {
-  const columns: { key: EquipmentSortKey; label: string }[] = [
-    { key: 'name', label: 'Наименование' },
-    { key: 'identity', label: '№ / кол-во' },
-    { key: 'condition', label: 'Состояние' },
-    { key: 'documents', label: 'Документы' },
-  ]
-  if (props.showOwner) columns.push({ key: 'owner', label: 'Владелец' })
-  return columns
-})
 
 const inCategory = computed(() => props.items.filter((i) => i.category === props.category))
 
@@ -218,6 +207,7 @@ function isSelected(item: EquipmentItem) {
 }
 
 function toggle(item: EquipmentItem) {
+  if (!canTransferItem(auth.value, item, transfers.value)) return
   selectedIds.value = isSelected(item)
     ? selectedIds.value.filter((id) => id !== item.id)
     : [...selectedIds.value, item.id]
@@ -255,7 +245,6 @@ function onTransferred() {
           <option v-for="opt in kindOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
         </select>
         <span class="toolbar__count">{{ positionsLabel(visible.length) }}</span>
-        <UiMobileSort v-model:sort-key="sortKey" v-model:direction="sortDirection" :options="sortColumns" />
       </div>
     </div>
 
@@ -280,13 +269,13 @@ function onTransferred() {
 
     <template v-else>
       <div :ref="bindList" class="list ui-fill-scroll" @scroll.passive="onListScroll">
-        <div class="rows" :class="{ 'rows--plain': !selectable.length, 'rows--no-owner': !showOwner }">
+        <div class="rows" :class="{ 'rows--no-owner': !showOwner }">
           <div class="rows__head">
             <span class="cell cell--check">
               <input
-                v-if="selectable.length"
                 type="checkbox"
                 :checked="isAllSelected"
+                :disabled="!selectable.length"
                 aria-label="Выбрать все доступные для передачи"
                 @change="toggleAll"
               />
@@ -336,22 +325,23 @@ function onTransferred() {
             <li
               v-for="item in pageItems"
               :key="item.id"
-              class="rows__item"
+              class="rows__item rows__item--wrap"
               :class="{ 'rows__item--selected': isSelected(item) }"
               :data-state="rowState(item)"
               @click="detailId = item.id"
             >
               <span class="cell cell--check" @click.stop>
                 <input
-                  v-if="canTransferItem(auth, item, transfers)"
                   type="checkbox"
                   :checked="isSelected(item)"
+                  :disabled="!canTransferItem(auth, item, transfers)"
                   :aria-label="`Выбрать ${item.name}`"
                   @change="toggle(item)"
                 />
               </span>
               <span class="cell cell--name">
                 <UiClipText tag="strong" class="name" :text="item.name" />
+                <span class="id-inline mono">{{ idText(item) }}</span>
                 <UiClipText
                   v-if="pendingOfferLabel(item, transfers)"
                   class="pending"
@@ -391,9 +381,10 @@ function onTransferred() {
                   Отменить
                 </button>
                 <button
-                  v-else-if="canTransferItem(auth, item, transfers)"
+                  v-else
                   type="button"
                   class="link"
+                  :disabled="!canTransferItem(auth, item, transfers)"
                   @click="openTransfer([item])"
                 >
                   Передать
@@ -554,35 +545,10 @@ function onTransferred() {
   overflow: hidden;
 }
 
-.rows--plain .rows__head,
-.rows--plain .rows__item {
-  grid-template-columns:
-    var(--name-col)
-    var(--id-col)
-    var(--condition-col)
-    var(--docs-col)
-    var(--owner-col)
-    var(--actions-col);
-}
-
-.rows--plain .cell--check {
-  display: none;
-}
-
 .rows--no-owner .rows__head,
 .rows--no-owner .rows__item {
   grid-template-columns:
     var(--check-col)
-    var(--name-col)
-    var(--id-col)
-    var(--condition-col)
-    var(--docs-col)
-    var(--actions-col);
-}
-
-.rows--plain.rows--no-owner .rows__head,
-.rows--plain.rows--no-owner .rows__item {
-  grid-template-columns:
     var(--name-col)
     var(--id-col)
     var(--condition-col)
@@ -695,6 +661,14 @@ function onTransferred() {
   margin: 0;
   accent-color: var(--accent-strong);
   cursor: pointer;
+}
+
+.cell--check input:disabled {
+  cursor: not-allowed;
+}
+
+.id-inline {
+  display: none;
 }
 
 .name {
@@ -814,8 +788,6 @@ function onTransferred() {
   }
 
   .rows {
-    --name-col: minmax(4.5rem, 2.2fr);
-    --id-col: minmax(3rem, 0.9fr);
     --condition-col: 1.5rem;
     --docs-col: 1.5rem;
     --owner-col: minmax(3rem, 1.05fr);
@@ -835,12 +807,99 @@ function onTransferred() {
     padding: 0 var(--space-2);
   }
 
-  .rows__item {
+  .rows .rows__item {
+    grid-template-columns: var(--check-col) auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'check name name name action'
+      'check condition docs owner action';
+    align-items: start;
+    max-height: none;
+    height: auto;
     margin-bottom: var(--space-1);
+    padding: var(--space-2);
     border: 1px solid var(--border-subtle);
-    border-top-color: var(--border-subtle);
     border-radius: var(--radius);
     background: var(--surface-card);
+  }
+
+  .rows--no-owner .rows__item {
+    grid-template-columns: var(--check-col) auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'check name name action'
+      'check condition docs action';
+  }
+
+  .cell--check {
+    grid-area: check;
+    align-self: stretch;
+  }
+
+  .cell--name {
+    grid-area: name;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    min-width: 0;
+    max-width: none;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .name {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .name :deep(.clip-text__label) {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .id-inline {
+    display: block;
+    width: 100%;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .cell--id {
+    display: none;
+  }
+
+  .cell--condition {
+    grid-area: condition;
+    min-width: 1.5rem;
+    max-width: 1.5rem;
+    justify-content: flex-start;
+  }
+
+  .cell--docs {
+    grid-area: docs;
+    min-width: 1.5rem;
+    max-width: 1.5rem;
+  }
+
+  .cell--owner {
+    grid-area: owner;
+    min-width: 0;
+    max-width: none;
+    justify-content: flex-end;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+  }
+
+  .cell--actions {
+    grid-area: action;
+    align-self: stretch;
+    align-items: center;
+    min-width: 0;
+    max-width: none;
   }
 
   .rows__list .rows__item:first-child {
@@ -852,29 +911,9 @@ function onTransferred() {
     background: var(--surface-app);
   }
 
-  .pending {
+  .pending,
+  .cell--condition .muted {
     display: none;
-  }
-
-  .rows__head,
-  .rows__item {
-    min-height: var(--control-height);
-    max-height: var(--control-height);
-  }
-
-  .cell--name {
-    min-width: 4.5rem;
-  }
-
-  .cell--id,
-  .cell--owner {
-    min-width: 3rem;
-  }
-
-  .cell--condition,
-  .cell--docs {
-    min-width: 1.5rem;
-    max-width: 1.5rem;
   }
 
   .cell--actions :deep(.btn),
