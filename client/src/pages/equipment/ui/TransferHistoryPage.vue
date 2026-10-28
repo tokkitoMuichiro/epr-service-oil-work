@@ -3,15 +3,28 @@ import { computed, ref } from 'vue'
 import { TRANSFER_STATUS_LABEL, pluralRu, useEquipmentStore, type TransferStatus } from '@/entities/equipment'
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { useScrollList } from '@/shared/lib/pagination'
-import { IconArrowUp, IconEquipment, UiClipText, UiPagination, UiState } from '@/shared/ui'
+import { compareLocale, compareNumber, useColumnSort } from '@/shared/lib/sort'
+import { IconArrowUp, IconEquipment, UiClipText, UiMobileSort, UiPagination, UiState } from '@/shared/ui'
 import EquipmentExportMenu from './EquipmentExportMenu.vue'
 
 const store = useEquipmentStore()
 
+type HistorySortKey = 'date' | 'name' | 'from' | 'to' | 'qty' | 'actor' | 'status'
+
+const SORT_COLUMNS: { key: HistorySortKey; label: string }[] = [
+  { key: 'date', label: 'Дата' },
+  { key: 'name', label: 'Позиция' },
+  { key: 'from', label: 'Откуда' },
+  { key: 'to', label: 'Куда' },
+  { key: 'qty', label: 'Кол-во' },
+  { key: 'actor', label: 'Кто передал' },
+  { key: 'status', label: 'Статус' },
+]
+
 const query = ref('')
 const actor = ref('')
 const status = ref<'' | TransferStatus>('')
-const order = ref<'desc' | 'asc'>('desc')
+const { sortKey, sortDirection, toggleSort, ariaSort, arrow } = useColumnSort<HistorySortKey>('date', 'desc')
 
 const actors = computed(() => [...new Set(store.transfers.map((t) => t.actorName))].sort((a, b) => a.localeCompare(b, 'ru')))
 
@@ -23,11 +36,18 @@ const rows = computed(() => {
     if (!q) return true
     return [t.equipmentName, t.factoryNumber, t.fromLabel, t.toLabel].some((v) => v?.toLowerCase().includes(q))
   })
-  const sign = order.value === 'desc' ? -1 : 1
-  return list.sort((a, b) => sign * a.createdAt.localeCompare(b.createdAt))
+  return list.sort((a, b) => {
+    if (sortKey.value === 'qty') return compareNumber(a.quantity, b.quantity, sortDirection.value) || compareLocale(a.equipmentName, b.equipmentName, 'asc')
+    if (sortKey.value === 'status') return compareLocale(TRANSFER_STATUS_LABEL[a.status], TRANSFER_STATUS_LABEL[b.status], sortDirection.value)
+    if (sortKey.value === 'name') return compareLocale(a.equipmentName, b.equipmentName, sortDirection.value)
+    if (sortKey.value === 'from') return compareLocale(a.fromLabel, b.fromLabel, sortDirection.value)
+    if (sortKey.value === 'to') return compareLocale(a.toLabel, b.toLabel, sortDirection.value)
+    if (sortKey.value === 'actor') return compareLocale(a.actorName, b.actorName, sortDirection.value)
+    return compareLocale(a.createdAt, b.createdAt, sortDirection.value)
+  })
 })
 
-const list = useScrollList(rows, { resetOn: [query, actor, status, order] })
+const list = useScrollList(rows, { resetOn: [query, actor, status, sortKey, sortDirection] })
 
 function tone(value: TransferStatus) {
   if (value === 'PENDING') return 'warn'
@@ -49,10 +69,7 @@ function tone(value: TransferStatus) {
           <option value="">Все статусы</option>
           <option v-for="(label, value) in TRANSFER_STATUS_LABEL" :key="value" :value="value">{{ label }}</option>
         </select>
-        <select v-model="order" class="ui-control" aria-label="Порядок">
-          <option value="desc">Сначала новые</option>
-          <option value="asc">Сначала старые</option>
-        </select>
+        <UiMobileSort v-model:sort-key="sortKey" v-model:direction="sortDirection" :options="SORT_COLUMNS" />
         <div class="filters__export">
           <EquipmentExportMenu />
         </div>
@@ -68,13 +85,41 @@ function tone(value: TransferStatus) {
           style="--ui-rows-columns: minmax(6.5rem, 0.9fr) minmax(6rem, 1.4fr) minmax(4.5rem, 1fr) minmax(4.5rem, 1fr) minmax(3.5rem, 4.5rem) minmax(4.5rem, 0.9fr) minmax(5.5rem, 7rem)"
         >
           <div class="ui-rows__head">
-            <span class="ui-rows__cell">Дата</span>
-            <span class="ui-rows__cell ui-rows__cell--name">Позиция</span>
-            <span class="ui-rows__cell">Откуда</span>
-            <span class="ui-rows__cell">Куда</span>
-            <span class="ui-rows__cell cell--qty">Кол-во</span>
-            <span class="ui-rows__cell">Кто передал</span>
-            <span class="ui-rows__cell">Статус</span>
+            <span class="ui-rows__cell" :aria-sort="ariaSort('date')">
+              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'date' }" @click="toggleSort('date')">
+                Дата<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('date') }}</span>
+              </button>
+            </span>
+            <span class="ui-rows__cell ui-rows__cell--name" :aria-sort="ariaSort('name')">
+              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'name' }" @click="toggleSort('name')">
+                Позиция<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('name') }}</span>
+              </button>
+            </span>
+            <span class="ui-rows__cell" :aria-sort="ariaSort('from')">
+              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'from' }" @click="toggleSort('from')">
+                Откуда<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('from') }}</span>
+              </button>
+            </span>
+            <span class="ui-rows__cell" :aria-sort="ariaSort('to')">
+              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'to' }" @click="toggleSort('to')">
+                Куда<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('to') }}</span>
+              </button>
+            </span>
+            <span class="ui-rows__cell cell--qty" :aria-sort="ariaSort('qty')">
+              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'qty' }" @click="toggleSort('qty')">
+                Кол-во<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('qty') }}</span>
+              </button>
+            </span>
+            <span class="ui-rows__cell" :aria-sort="ariaSort('actor')">
+              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'actor' }" @click="toggleSort('actor')">
+                Кто передал<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('actor') }}</span>
+              </button>
+            </span>
+            <span class="ui-rows__cell" :aria-sort="ariaSort('status')">
+              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'status' }" @click="toggleSort('status')">
+                Статус<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('status') }}</span>
+              </button>
+            </span>
           </div>
           <ul class="ui-rows__list" aria-label="История передач">
             <li v-for="t in list.pageItems" :key="t.id" class="ui-rows__item">
@@ -132,7 +177,7 @@ function tone(value: TransferStatus) {
 <style scoped>
 .filters {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(140px, 0.7fr)) auto;
+  grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(140px, 0.7fr)) auto;
   gap: var(--space-2);
   align-items: center;
 }

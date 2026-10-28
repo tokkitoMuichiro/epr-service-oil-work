@@ -39,8 +39,8 @@ withDefaults(
   display: inline-grid;
   flex: none;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   background: var(--surface-sunken);

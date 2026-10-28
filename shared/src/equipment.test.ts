@@ -31,6 +31,7 @@ import {
   positionsLabel,
   repairOrigin,
   sortEquipment,
+  sortEquipmentBy,
   validateEquipmentDraft,
   validateEquipmentPatch,
   withKeeperWarehouses,
@@ -284,6 +285,23 @@ describe('equipment lists', () => {
       sorted.map((i) => i.id),
       ['c', 'b', 'a'],
     )
+  })
+
+  it('sorts equipment by a chosen column', () => {
+    const sorted = sortEquipmentBy(
+      [
+        item({ id: 'a', name: 'Анкер', hasDocuments: false }),
+        item({ id: 'b', name: 'Болгарка', hasDocuments: true, fillStatus: 'NEEDS_FIX' }),
+      ],
+      'documents',
+      'desc',
+      { owner: () => '', identity: (entry) => entry.factoryNumber ?? '' },
+    )
+    assert.deepEqual(
+      sorted.map((entry) => entry.id),
+      ['b', 'a'],
+    )
+    assert.equal(sorted[0]?.fillStatus, 'NEEDS_FIX')
   })
 
   it('finds who sent an item to repair', () => {

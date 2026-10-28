@@ -75,26 +75,25 @@ export function pageNumbers(page: number, pageCount: number, siblingCount = 1): 
 }
 
 /**
- * One-row pager: current, neighbour, last. On page 2 that is `1, 2, 3, …, last`.
- * From page 3 the window slides off 1 so the UI can show a jump-to-first control.
+ * Fixed-width window of up to 5 page numbers so the pager does not grow
+ * when moving from page 1 (no extra «3» / first-page jump).
  */
 export function compactPageNumbers(page: number, pageCount: number): PageNumberToken[] {
   const last = Math.max(1, Math.trunc(pageCount) || 1)
   const current = Math.min(Math.max(1, Math.trunc(page) || 1), last)
-
   if (last <= 5) return Array.from({ length: last }, (_, i) => i + 1)
 
-  const left = current <= 1 ? 1 : current - 1
-  const right = Math.min(last, current + 1)
-
-  if (right >= last) {
-    const start = Math.min(left, Math.max(1, last - 2))
-    return Array.from({ length: last - start + 1 }, (_, i) => start + i)
+  const size = 5
+  let start = current - Math.floor(size / 2)
+  let end = start + size - 1
+  if (start < 1) {
+    end += 1 - start
+    start = 1
   }
-
-  const tokens: PageNumberToken[] = []
-  for (let n = left; n <= right; n += 1) tokens.push(n)
-  if (right < last - 1) tokens.push('ellipsis')
-  tokens.push(last)
-  return tokens
+  if (end > last) {
+    start -= end - last
+    end = last
+  }
+  start = Math.max(1, start)
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i)
 }

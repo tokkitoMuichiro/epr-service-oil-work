@@ -7,6 +7,7 @@ import { WarehouseFormDialog } from '@/features/warehouse-form'
 import { shortFullName } from '@shared/person-name'
 import { useIsMobile } from '@/shared/lib/media'
 import { useFitPagination, useInfiniteWindow } from '@/shared/lib/pagination'
+import { compareLocale, compareNumber, useColumnSort } from '@/shared/lib/sort'
 import {
   IconArrowUp,
   IconClose,
@@ -15,6 +16,7 @@ import {
   IconTrash,
   UiButton,
   UiClipText,
+  UiMobileSort,
   UiPagination,
   UiState,
   askConfirm,
@@ -33,11 +35,35 @@ const sentinelEl = ref<HTMLElement | null>(null)
 const showScrollTop = ref(false)
 const canManage = computed(() => canManageWarehouses(store.auth))
 
-const bases = computed(() =>
-  [...store.warehouses].sort((a, b) => Number(b.isSystem) - Number(a.isSystem) || a.name.localeCompare(b.name, 'ru')),
-)
+type WarehouseSortKey = 'name' | 'address' | 'keepers' | 'total'
 
-const resetOn = [bases]
+const SORT_COLUMNS: { key: WarehouseSortKey; label: string }[] = [
+  { key: 'name', label: 'Название' },
+  { key: 'address', label: 'Адрес' },
+  { key: 'keepers', label: 'Кладовщики' },
+  { key: 'total', label: 'Всего' },
+]
+
+const { sortKey, sortDirection, toggleSort, ariaSort, arrow } = useColumnSort<WarehouseSortKey>('name')
+
+const bases = computed(() => {
+  const list = [...store.warehouses]
+  return list.sort((a, b) => {
+    const system = Number(b.isSystem) - Number(a.isSystem)
+    if (system) return system
+    if (sortKey.value === 'total') {
+      return (
+        compareNumber(store.itemsOnWarehouse(a.id).length, store.itemsOnWarehouse(b.id).length, sortDirection.value) ||
+        compareLocale(a.name, b.name, 'asc')
+      )
+    }
+    if (sortKey.value === 'address') return compareLocale(a.address || '', b.address || '', sortDirection.value) || compareLocale(a.name, b.name, 'asc')
+    if (sortKey.value === 'keepers') return compareLocale(keepersOf(a), keepersOf(b), sortDirection.value) || compareLocale(a.name, b.name, 'asc')
+    return compareLocale(a.name, b.name, sortDirection.value)
+  })
+})
+
+const resetOn = [bases, sortKey, sortDirection]
 const pager = useFitPagination(bases, { resetOn })
 const infinite = useInfiniteWindow(bases, { enabled: isMobile, resetOn })
 const pageItems = computed(() => (isMobile.value ? infinite.pageItems : pager.pageItems))
@@ -141,6 +167,7 @@ async function remove(w: Warehouse) {
         попадает всё со статусом «В ремонте».
       </p>
       <div class="page__actions">
+        <UiMobileSort v-model:sort-key="sortKey" v-model:direction="sortDirection" :options="SORT_COLUMNS" />
         <UiButton v-if="canManage" variant="primary" @click="openForm(null)">
           <span class="ui-hide-mobile">Новая база</span>
           <span class="page__add-short">Добавить</span>
@@ -160,10 +187,26 @@ async function remove(w: Warehouse) {
       <div :ref="bindList" class="list ui-fill-scroll" @scroll.passive="onListScroll">
         <div class="rows" :class="{ 'rows--manage': canManage }">
           <div class="rows__head">
-            <span class="cell cell--name">Название</span>
-            <span class="cell cell--address">Адрес</span>
-            <span class="cell cell--keepers">Кладовщики</span>
-            <span class="cell cell--total">Всего</span>
+            <span class="cell cell--name" :aria-sort="ariaSort('name')">
+              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'name' }" @click="toggleSort('name')">
+                Название<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('name') }}</span>
+              </button>
+            </span>
+            <span class="cell cell--address" :aria-sort="ariaSort('address')">
+              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'address' }" @click="toggleSort('address')">
+                Адрес<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('address') }}</span>
+              </button>
+            </span>
+            <span class="cell cell--keepers" :aria-sort="ariaSort('keepers')">
+              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'keepers' }" @click="toggleSort('keepers')">
+                Кладовщики<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('keepers') }}</span>
+              </button>
+            </span>
+            <span class="cell cell--total" :aria-sort="ariaSort('total')">
+              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'total' }" @click="toggleSort('total')">
+                Всего<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('total') }}</span>
+              </button>
+            </span>
             <span v-if="canManage" class="cell cell--actions" />
           </div>
           <ul class="rows__list" aria-label="Производственные базы">
@@ -289,8 +332,8 @@ async function remove(w: Warehouse) {
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  min-height: var(--control-height);
-  max-height: var(--control-height);
+  min-height: var(--control-height-sm);
+  max-height: var(--control-height-sm);
   padding: 0 var(--space-3);
   overflow: hidden;
 }
@@ -305,7 +348,7 @@ async function remove(w: Warehouse) {
   top: 0;
   z-index: 1;
   min-height: var(--control-height-sm);
-  max-height: var(--control-height);
+  max-height: var(--control-height-sm);
   border-bottom: 1px solid var(--border-subtle);
   background: var(--table-head-bg);
   color: var(--text-secondary);
@@ -481,6 +524,8 @@ async function remove(w: Warehouse) {
   .rows__item {
     gap: var(--space-1);
     margin-bottom: var(--space-1);
+    min-height: var(--control-height);
+    max-height: var(--control-height);
     padding: 0 var(--space-2);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius);

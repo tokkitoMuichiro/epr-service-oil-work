@@ -46,15 +46,14 @@ describe('pagination', () => {
     assert.deepEqual(pageNumbers(1, 10, 2), [1, 2, 3, 4, 5, 6, 'ellipsis', 10])
   })
 
-  it('builds a one-row window that shows the next page and drops 1 from page 3', () => {
+  it('keeps a 5-number window so page 1 and 2 have the same button count', () => {
     assert.deepEqual(compactPageNumbers(1, 1), [1])
     assert.deepEqual(compactPageNumbers(2, 5), [1, 2, 3, 4, 5])
-    assert.deepEqual(compactPageNumbers(1, 10), [1, 2, 'ellipsis', 10])
-    assert.deepEqual(compactPageNumbers(2, 10), [1, 2, 3, 'ellipsis', 10])
-    assert.deepEqual(compactPageNumbers(2, 6), [1, 2, 3, 'ellipsis', 6])
-    assert.deepEqual(compactPageNumbers(3, 10), [2, 3, 4, 'ellipsis', 10])
-    assert.deepEqual(compactPageNumbers(8, 10), [7, 8, 9, 10])
-    assert.deepEqual(compactPageNumbers(9, 10), [8, 9, 10])
-    assert.deepEqual(compactPageNumbers(10, 10), [8, 9, 10])
+    assert.deepEqual(compactPageNumbers(1, 10), [1, 2, 3, 4, 5])
+    assert.deepEqual(compactPageNumbers(2, 10), [1, 2, 3, 4, 5])
+    assert.deepEqual(compactPageNumbers(3, 10), [1, 2, 3, 4, 5])
+    assert.deepEqual(compactPageNumbers(4, 10), [2, 3, 4, 5, 6])
+    assert.deepEqual(compactPageNumbers(8, 10), [6, 7, 8, 9, 10])
+    assert.deepEqual(compactPageNumbers(10, 10), [6, 7, 8, 9, 10])
   })
 })
