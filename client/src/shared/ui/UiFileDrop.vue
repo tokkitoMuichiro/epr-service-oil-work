@@ -9,8 +9,9 @@ const props = withDefaults(
     multiple?: boolean
     disabled?: boolean
     compact?: boolean
+    accept?: string
   }>(),
-  { hint: 'PDF, изображения, документы', multiple: true, disabled: false, compact: false },
+  { hint: 'PDF, изображения, документы', multiple: true, disabled: false, compact: false, accept: '' },
 )
 
 const emit = defineEmits<{ pick: [files: File[]] }>()
@@ -21,7 +22,7 @@ const input = ref<HTMLInputElement | null>(null)
 
 let dragDepth = 0
 
-function accept(list: FileList | null) {
+function takeFiles(list: FileList | null) {
   if (!list || props.disabled) return
   const files = Array.from(list)
   const tooBig = files.filter((f) => f.size > props.maxBytes).map((f) => f.name)
@@ -49,12 +50,12 @@ function onDragLeave() {
 function onDrop(event: DragEvent) {
   dragDepth = 0
   isOver.value = false
-  accept(event.dataTransfer?.files ?? null)
+  takeFiles(event.dataTransfer?.files ?? null)
 }
 
 function onPick(event: Event) {
   const target = event.target as HTMLInputElement
-  accept(target.files)
+  takeFiles(target.files)
   target.value = ''
 }
 </script>
@@ -87,7 +88,7 @@ function onPick(event: Event) {
       </svg>
       <span><strong>Перетащите {{ multiple ? 'файлы' : 'файл' }} сюда</strong> или нажмите, чтобы выбрать</span>
       <small>{{ hint }} — до {{ formatFileSize(maxBytes) }}</small>
-      <input ref="input" type="file" :multiple="multiple" hidden @change="onPick" />
+      <input ref="input" type="file" :multiple="multiple" :accept="accept || undefined" hidden @change="onPick" />
     </div>
     <p v-if="rejected" class="file-drop__error">{{ rejected }}</p>
   </div>
