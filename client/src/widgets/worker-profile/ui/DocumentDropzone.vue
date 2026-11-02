@@ -138,21 +138,22 @@ defineExpose({ clear })
           </label>
           <label class="pending__wide">
             <span>Название</span>
-            <input
+            <textarea
               v-model="item.title"
-              class="ui-control"
-              :placeholder="item.file.name"
+              class="ui-control pending__title"
+              rows="2"
+              placeholder="Название документа"
               @input="item.isTitleTouched = true"
             />
           </label>
           <template v-if="item.typeId">
             <label>
               <span>Номер</span>
-              <input v-model="item.number" class="ui-control" placeholder="№ удостоверения" />
+              <input v-model="item.number" class="ui-control" size="1" placeholder="№ удостоверения" />
             </label>
             <label v-if="hasGroup(item)">
               <span>Группа</span>
-              <input v-model="item.group" class="ui-control" placeholder="III" />
+              <input v-model="item.group" class="ui-control" size="1" placeholder="III" />
             </label>
             <label>
               <span>Дата выдачи</span>
@@ -164,7 +165,7 @@ defineExpose({ clear })
             </label>
             <label class="pending__wide">
               <span>Кем выдан</span>
-              <input v-model="item.issuer" class="ui-control" placeholder="Учебный центр" />
+              <input v-model="item.issuer" class="ui-control" size="1" placeholder="Учебный центр" />
             </label>
           </template>
           <label v-else>
@@ -190,6 +191,7 @@ defineExpose({ clear })
 <style scoped>
 .upload {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
   min-width: 0;
   max-width: 100%;
@@ -197,12 +199,14 @@ defineExpose({ clear })
 
 .upload__error {
   margin: 0;
+  overflow-wrap: anywhere;
   font-size: var(--font-size-sm);
   color: var(--status-bad-fg);
 }
 
 .pending {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
   margin: 0;
   padding: 0;
@@ -213,6 +217,7 @@ defineExpose({ clear })
 
 .pending__item {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
   min-width: 0;
   max-width: 100%;
@@ -224,9 +229,10 @@ defineExpose({ clear })
 
 .pending__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-2);
+  min-width: 0;
   margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) 0 0;
 }
 
@@ -255,11 +261,20 @@ defineExpose({ clear })
 }
 
 .pending__fields input,
-.pending__fields select {
+.pending__fields select,
+.pending__fields textarea {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
   max-width: 100%;
+}
+
+.pending__title {
+  min-height: calc(var(--control-height) * 2);
+  padding-block: 8px;
+  overflow-wrap: anywhere;
+  resize: vertical;
+  field-sizing: fixed;
 }
 
 .pending__remove {
@@ -283,16 +298,18 @@ defineExpose({ clear })
 }
 
 .pending__file {
+  flex: 1 1 0;
   min-width: 0;
   font-size: var(--font-size-xs);
   color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: var(--line-height-tight);
+  overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
 }
 
 .pending__note {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: var(--font-size-xs);
   color: var(--text-secondary);
 }

@@ -96,7 +96,10 @@ function onPick(event: Event) {
 <style scoped>
 .file-drop {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .drop {
@@ -151,6 +154,7 @@ function onPick(event: Event) {
 
 .file-drop__error {
   margin: 0;
+  overflow-wrap: anywhere;
   font-size: var(--font-size-xs);
   color: var(--status-bad-fg);
 }
