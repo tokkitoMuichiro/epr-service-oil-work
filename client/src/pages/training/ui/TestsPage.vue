@@ -24,7 +24,7 @@ const router = useRouter()
 
 const search = ref('')
 const programFilter = ref('')
-const statusFilter = ref<TestStatus | ''>('')
+const statusFilter = ref<TestStatus | ''>('published')
 const elKind = ref('')
 const elGroup = ref('')
 const elVoltage = ref('')
