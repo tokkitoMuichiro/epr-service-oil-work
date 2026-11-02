@@ -163,7 +163,8 @@ export function isValidSnils(value: string): boolean {
   return SNILS_FORMAT.test(value)
 }
 
-export function trainingDocState(expiresAt: string, today: string): TrainingDocState {
+export function trainingDocState(expiresAt: string | undefined, today: string): TrainingDocState {
+  if (!expiresAt) return 'valid'
   const left = daysBetweenIso(today, expiresAt)
   if (left < 0) return 'expired'
   if (left <= TRAINING_EXPIRING_DAYS) return 'expiring'

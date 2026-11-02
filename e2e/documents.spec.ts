@@ -15,6 +15,10 @@ test('документ сотрудника загружается, скачив
   const link = card.getByRole('button', { name: 'Удостоверение E2E', exact: true })
   await expect(link).toBeVisible()
   await expect(card.getByText('Удостоверение e2e.txt')).toBeVisible()
+  const uploaded = card.locator('li', { has: link })
+  await expect(uploaded.getByText('Срок действия')).toBeVisible()
+  await expect(uploaded.getByText('бессрочно')).toBeVisible()
+  await expect(uploaded.getByText('Действует')).toBeVisible()
 
   const downloaded = await downloadText(page, link)
   expect(downloaded.name).toBe(file.name)
