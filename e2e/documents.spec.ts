@@ -3,35 +3,36 @@ import { downloadText, textFile } from './support/files'
 import { listRow } from './support/lists'
 import { openWorker } from './support/personnel'
 
-test('документ сотрудника загружается, скачивается и удаляется', async ({ page }) => {
+test('документ сотрудника загружается, скачивается и удаляется', async ({ page }, testInfo) => {
   const card = await openWorker(page, 'Кузнецов Артём Дмитриевич')
   await card.getByRole('tab', { name: 'Документы' }).click()
 
-  const file = textFile('Удостоверение e2e.txt', 'Удостоверение № E2E-1')
+  const stamp = `${testInfo.workerIndex}-${testInfo.retry}-${Date.now()}`
+  const title = `Удостоверение E2E ${stamp}`
+  const file = textFile(`Удостоверение e2e ${stamp}.txt`, 'Удостоверение № E2E-1')
   await card.locator('input[type=file]').setInputFiles(file)
-  await card.getByLabel('Название').fill('Удостоверение E2E')
+  await card.getByLabel('Название').fill(title)
   await card.getByRole('button', { name: 'Загрузить (1)' }).click()
 
-  const link = card.getByRole('button', { name: 'Удостоверение E2E', exact: true })
+  const row = card.locator('li').filter({ hasText: file.name })
+  const link = row.getByRole('button', { name: title, exact: true })
   await expect(link).toBeVisible()
-  await expect(card.getByText('Удостоверение e2e.txt')).toBeVisible()
-  const uploaded = card.locator('li', { has: link })
-  await expect(uploaded.getByText('Срок действия')).toBeVisible()
-  await expect(uploaded.getByText('бессрочно')).toBeVisible()
-  await expect(uploaded.getByText('Действует')).toBeVisible()
+  await expect(row.getByText('Срок действия')).toBeVisible()
+  await expect(row.getByText('бессрочно')).toBeVisible()
+  await expect(row.getByText('Действует')).toBeVisible()
 
   const downloaded = await downloadText(page, link)
   expect(downloaded.name).toBe(file.name)
   expect(downloaded.text).toBe('Удостоверение № E2E-1')
 
-  await card.getByRole('button', { name: 'Удалить Удостоверение E2E' }).click()
-  await page.getByRole('alertdialog', { name: 'Удалить документ «Удостоверение E2E»?' }).getByRole('button', { name: 'Удалить документ' }).click()
-  await expect(link).toHaveCount(0)
+  await row.getByRole('button', { name: `Удалить ${title}` }).click()
+  await page.getByRole('alertdialog', { name: `Удалить документ «${title}»?` }).getByRole('button', { name: 'Удалить документ' }).click()
+  await expect(card.getByRole('button', { name: title, exact: true })).toHaveCount(0)
 
   await page.reload()
   const reopened = await openWorker(page, 'Кузнецов Артём Дмитриевич')
   await reopened.getByRole('tab', { name: 'Документы' }).click()
-  await expect(reopened.getByRole('button', { name: 'Удостоверение E2E', exact: true })).toHaveCount(0)
+  await expect(reopened.getByRole('button', { name: title, exact: true })).toHaveCount(0)
 })
 
 test('документ оборудования загружается в папку позиции, скачивается и удаляется', async ({ page }) => {
