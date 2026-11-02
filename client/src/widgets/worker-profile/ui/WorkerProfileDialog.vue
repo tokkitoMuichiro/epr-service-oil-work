@@ -441,6 +441,7 @@ useEscape(
 <style scoped>
 .overlay {
   z-index: var(--z-overlay);
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -463,6 +464,8 @@ useEscape(
 }
 
 .profile {
+  min-width: 0;
+  max-width: 100%;
   height: min(760px, calc(100vh - 2rem));
   height: min(760px, calc(100dvh - 2rem));
 }
@@ -470,6 +473,7 @@ useEscape(
 .profile__body {
   display: grid;
   gap: var(--space-5);
+  min-width: 0;
   align-content: start;
 }
 
@@ -710,6 +714,8 @@ useEscape(
 .docs {
   display: grid;
   gap: var(--space-3);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .docs h3 {

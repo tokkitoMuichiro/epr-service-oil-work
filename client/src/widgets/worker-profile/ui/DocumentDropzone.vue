@@ -129,7 +129,7 @@ defineExpose({ clear })
           </button>
         </div>
         <div class="pending__fields">
-          <label>
+          <label class="pending__wide">
             <span>Вид документа</span>
             <select v-model="item.typeId" class="ui-control" @change="onTypeChange(item)">
               <option value="">{{ OTHER_QUALIFICATION_LABEL }}</option>
@@ -150,20 +150,24 @@ defineExpose({ clear })
               <span>Номер</span>
               <input v-model="item.number" class="ui-control" placeholder="№ удостоверения" />
             </label>
+            <label v-if="hasGroup(item)">
+              <span>Группа</span>
+              <input v-model="item.group" class="ui-control" placeholder="III" />
+            </label>
             <label>
               <span>Дата выдачи</span>
               <input v-model="item.issuedAt" class="ui-control" type="date" @change="syncExpiry(item)" />
+            </label>
+            <label>
+              <span>Действует до</span>
+              <input v-model="item.expiresAt" class="ui-control" type="date" @input="item.isExpiryTouched = true" />
             </label>
             <label class="pending__wide">
               <span>Кем выдан</span>
               <input v-model="item.issuer" class="ui-control" placeholder="Учебный центр" />
             </label>
-            <label v-if="hasGroup(item)">
-              <span>Группа</span>
-              <input v-model="item.group" class="ui-control" placeholder="III" />
-            </label>
           </template>
-          <label>
+          <label v-else>
             <span>Действует до</span>
             <input v-model="item.expiresAt" class="ui-control" type="date" @input="item.isExpiryTouched = true" />
           </label>
@@ -187,6 +191,8 @@ defineExpose({ clear })
 .upload {
   display: grid;
   gap: var(--space-3);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .upload__error {
@@ -201,11 +207,15 @@ defineExpose({ clear })
   margin: 0;
   padding: 0;
   list-style: none;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .pending__item {
   display: grid;
   gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
   padding: var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
@@ -222,12 +232,14 @@ defineExpose({ clear })
 
 .pending__fields {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .pending__wide {
-  grid-column: span 2;
+  grid-column: 1 / -1;
 }
 
 .pending__fields label {
@@ -244,7 +256,10 @@ defineExpose({ clear })
 
 .pending__fields input,
 .pending__fields select {
+  box-sizing: border-box;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .pending__remove {
@@ -284,17 +299,15 @@ defineExpose({ clear })
 
 .upload__actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 @media (max-width: 560px) {
   .pending__fields {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .pending__wide {
-    grid-column: auto;
   }
 
   .upload__actions :deep(.btn) {
