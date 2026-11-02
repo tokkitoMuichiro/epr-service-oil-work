@@ -88,6 +88,14 @@ function documentMeta(doc: { qualificationTypeId?: string; number?: string; grou
     .join(' · ')
 }
 
+function documentState(expiresAt: string | undefined) {
+  return trainingDocState(expiresAt, today.value)
+}
+
+function documentExpiryText(expiresAt: string | undefined) {
+  return expiresAt ? `до ${formatDateRu(expiresAt)}` : 'бессрочно'
+}
+
 const initials = computed(() => initialsOf(worker.value?.fullName ?? ''))
 
 const draft = computed<WorkerDraft | null>(() => {
@@ -399,10 +407,15 @@ useEscape(
                   <span class="doc__meta">
                     {{ doc.fileName }}<template v-if="doc.size"> · {{ formatFileSize(doc.size) }}</template>
                     · загружен {{ formatDateRu(doc.uploadedAt.slice(0, 10)) }}
-                    <template v-if="doc.expiresAt"> · до {{ formatDateRu(doc.expiresAt) }}</template>
                   </span>
+                  <div class="doc__validity" :data-state="documentState(doc.expiresAt)">
+                    <p class="doc__until">
+                      <span class="doc__until-label">Срок действия</span>
+                      <span class="doc__until-value">{{ documentExpiryText(doc.expiresAt) }}</span>
+                    </p>
+                    <TrainingStateBadge :state="documentState(doc.expiresAt)" />
+                  </div>
                 </div>
-                <TrainingStateBadge v-if="doc.expiresAt" :state="trainingDocState(doc.expiresAt, today)" />
                 <button
                   v-if="canEdit"
                   type="button"
@@ -718,16 +731,17 @@ useEscape(
 
 .doc {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-3);
   min-height: 56px;
-  padding: var(--space-2) var(--space-1) var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-1) var(--space-3) var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
 }
 
 .doc__icon {
   flex: none;
+  margin-top: var(--space-1);
   color: var(--status-info-fg);
 }
 
@@ -735,10 +749,10 @@ useEscape(
   display: grid;
   flex: 1;
   min-width: 0;
+  gap: var(--space-1);
 }
 
 .doc__link {
-  overflow: hidden;
   padding: 0;
   border: 0;
   background: none;
@@ -746,20 +760,72 @@ useEscape(
   font: inherit;
   font-size: var(--font-size-sm);
   font-weight: 600;
+  line-height: var(--line-height-tight);
   text-align: left;
   text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 
 .doc__meta {
-  overflow: hidden;
   font-size: var(--font-size-xs);
   color: var(--text-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: var(--line-height-tight);
+  overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
+}
+
+.doc__validity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--surface-sunken);
+  box-shadow: inset 3px 0 0 var(--status-ok-solid);
+}
+
+.doc__validity[data-state='expiring'] {
+  box-shadow: inset 3px 0 0 var(--status-warn-solid);
+}
+
+.doc__validity[data-state='expired'] {
+  box-shadow: inset 3px 0 0 var(--status-bad-solid);
+}
+
+.doc__until {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.doc__until-label {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.doc__until-value {
+  color: var(--status-ok-fg);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.doc__validity[data-state='expiring'] .doc__until-value {
+  color: var(--status-warn-fg);
+}
+
+.doc__validity[data-state='expired'] .doc__until-value {
+  color: var(--status-bad-fg);
+}
+
+.doc__validity :deep(.ui-badge) {
+  flex: none;
 }
 
 .doc__remove {

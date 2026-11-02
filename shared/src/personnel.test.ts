@@ -78,6 +78,8 @@ describe('personnel', () => {
     assert.equal(trainingDocState('2026-09-28', today), 'expired')
     assert.equal(trainingDocState('2026-10-29', today), 'expiring')
     assert.equal(trainingDocState('2026-10-30', today), 'valid')
+    assert.equal(trainingDocState(undefined, today), 'valid')
+    assert.equal(trainingDocState('', today), 'valid')
     assert.equal(worstTrainingState([doc('2027-01-01'), doc('2026-10-01')], today), 'expiring')
     assert.equal(worstTrainingState([], today), null)
     assert.equal(worstTrainingState([doc()], today), null)
