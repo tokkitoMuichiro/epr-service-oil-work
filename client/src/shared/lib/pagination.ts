@@ -107,7 +107,11 @@ export function useFitPagination<T>(items: MaybeRefOrGetter<readonly T[]>, optio
 
     const measured = measureRowHeight(root)
     if (measured > 0) lockedRowPx = measured
-    const rowHeight = lockedRowPx || estimateRowPx
+    // Wrapped titles make rows much taller than a compact control. Using that height
+    // collapses pageSize toward FIT_MIN and splits a short list across pages; keep
+    // capacity on the compact estimate and let the scrollport absorb wrap overflow.
+    const rowHeight =
+      lockedRowPx > 0 && lockedRowPx <= estimateRowPx * 1.35 ? lockedRowPx : estimateRowPx
 
     const head = root.querySelector('thead, .ui-rows__head')
     const headH = head instanceof HTMLElement ? head.offsetHeight : 0
