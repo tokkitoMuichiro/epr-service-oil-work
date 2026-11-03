@@ -255,23 +255,34 @@ const title = computed(() => {
         </label>
       </div>
 
-      <label>
-        <span>Тест</span>
-        <select v-model="testId" required>
-          <option v-if="!tests.length" value="" disabled>Нет опубликованных тестов</option>
-          <option v-for="t in tests" :key="t.id" :value="t.id">
-            {{ t.title }}{{ t.electrical ? ` — ${describeElectricalScope(t.electrical)}` : '' }}
-          </option>
-        </select>
-      </label>
-      <p v-if="!tests.length && store.status === 'ready'" class="ui-form__hint">
-        {{
-          programId
-            ? `По программе «${store.titleOf(programId)}» нет опубликованного теста`
-            : 'Нет опубликованных тестов'
-        }}
-        — создайте и опубликуйте тест в разделе «Обучение → Тесты».
-      </p>
+      <div class="assign__tests-field">
+        <span id="assign-test-label" class="assign__tests-label">Тест</span>
+        <ul
+          v-if="tests.length"
+          class="assign__tests"
+          role="radiogroup"
+          aria-labelledby="assign-test-label"
+        >
+          <li v-for="t in tests" :key="t.id">
+            <label class="assign__test">
+              <input v-model="testId" type="radio" name="assign-test" :value="t.id" required />
+              <span class="assign__test-body">
+                <strong>{{ t.title }}</strong>
+                <small v-if="t.electrical">{{ describeElectricalScope(t.electrical) }}</small>
+              </span>
+            </label>
+          </li>
+        </ul>
+        <p v-else-if="store.status === 'ready'" class="ui-form__hint">
+          {{
+            programId
+              ? `По программе «${store.titleOf(programId)}» нет опубликованного теста`
+              : 'Нет опубликованных тестов'
+          }}
+          — создайте и опубликуйте тест в разделе «Обучение → Тесты».
+        </p>
+        <p v-else class="ui-form__note">Нет опубликованных тестов</p>
+      </div>
       <p v-if="test" class="ui-form__note">
         {{ test.questionCount }} вопр. в банке · порог {{ test.passPercent }} % · попыток {{ test.attemptsPerAssignment }}
         <template v-if="test.timeLimitMin"> · {{ test.timeLimitMin }} мин</template>
@@ -369,6 +380,77 @@ const title = computed(() => {
   min-width: 0;
 }
 
+.assign__tests-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.assign__tests-label {
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.assign__tests {
+  display: grid;
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  list-style: none;
+  min-width: 0;
+}
+
+.assign__tests li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ui-form .assign__test {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: var(--tap-size);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+
+.assign__test input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.assign__test-body {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
+}
+
+.assign__test-body strong {
+  color: var(--text-primary);
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.assign__test-body small {
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
 .assign__people {
   display: grid;
   max-height: 320px;
@@ -439,7 +521,8 @@ const title = computed(() => {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .assign__person:hover {
+  .assign__person:hover,
+  .assign__test:hover {
     background: var(--row-hover-bg);
   }
 }

@@ -217,7 +217,16 @@ async function archive() {
 async function remove() {
   const id = testId.value
   if (!id) return
-  if (!(await askConfirm({ title: 'Удалить тест безвозвратно?', confirmText: 'Удалить тест' }))) return
+  const confirmed = await askConfirm({
+    title: 'Удалить тест безвозвратно?',
+    message:
+      test.value?.status === 'draft'
+        ? 'Черновик будет удалён без возможности восстановления.'
+        : 'Тест, его версии, назначения и результаты по нему будут удалены без возможности восстановления.',
+    confirmText: 'Удалить тест',
+    tone: 'danger',
+  })
+  if (!confirmed) return
   return run(async () => {
     await trainingApi.removeTest(id)
     await store.refresh()
@@ -399,7 +408,7 @@ const bankInfo = computed(() => {
 
       <div class="editor__actions">
         <UiButton v-if="test && test.status !== 'archived'" variant="ghost" :disabled="busy" @click="archive">В архив</UiButton>
-        <UiButton v-if="test && test.status === 'draft'" variant="ghost" :disabled="busy" @click="remove">Удалить</UiButton>
+        <UiButton v-if="test" variant="ghost" :disabled="busy" @click="remove">Удалить</UiButton>
         <UiButton
           v-if="test"
           variant="ghost"
