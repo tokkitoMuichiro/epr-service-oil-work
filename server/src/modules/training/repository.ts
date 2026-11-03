@@ -1,6 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { persisted, type AuditLog, type Storage } from '../../db.js'
-import { workbook } from '../../excel.js'
 import { HttpError, badRequest, conflict, forbidden, notFound, nowIso, trimmed, uid, type StoredFile } from '../../http.js'
 import {
   ANSWER_GRACE_MS,
@@ -15,6 +14,7 @@ import {
   assignmentStatus,
   canAssignWorker,
   drawQuestions,
+  emptyTestContent,
   formatIsoDate,
   isActiveAssignment,
   isDirectionKind,
@@ -81,6 +81,7 @@ import {
 } from '../../shared.js'
 import { isFileUnavailable, type StorageFolder, type TrainingStorage } from './bitrix.js'
 import { emptyTraining, type AssignmentRecord, type LegacyAssignmentFields, type TrainingState } from './model.js'
+import { questionsFromXlsx, testImportTemplateXlsx, testQuestionsXlsx } from './questions-xlsx.js'
 
 export interface TrainingWorker {
   id: string
@@ -187,6 +188,22 @@ function parseQuestions(value: unknown): TestQuestion[] {
       weight: int(raw?.weight, 1),
     }
   })
+}
+
+function importedQuestions(file: StoredFile, fileName: string): TestQuestion[] {
+  if (!file.data.length) badRequest('Файл пустой')
+  try {
+    return questionsFromXlsx(file.data, fileName)
+  } catch (error) {
+    return badRequest(error instanceof Error ? error.message : 'Не удалось прочитать Excel')
+  }
+}
+
+function titleFromUpload(title: string, fileName: string): string {
+  const named = trimmed(title)
+  if (named) return named.slice(0, 200)
+  const base = fileName.replace(/\.[^.]+$/u, '').trim()
+  return (base || 'Тест из Excel').slice(0, 200)
 }
 
 function parseContent(body: Partial<Record<keyof TestContent, unknown>>, current?: TestContent): TestContent {
@@ -792,6 +809,25 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
       return structuredClone(test)
     },
 
+    createTestFromXlsx(
+      actor: Actor,
+      meta: { programId: string; title: string; fileName: string },
+      file: StoredFile,
+    ): TrainingTest {
+      const programId = trimmed(meta.programId)
+      if (!programId) badRequest('Выберите программу')
+      findProgram(programId)
+      const content: TestContent = {
+        ...emptyTestContent(programId),
+        title: titleFromUpload(meta.title, meta.fileName),
+        questions: importedQuestions(file, meta.fileName),
+      }
+      checkTestContent(content, false)
+      const test: TrainingTest = { id: uid('test'), ...content, status: 'draft', version: 1, updatedAt: nowIso(), updatedBy: actor.fullName }
+      state.tests.push(test)
+      return structuredClone(test)
+    },
+
     /** A draft changes freely; editing a published test creates a new version, issued links keep theirs. */
     updateTest(actor: Actor, id: string, body: Record<string, unknown>): TrainingTest {
       const test = findTest(id)
@@ -1027,35 +1063,30 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
       return structuredClone(record)
     },
 
+    exportTestTemplateXlsx(): { data: Buffer; fileName: string } {
+      return { data: testImportTemplateXlsx(), fileName: 'Шаблон теста.xlsx' }
+    },
+
     exportTestXlsx(testId: string): { data: Buffer; fileName: string } {
       const test = findTest(testId)
-      const rows: (string | number)[][] = [
-        ['№', 'Текст', 'Тип', 'Балл', 'Варианты', 'Правильные id', 'Пояснение'],
-        ...test.questions.map((q, index) => [
-          index + 1,
-          q.text,
-          q.kind,
-          q.weight,
-          q.options.map((o) => `${o.id}:${o.side ? `${o.side}|` : ''}${o.text}`).join(' | '),
-          q.correctOptionIds.join(','),
-          q.explanation,
-        ]),
-      ]
-      const data = workbook([{ name: 'Вопросы', columns: [6, 40, 12, 8, 48, 24, 32], rows, freeze: { rows: 1, columns: 0 } }])
-      const safe = test.title.replace(/[\\/:*?"<>|]+/g, ' ').trim() || test.id
-      return { data, fileName: `Тест ${safe}.xlsx` }
+      return testQuestionsXlsx(test.title || test.id, test.questions)
     },
 
     /** Replaces the question bank from a previously exported shape (JSON), keeping the test shell. */
     importTestQuestions(actor: Actor, testId: string, body: { questions?: unknown }): TrainingTest {
       const test = findTest(testId)
       if (test.status === 'published') conflict('Сначала снимите публикацию или создайте новую версию через правку')
+      if (test.status === 'archived') conflict('Тест в архиве — сначала опубликуйте его снова')
       if (!Array.isArray(body.questions)) badRequest('Ожидается массив questions')
       const questions = body.questions as TestQuestion[]
       const content: TestContent = { ...test, questions }
       checkTestContent(content, false)
       Object.assign(test, content, { updatedAt: nowIso(), updatedBy: actor.fullName })
       return structuredClone(test)
+    },
+
+    importTestXlsx(actor: Actor, testId: string, file: StoredFile, fileName: string): TrainingTest {
+      return this.importTestQuestions(actor, testId, { questions: importedQuestions(file, fileName) })
     },
 
     knowledgeIssuesFor(memberIds: string[]): KnowledgeIssue[] {
@@ -1253,8 +1284,10 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
       'updateMaterial',
       'removeMaterial',
       'createTest',
+      'createTestFromXlsx',
       'updateTest',
       'importTestQuestions',
+      'importTestXlsx',
       'publishTest',
       'archiveTest',
       'removeTest',

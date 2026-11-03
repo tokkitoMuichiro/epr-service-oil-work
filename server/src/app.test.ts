@@ -20,6 +20,7 @@ import {
 } from './testing/fake-bitrix.js'
 import { demoUserOf } from './modules/auth/repository.js'
 import { demoSeed } from './testing/fixtures/index.js'
+import { testQuestionsXlsx } from './modules/training/questions-xlsx.js'
 import { unzip } from './testing/unzip.js'
 import {
   validateBrigadeDraft,
@@ -104,7 +105,7 @@ async function startApp(options: AppOptions = {}) {
     return { status: response.status, headers: response.headers, data: Buffer.from(await response.arrayBuffer()) }
   }
 
-  function upload(url: string, method: string, body: string, who: Who = 'admin') {
+  function upload(url: string, method: string, body: string | Buffer, who: Who = 'admin') {
     return raw(method, url, who, { headers: { 'Content-Type': 'application/octet-stream' }, body })
   }
 
@@ -1296,6 +1297,62 @@ describe('training', () => {
     const list = await training.call('GET', `/api/training/assignments?testId=${encodeURIComponent(testId)}`, 'admin')
     assert.equal(list.status, 200)
     assert.equal((list.json.items as { id: string }[]).some((item) => item.id === assignmentId), false)
+  })
+
+  it('creates a draft from an Excel question bank and reimports it', async () => {
+    const template = await training.download('/api/training/tests/template.xlsx')
+    assert.equal(template.status, 200)
+    const files = unzip(template.data)
+    assert.match(files.get('xl/workbook.xml') ?? '', /name="Вопросы"/)
+    assert.match(files.get('xl/workbook.xml') ?? '', /name="Памятка"/)
+    assert.equal((await training.download('/api/training/tests/template.xlsx', 'office')).status, 403)
+
+    const { data, fileName } = testQuestionsXlsx('СИЗ', [
+      {
+        id: 'q1',
+        text: 'Какой СИЗ обязателен?',
+        kind: 'single',
+        image: null,
+        options: [
+          { id: 'a', text: 'Каска' },
+          { id: 'b', text: 'Зонт' },
+        ],
+        correctOptionIds: ['a'],
+        explanation: '',
+        weight: 1,
+      },
+      {
+        id: 'q2',
+        text: 'Что надеть при зачистке?',
+        kind: 'multiple',
+        image: null,
+        options: [
+          { id: 'a', text: 'Спецодежда' },
+          { id: 'b', text: 'СИЗОД' },
+          { id: 'c', text: 'Очки' },
+        ],
+        correctOptionIds: ['a', 'b'],
+        explanation: '',
+        weight: 1,
+      },
+    ])
+    const query = new URLSearchParams({ programId: 'pr-ot-siz', title: 'СИЗ — чистильщики', fileName })
+    const created = await training.upload(`/api/training/tests/from-xlsx?${query}`, 'POST', data)
+    assert.equal(created.status, 201)
+    const draft = ((await created.json()) as { item: { id: string; status: string; questions: { text: string; kind: string }[] } }).item
+    assert.equal(draft.status, 'draft')
+    assert.equal(draft.questions.length, 2)
+    assert.equal(draft.questions[0].text, 'Какой СИЗ обязателен?')
+    assert.equal(draft.questions[1].kind, 'multiple')
+
+    const exported = await training.download(`/api/training/tests/${draft.id}/export.xlsx`)
+    assert.equal(exported.status, 200)
+    const again = await training.upload(`/api/training/tests/${draft.id}/import.xlsx?fileName=${encodeURIComponent(fileName)}`, 'POST', exported.data)
+    assert.equal(again.status, 200)
+    assert.equal(((await again.json()) as { item: { questions: unknown[] } }).item.questions.length, 2)
+
+    assert.equal((await training.upload('/api/training/tests/from-xlsx?programId=pr-ot-siz', 'POST', Buffer.from('not-xlsx'), 'admin')).status, 400)
+    assert.equal((await training.upload(`/api/training/tests/test-fire/import.xlsx?fileName=${encodeURIComponent(fileName)}`, 'POST', data)).status, 409)
   })
 })
 
