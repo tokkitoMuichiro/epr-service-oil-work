@@ -45,8 +45,13 @@ function createPager<T>(
     isPaged.value ? pageSlice(toValue(items), page.value, pageSize.value) : toValue(items),
   )
 
-  watch([total, pageSize], () => {
-    page.value = clampPage(page.value, total.value, pageSize.value)
+  watch([total, pageSize], ([nextTotal, nextSize], previous) => {
+    // Shrinking the catalogue (delete/refresh) must not leave the user on an empty later page.
+    if (previous && nextTotal < previous[0]) {
+      page.value = 1
+      return
+    }
+    page.value = clampPage(page.value, nextTotal, nextSize)
   })
 
   if (options.resetOn?.length) {
@@ -150,14 +155,14 @@ export function useFitPagination<T>(items: MaybeRefOrGetter<readonly T[]>, optio
     window.visualViewport?.removeEventListener('resize', scheduleMeasure)
   })
 
-  // First rows appearing → lock real row height once; do not remeasure on every length change.
+  // Row height changes with wrapping titles and after deletes — remeasure whenever the list length changes.
   watch(
     () => toValue(items).length,
     (count, prev) => {
-      if (prev === 0 && count > 0) {
-        lockedRowPx = 0
-        scheduleMeasure()
-      }
+      if (count === prev) return
+      lockedRowPx = 0
+      lastPortHeight = 0
+      scheduleMeasure()
     },
   )
 
