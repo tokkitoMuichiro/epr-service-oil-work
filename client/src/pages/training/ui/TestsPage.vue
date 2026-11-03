@@ -242,6 +242,20 @@ function openTest(id: string) {
   --ui-rows-columns: minmax(6rem, 1.6fr) minmax(5rem, 1fr) minmax(5rem, 8rem) minmax(4rem, 6rem);
 }
 
+.tests-rows .ui-rows__item {
+  align-items: start;
+  max-height: none;
+  height: auto;
+  padding-block: var(--space-2);
+}
+
+.tests-rows .cell--name {
+  flex-direction: column;
+  align-items: flex-start;
+  overflow: visible;
+  max-height: none;
+}
+
 .tests__list {
   gap: var(--space-3);
 }
@@ -297,12 +311,14 @@ function openTest(id: string) {
 }
 
 .tests__title {
+  display: block;
   min-width: 0;
-  overflow: hidden;
+  max-width: 100%;
   color: var(--text-link);
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .tests__sub {
@@ -401,13 +417,7 @@ function openTest(id: string) {
   }
 
   .tests__title {
-    display: block;
     width: 100%;
-    overflow: visible;
-    text-overflow: unset;
-    white-space: normal;
-    overflow-wrap: anywhere;
-    word-break: break-word;
   }
 
   .tests__q-suffix {

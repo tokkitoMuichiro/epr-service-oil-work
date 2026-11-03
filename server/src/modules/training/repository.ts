@@ -863,7 +863,10 @@ export function createTrainingRepository(storage: Storage, disk: TrainingStorage
 
     removeTest(id: string): void {
       findTest(id)
-      if (state.assignments.some((a) => a.testId === id)) conflict('По тесту уже были назначения — его можно только отправить в архив')
+      const assignmentIds = new Set(state.assignments.filter((a) => a.testId === id).map((a) => a.id))
+      state.assignments = state.assignments.filter((a) => a.testId !== id)
+      state.attempts = state.attempts.filter((a) => !assignmentIds.has(a.assignmentId))
+      state.records = state.records.filter((r) => !assignmentIds.has(r.assignmentId))
       state.tests = state.tests.filter((t) => t.id !== id)
       for (const key of Object.keys(state.versions)) if (key.startsWith(`${id}:`)) delete state.versions[key]
     },

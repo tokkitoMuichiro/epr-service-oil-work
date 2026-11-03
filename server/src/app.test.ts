@@ -1253,6 +1253,52 @@ describe('training', () => {
     assert.equal((await training.call('GET', '/api/public/test/unknown-token', null)).status, 410)
   })
 
+  it('deletes a published test together with its assignments and results', async () => {
+    const created = await training.call('POST', '/api/training/tests', 'admin', {
+      title: 'Временный тест на удаление',
+      programId: 'pr-ot-a',
+      questions: [
+        {
+          id: 'q-del',
+          text: 'Вопрос?',
+          kind: 'single',
+          image: null,
+          options: [
+            { id: 'a', text: 'Да' },
+            { id: 'b', text: 'Нет' },
+          ],
+          correctOptionIds: ['a'],
+          explanation: '',
+          weight: 1,
+        },
+      ],
+      passPercent: 80,
+      attemptsPerAssignment: 2,
+      isShuffled: true,
+      isAnswersShown: true,
+    })
+    assert.equal(created.status, 201)
+    const testId = created.json.item.id as string
+    assert.equal((await training.call('POST', `/api/training/tests/${testId}/publish`, 'admin')).status, 200)
+
+    const assigned = await training.call('POST', '/api/training/assignments', 'admin', {
+      testId,
+      workerIds: ['p-7'],
+      dueDate: '2026-12-01',
+      kind: 'regular',
+    })
+    assert.equal(assigned.status, 201)
+    const link = assigned.json.created[0].link as string
+    const assignmentId = assigned.json.created[0].assignment.id as string
+
+    assert.equal((await training.call('DELETE', `/api/training/tests/${testId}`, 'admin')).status, 204)
+    assert.equal((await training.call('GET', `/api/training/tests/${testId}`, 'admin')).status, 404)
+    assert.equal((await training.call('GET', `/api/public/test/${tokenOf(link)}`, null)).status, 410)
+    const list = await training.call('GET', `/api/training/assignments?testId=${encodeURIComponent(testId)}`, 'admin')
+    assert.equal(list.status, 200)
+    assert.equal((list.json.items as { id: string }[]).some((item) => item.id === assignmentId), false)
+  })
+
   it('creates a draft from an Excel question bank and reimports it', async () => {
     const template = await training.download('/api/training/tests/template.xlsx')
     assert.equal(template.status, 200)
