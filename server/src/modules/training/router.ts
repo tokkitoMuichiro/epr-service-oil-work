@@ -127,6 +127,25 @@ export function trainingRouter(repo: TrainingRepository, access: AccessStore, op
     res.status(201).json({ item: repo.createTest(actor(req), req.body ?? {}) })
   })
 
+  router.get('/tests/template.xlsx', need('training_manage'), (_req, res) => {
+    const { data, fileName } = repo.exportTestTemplateXlsx()
+    sendFile(res, { data, mimeType: XLSX_MIME }, fileName)
+  })
+
+  router.post('/tests/from-xlsx', need('training_manage'), rawBody, (req, res) => {
+    res.status(201).json({
+      item: repo.createTestFromXlsx(
+        actor(req),
+        {
+          programId: trimmed(req.query.programId),
+          title: trimmed(req.query.title),
+          fileName: trimmed(req.query.fileName),
+        },
+        uploadedFile(req),
+      ),
+    })
+  })
+
   router.get('/tests/:id', need('training_manage'), (req, res) => {
     res.json({ item: repo.getTest(param(req, 'id')) })
   })
@@ -134,6 +153,12 @@ export function trainingRouter(repo: TrainingRepository, access: AccessStore, op
   router.get('/tests/:id/export.xlsx', need('training_manage'), (req, res) => {
     const { data, fileName } = repo.exportTestXlsx(param(req, 'id'))
     sendFile(res, { data, mimeType: XLSX_MIME }, fileName)
+  })
+
+  router.post('/tests/:id/import.xlsx', need('training_manage'), rawBody, (req, res) => {
+    res.json({
+      item: repo.importTestXlsx(actor(req), param(req, 'id'), uploadedFile(req), trimmed(req.query.fileName)),
+    })
   })
 
   router.post('/tests/:id/import', need('training_manage'), (req, res) => {

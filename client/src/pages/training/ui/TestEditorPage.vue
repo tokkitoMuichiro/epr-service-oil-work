@@ -36,6 +36,7 @@ const error = ref('')
 const notice = ref('')
 const busy = ref(false)
 const savedSnapshot = ref('')
+const importInput = ref<HTMLInputElement | null>(null)
 
 const testId = computed(() => (route.params.id === 'new' ? null : String(route.params.id)))
 
@@ -52,8 +53,7 @@ async function load() {
     if (testId.value) {
       const loaded = await trainingApi.test(testId.value)
       test.value = loaded
-      const { id: _id, status: _status, version: _version, updatedAt: _updatedAt, updatedBy: _updatedBy, ...rest } = loaded
-      content.value = structuredClone(rest)
+      content.value = extractContent(loaded)
     } else {
       test.value = null
       content.value = emptyTestContent(typeof route.query.programId === 'string' ? route.query.programId : '')
@@ -108,6 +108,40 @@ function nullableNumber(value: unknown): number | null {
   if (value === '' || value === null || value === undefined) return null
   const n = Number(value)
   return Number.isFinite(n) ? n : null
+}
+
+function extractContent(loaded: TrainingTest): TestContent {
+  const { id: _id, status: _status, version: _version, updatedAt: _updatedAt, updatedBy: _updatedBy, ...rest } = loaded
+  return structuredClone(rest)
+}
+
+async function importXlsx(file: File | undefined) {
+  const id = testId.value
+  if (!id || !file || isPublished.value || isArchived.value) return
+  if (
+    content.value.questions.length &&
+    !(await askConfirm({
+      title: 'Заменить вопросы?',
+      message: 'Банк вопросов черновика будет заменён файлом. Несохранённые правки параметров сбросятся.',
+      confirmText: 'Заменить',
+    }))
+  )
+    return
+  return run(async () => {
+    const imported = await trainingApi.importTestXlsx(id, file)
+    test.value = imported
+    content.value = extractContent(imported)
+    savedSnapshot.value = snapshot()
+    notice.value = `Загружено ${imported.questions.length} вопр.`
+    tab.value = 'questions'
+  })
+}
+
+function onImportPick(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  void importXlsx(file)
 }
 
 function addQuestion() {
@@ -217,7 +251,16 @@ async function archive() {
 async function remove() {
   const id = testId.value
   if (!id) return
-  if (!(await askConfirm({ title: 'Удалить тест безвозвратно?', confirmText: 'Удалить тест' }))) return
+  const confirmed = await askConfirm({
+    title: 'Удалить тест безвозвратно?',
+    message:
+      test.value?.status === 'draft'
+        ? 'Черновик будет удалён без возможности восстановления.'
+        : 'Тест, его версии, назначения и результаты по нему будут удалены без возможности восстановления.',
+    confirmText: 'Удалить тест',
+    tone: 'danger',
+  })
+  if (!confirmed) return
   return run(async () => {
     await trainingApi.removeTest(id)
     await store.refresh()
@@ -373,6 +416,25 @@ const bankInfo = computed(() => {
       </form>
 
       <section v-show="tab === 'questions'" class="ui-form editor__questions">
+        <div class="editor__bank-actions">
+          <UiButton variant="ghost" :disabled="busy" @click="trainingApi.downloadTestTemplate()">Шаблон Excel</UiButton>
+          <UiButton
+            variant="ghost"
+            :disabled="busy || !testId || isPublished || isArchived"
+            @click="importInput?.click()"
+          >
+            Загрузить Excel
+          </UiButton>
+          <input
+            ref="importInput"
+            type="file"
+            hidden
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            @change="onImportPick"
+          />
+        </div>
+        <p v-if="!testId" class="ui-form__note">Сначала сохраните черновик — или загрузите файл со списка тестов.</p>
+        <p v-else-if="isPublished" class="ui-form__note">Импорт Excel доступен только для черновика. Правки опубликованного теста сохраняются новой версией.</p>
         <QuestionEditor
           v-for="(q, i) in content.questions"
           :key="q.id"
@@ -399,7 +461,7 @@ const bankInfo = computed(() => {
 
       <div class="editor__actions">
         <UiButton v-if="test && test.status !== 'archived'" variant="ghost" :disabled="busy" @click="archive">В архив</UiButton>
-        <UiButton v-if="test && test.status === 'draft'" variant="ghost" :disabled="busy" @click="remove">Удалить</UiButton>
+        <UiButton v-if="test" variant="ghost" :disabled="busy" @click="remove">Удалить</UiButton>
         <UiButton
           v-if="test"
           variant="ghost"
@@ -527,6 +589,12 @@ div.editor {
 .editor__questions {
   width: 100%;
   max-width: none;
+}
+
+.editor__bank-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 .editor__notice {

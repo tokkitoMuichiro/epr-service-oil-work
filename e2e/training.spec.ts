@@ -20,7 +20,7 @@ async function assignTest(page: Page) {
   await card.getByRole('button', { name: 'Назначить тестирование' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'Назначить проверку знаний' })
-  await dialog.locator('label', { has: page.getByText('Тест', { exact: true }) }).locator('select').selectOption({ label: TEST_TITLE })
+  await dialog.getByRole('radio', { name: TEST_TITLE }).check()
   await expect(dialog.getByText('Сотрудники · выбрано 1')).toBeVisible()
   await dialog.getByRole('button', { name: 'Назначить (1)' }).click()
 

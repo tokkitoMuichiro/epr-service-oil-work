@@ -3,15 +3,19 @@ import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import {
   ELECTRICAL_GROUPS,
+  MATERIAL_MAX_BYTES,
   PERSONNEL_KIND_LABEL,
   TEST_STATUS_LABEL,
   VOLTAGE_LABEL,
   describeElectricalScope,
+  trainingApi,
   useTrainingStore,
   type TestStatus,
 } from '@/entities/training'
+import { errorMessage } from '@/shared/api'
+import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { useScrollList } from '@/shared/lib/pagination'
-import { IconArrowUp, IconTraining, UiClipText, UiPagination, UiState } from '@/shared/ui'
+import { IconArrowUp, IconTraining, UiButton, UiClipText, UiDialog, UiFileDrop, UiPagination, UiState } from '@/shared/ui'
 
 const STATUS_TONE: Record<TestStatus, string> = { draft: 'warn', published: 'ok', archived: '' }
 
@@ -20,10 +24,70 @@ const router = useRouter()
 
 const search = ref('')
 const programFilter = ref('')
-const statusFilter = ref<TestStatus | ''>('')
+const statusFilter = ref<TestStatus | ''>('published')
 const elKind = ref('')
 const elGroup = ref('')
 const elVoltage = ref('')
+const importOpen = ref(false)
+const importProgramId = ref('')
+const importTitle = ref('')
+const importFile = ref<File | null>(null)
+const importError = ref('')
+const importBusy = ref(false)
+const { isDirty: isImportDirty } = useDialogDirty(
+  () => ({ programId: importProgramId.value, title: importTitle.value, file: importFile.value?.name ?? '' }),
+  importOpen,
+)
+
+function openImport() {
+  importProgramId.value = programFilter.value
+  importTitle.value = ''
+  importFile.value = null
+  importError.value = ''
+  importOpen.value = true
+}
+
+function closeImport() {
+  importOpen.value = false
+}
+
+function pickImportFile(files: File[]) {
+  const file = files[0]
+  if (!file) return
+  if (!file.name.toLocaleLowerCase('ru').endsWith('.xlsx')) {
+    importError.value = 'Нужен файл Excel (.xlsx)'
+    importFile.value = null
+    return
+  }
+  importError.value = ''
+  importFile.value = file
+}
+
+async function submitImport() {
+  if (!importProgramId.value) {
+    importError.value = 'Выберите программу'
+    return
+  }
+  if (!importFile.value) {
+    importError.value = 'Выберите файл Excel'
+    return
+  }
+  importBusy.value = true
+  importError.value = ''
+  try {
+    const created = await trainingApi.createTestFromXlsx(importFile.value, {
+      programId: importProgramId.value,
+      title: importTitle.value,
+    })
+    await store.refresh()
+    importOpen.value = false
+    await router.push(`/training/tests/${created.id}`)
+  } catch (e) {
+    importError.value = errorMessage(e, 'Не удалось загрузить тест')
+  } finally {
+    importBusy.value = false
+  }
+}
 
 const isElectrical = computed(() => (programFilter.value ? store.directionOf(programFilter.value)?.kind === 'electrical' : false))
 
@@ -71,7 +135,10 @@ function openTest(id: string) {
           <option v-for="(label, key) in VOLTAGE_LABEL" :key="key" :value="key">{{ label }}</option>
         </select>
       </template>
-      <RouterLink class="tests__new" to="/training/tests/new">Создать тест</RouterLink>
+      <div class="tests__actions">
+        <UiButton variant="secondary" @click="openImport">Загрузить из Excel</UiButton>
+        <RouterLink class="tests__new" to="/training/tests/new">Создать тест</RouterLink>
+      </div>
     </div>
 
     <UiState v-if="!visible.length" title="Тестов нет" :icon="IconTraining" text="Создайте тест: добавьте вопросы и опубликуйте его." />
@@ -130,6 +197,39 @@ function openTest(id: string) {
         <IconArrowUp :size="20" />
       </button>
     </div>
+
+    <UiDialog :open="importOpen" title="Загрузить тест из Excel" :dirty="isImportDirty" @close="closeImport">
+      <form class="ui-form" novalidate @submit.prevent="submitImport">
+        <p class="ui-form__note">
+          Файл сам подставит вопросы и правильные ответы. Порог сдачи и попытки настроите в карточке теста.
+          <button type="button" class="tests__template" @click="trainingApi.downloadTestTemplate()">Скачать шаблон</button>
+        </p>
+        <label>
+          <span>Программа</span>
+          <select v-model="importProgramId">
+            <option value="" disabled>Выберите программу</option>
+            <option v-for="p in store.activePrograms" :key="p.id" :value="p.id">{{ store.titleOf(p.id) }}</option>
+          </select>
+        </label>
+        <label>
+          <span>Название теста</span>
+          <input v-model="importTitle" type="text" maxlength="200" placeholder="Как в файле или короткое название" />
+        </label>
+        <UiFileDrop
+          :max-bytes="MATERIAL_MAX_BYTES"
+          :multiple="false"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          hint="Excel (.xlsx)"
+          @pick="pickImportFile"
+        />
+        <p v-if="importFile" class="ui-form__note">Выбран: {{ importFile.name }}</p>
+        <p v-if="importError" class="ui-form__hint" role="alert">{{ importError }}</p>
+        <div class="ui-form__actions">
+          <UiButton variant="ghost" @click="closeImport">Отмена</UiButton>
+          <UiButton type="submit" variant="primary" :disabled="importBusy">Загрузить</UiButton>
+        </div>
+      </form>
+    </UiDialog>
   </div>
 </template>
 
@@ -140,6 +240,20 @@ function openTest(id: string) {
 
 .tests-rows {
   --ui-rows-columns: minmax(6rem, 1.6fr) minmax(5rem, 1fr) minmax(5rem, 8rem) minmax(4rem, 6rem);
+}
+
+.tests-rows .ui-rows__item {
+  align-items: start;
+  max-height: none;
+  height: auto;
+  padding-block: var(--space-2);
+}
+
+.tests-rows .cell--name {
+  flex-direction: column;
+  align-items: flex-start;
+  overflow: visible;
+  max-height: none;
 }
 
 .tests__list {
@@ -167,12 +281,18 @@ function openTest(id: string) {
   min-width: 180px;
 }
 
+.tests__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
 .tests__new {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: var(--control-height);
-  margin-left: auto;
   padding: 0 var(--space-4);
   border-radius: var(--radius);
   background: var(--accent-strong);
@@ -181,13 +301,24 @@ function openTest(id: string) {
   text-decoration: none;
 }
 
+.tests__template {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-link);
+  font: inherit;
+  cursor: pointer;
+}
+
 .tests__title {
+  display: block;
   min-width: 0;
-  overflow: hidden;
+  max-width: 100%;
   color: var(--text-link);
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .tests__sub {
@@ -198,6 +329,10 @@ function openTest(id: string) {
 @media (hover: hover) and (pointer: fine) {
   .tests__new:hover {
     background: var(--accent-strong-hover);
+  }
+
+  .tests__template:hover {
+    text-decoration: underline;
   }
 }
 
@@ -220,9 +355,16 @@ function openTest(id: string) {
     grid-column: 1 / -1;
   }
 
-  .tests__new {
+  .tests__actions {
     grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin-left: 0;
+  }
+
+  .tests__actions :deep(.btn),
+  .tests__new {
+    width: 100%;
   }
 
   .tests-rows {
@@ -275,17 +417,17 @@ function openTest(id: string) {
   }
 
   .tests__title {
-    display: block;
     width: 100%;
-    overflow: visible;
-    text-overflow: unset;
-    white-space: normal;
-    overflow-wrap: anywhere;
-    word-break: break-word;
   }
 
   .tests__q-suffix {
     display: inline;
+  }
+}
+
+@media (max-width: 560px) {
+  .tests__actions {
+    grid-template-columns: 1fr;
   }
 }
 </style>

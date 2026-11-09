@@ -126,6 +126,30 @@ export const trainingApi = {
     await downloadFile(`/training/tests/${id}/export.xlsx`, fileName)
   },
 
+  async downloadTestTemplate(fileName = 'Шаблон теста.xlsx'): Promise<void> {
+    await downloadFile('/training/tests/template.xlsx', fileName)
+  },
+
+  async createTestFromXlsx(file: File, meta: { programId: string; title: string }): Promise<TrainingTest> {
+    return (
+      await http.upload<Item<TrainingTest>>('POST', '/training/tests/from-xlsx', file, {
+        programId: meta.programId,
+        title: meta.title,
+        fileName: file.name,
+        mimeType: file.type,
+      })
+    ).item
+  },
+
+  async importTestXlsx(id: string, file: File): Promise<TrainingTest> {
+    return (
+      await http.upload<Item<TrainingTest>>('POST', `/training/tests/${id}/import.xlsx`, file, {
+        fileName: file.name,
+        mimeType: file.type,
+      })
+    ).item
+  },
+
   async importTestQuestions(id: string, questions: TestContent['questions']): Promise<TrainingTest> {
     return (await http.post<Item<TrainingTest>>(`/training/tests/${id}/import`, { questions })).item
   },
