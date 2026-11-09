@@ -229,7 +229,7 @@ describe('api', () => {
     assert.equal(image.headers.get('content-type'), 'image/png')
   })
 
-  it('stores qualification documents with a default expiry', async () => {
+  it('stores qualification documents without inventing an expiry', async () => {
     const worker = ((await call('GET', '/api/personnel')).json.items as Worker[]).find((w) => w.id === 'p-6')
     assert.ok(worker)
     const base = { title: 'Удостоверение ГОР', fileName: 'gor.pdf', mimeType: 'application/pdf' }
@@ -241,7 +241,57 @@ describe('api', () => {
     const doc = ((await created.json()) as { item: Worker }).item.documents[0]
     assert.equal(doc.qualificationTypeId, 'gas')
     assert.equal(doc.number, 'ГО-900')
-    assert.equal(doc.expiresAt, '2027-09-01')
+    assert.equal(doc.expiresAt, undefined)
+
+    const confined = new URLSearchParams({
+      title: 'Удостоверение ЗП',
+      fileName: 'zp.pdf',
+      mimeType: 'application/pdf',
+      qualificationTypeId: 'confined',
+      group: '3',
+      number: 'ЗП-900',
+      issuedAt: '2026-03-02',
+      issuer: 'УЦ',
+      expiresAt: '2031-03-02',
+    })
+    const confinedCreated = await upload(`/api/personnel/p-6/documents?${confined}`, 'POST', 'x')
+    assert.equal(confinedCreated.status, 201)
+    const confinedDoc = ((await confinedCreated.json()) as { item: Worker }).item.documents[0]
+    assert.equal(confinedDoc.qualificationTypeId, 'confined')
+    assert.equal(confinedDoc.group, '3')
+    assert.equal(confinedDoc.expiresAt, '2031-03-02')
+
+    const electrical = new URLSearchParams({
+      title: 'Электробезопасность',
+      fileName: 'eb.pdf',
+      mimeType: 'application/pdf',
+      qualificationTypeId: 'electrical',
+      group: '3',
+      voltage: 'up_to_1000',
+      issuedAt: '2026-01-15',
+      expiresAt: '2027-01-15',
+    })
+    const electricalCreated = await upload(`/api/personnel/p-6/documents?${electrical}`, 'POST', 'x')
+    assert.equal(electricalCreated.status, 201)
+    const electricalDoc = ((await electricalCreated.json()) as { item: Worker }).item.documents[0]
+    assert.equal(electricalDoc.group, '3')
+    assert.equal(electricalDoc.voltage, 'up_to_1000')
+
+    const patched = await call('PATCH', `/api/personnel/p-6/documents/${electricalDoc.id}`, 'admin', {
+      title: 'ЭБ III',
+      qualificationTypeId: 'electrical',
+      group: '4',
+      voltage: 'above_1000',
+      issuedAt: '2026-01-15',
+      expiresAt: '',
+    })
+    assert.equal(patched.status, 200)
+    const edited = (patched.json.item as Worker).documents.find((d) => d.id === electricalDoc.id)
+    assert.ok(edited)
+    assert.equal(edited.title, 'ЭБ III')
+    assert.equal(edited.group, '4')
+    assert.equal(edited.voltage, 'above_1000')
+    assert.equal(edited.expiresAt, undefined)
   })
 
   it('serves the qualification catalogue without position requirements', async () => {

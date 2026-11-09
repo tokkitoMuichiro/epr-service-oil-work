@@ -20,11 +20,14 @@ export {
   type WorkerStatus,
 } from '@shared/personnel'
 export {
+  ADMISSION_GROUPS,
+  ELECTRICAL_ADMISSION_GROUPS,
   OTHER_QUALIFICATION_LABEL,
   QUALIFICATION_TYPES,
   TANK_CLEANING_QUALIFICATIONS,
-  defaultExpiry,
+  admissionGroupValue,
   describeAssignmentIssue,
+  isElectricalVoltage,
   qualificationLabel,
   qualificationType,
   validateQualificationFields,
@@ -32,3 +35,4 @@ export {
   type QualificationType,
   type QualificationTypeId,
 } from '@shared/qualifications'
+export { VOLTAGE_LABEL, type ElectricalVoltage } from '@shared/training'

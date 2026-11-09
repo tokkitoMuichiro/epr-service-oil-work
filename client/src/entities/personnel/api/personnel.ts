@@ -12,6 +12,18 @@ export interface DocumentUpload {
   issuedAt?: string
   issuer?: string
   group?: string
+  voltage?: string
+}
+
+export interface DocumentUpdate {
+  title: string
+  expiresAt?: string
+  qualificationTypeId?: QualificationTypeId
+  number?: string
+  issuedAt?: string
+  issuer?: string
+  group?: string
+  voltage?: string
 }
 
 export interface EmploymentResult {
@@ -50,6 +62,10 @@ export const personnelApi = {
         mimeType: file.type,
       })
     ).item
+  },
+
+  async updateDocument(id: string, docId: string, patch: DocumentUpdate): Promise<Worker> {
+    return (await http.patch<One>(`/personnel/${id}/documents/${docId}`, patch)).item
   },
 
   async removeDocument(id: string, docId: string): Promise<Worker> {

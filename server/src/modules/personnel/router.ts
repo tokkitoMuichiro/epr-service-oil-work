@@ -16,7 +16,17 @@ import { DOCUMENT_MAX_BYTES, type AssignmentActor, type PersonnelRepository } fr
 
 const rawBody = rawBodyOf(DOCUMENT_MAX_BYTES)
 
-const DOCUMENT_FIELDS = ['title', 'fileName', 'expiresAt', 'qualificationTypeId', 'number', 'issuedAt', 'issuer', 'group'] as const
+const DOCUMENT_FIELDS = [
+  'title',
+  'fileName',
+  'expiresAt',
+  'qualificationTypeId',
+  'number',
+  'issuedAt',
+  'issuer',
+  'group',
+  'voltage',
+] as const
 
 export function personnelRouter(repo: PersonnelRepository) {
   const router = Router()
@@ -49,6 +59,10 @@ export function personnelRouter(repo: PersonnelRepository) {
   router.post('/:id/documents', rawBody, async (req, res) => {
     const meta = Object.fromEntries(DOCUMENT_FIELDS.map((key) => [key, trimmed(req.query[key])])) as unknown as DocumentMeta
     res.status(201).json({ item: await repo.addDocument(requestRole(req), param(req, 'id'), meta, uploadedFile(req)) })
+  })
+
+  router.patch('/:id/documents/:docId', (req, res) => {
+    res.json({ item: repo.updateDocument(requestRole(req), param(req, 'id'), param(req, 'docId'), req.body ?? {}) })
   })
 
   router.get('/:id/documents/:docId/file', async (req, res) => {

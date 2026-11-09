@@ -5,7 +5,6 @@ import {
   assignmentConflict,
   brigadeOfWorker,
   canViewPii,
-  defaultExpiry,
   describeAssignmentIssue,
   describeKnowledgeIssue,
   formatIsoDate,
@@ -13,7 +12,6 @@ import {
   isEmploymentStatus,
   isFutureAssignment,
   isOutsidePlan,
-  isQualificationTypeId,
   membershipConflicts,
   objectConflict,
   permissionLabel,
@@ -107,24 +105,35 @@ function parseWorkerDraft(body: Partial<WorkerDraft>): WorkerDraft {
   return draft
 }
 
+const DOCUMENT_OPTIONAL_KEYS = [
+  'expiresAt',
+  'qualificationTypeId',
+  'number',
+  'issuedAt',
+  'issuer',
+  'group',
+  'voltage',
+] as const satisfies readonly (keyof DocumentMeta)[]
+
 function parseDocumentMeta(body: Partial<DocumentMeta>): DocumentMeta {
-  const optional = (key: keyof DocumentMeta) => (trimmed(body[key]) ? { [key]: trimmed(body[key]) } : {})
+  const optional = (key: (typeof DOCUMENT_OPTIONAL_KEYS)[number]) =>
+    trimmed(body[key]) ? { [key]: trimmed(body[key]) } : {}
   const meta: DocumentMeta = {
     title: trimmed(body.title),
     fileName: trimmed(body.fileName).replace(/[\\/:*?"<>|]+/g, '_'),
-    ...optional('expiresAt'),
-    ...optional('qualificationTypeId'),
-    ...optional('number'),
-    ...optional('issuedAt'),
-    ...optional('issuer'),
-    ...optional('group'),
-  }
-  if (isQualificationTypeId(meta.qualificationTypeId) && meta.issuedAt && !meta.expiresAt) {
-    meta.expiresAt = defaultExpiry(meta.qualificationTypeId, meta.issuedAt)
+    ...Object.assign({}, ...DOCUMENT_OPTIONAL_KEYS.map(optional)),
   }
   const error = validateQualificationFields(meta) ?? validateDocumentMeta(meta)
   if (error) badRequest(error)
   return meta
+}
+
+function applyDocumentMeta(doc: WorkerDocumentRecord, meta: DocumentMeta) {
+  doc.title = meta.title
+  for (const key of DOCUMENT_OPTIONAL_KEYS) {
+    if (meta[key]) doc[key] = meta[key]
+    else delete doc[key]
+  }
 }
 
 export function createPersonnelRepository(contracts: ContractsRepository, storage: Storage, deps: PersonnelDeps) {
@@ -407,6 +416,14 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
       return toWorker(record, role)
     },
 
+    updateDocument(role: RoleId, workerId: string, docId: string, body: Partial<DocumentMeta>): Worker {
+      const record = findWorker(workerId)
+      const doc = record.documents.find((d) => d.id === docId) ?? notFound('Документ не найден')
+      const meta = parseDocumentMeta({ ...body, fileName: doc.fileName })
+      applyDocumentMeta(doc, meta)
+      return toWorker(record, role)
+    },
+
     async removeDocument(role: RoleId, workerId: string, docId: string): Promise<Worker> {
       const doc = findWorker(workerId).documents.find((d) => d.id === docId) ?? notFound('Документ не найден')
       if (doc.diskFileId) await disk.trash(doc.diskFileId)
@@ -609,6 +626,7 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
       'removeWorker',
       'setEmployment',
       'addDocument',
+      'updateDocument',
       'removeDocument',
       'setPhoto',
       'removePhoto',
