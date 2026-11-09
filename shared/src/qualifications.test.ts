@@ -37,12 +37,26 @@ describe('qualification catalogue', () => {
     assert.equal(addMonthsIso('2026-01-31', 1), '2026-02-28')
   })
 
+  it('computes confined-space expiry from the group', () => {
+    assert.equal(defaultExpiry('confined', '2026-03-02'), '2029-03-02')
+    assert.equal(defaultExpiry('confined', '2026-03-02', '1'), '2029-03-02')
+    assert.equal(defaultExpiry('confined', '2026-03-02', 'II'), '2029-03-02')
+    assert.equal(defaultExpiry('confined', '2026-03-02', '3 группа'), '2031-03-02')
+    assert.equal(defaultExpiry('confined', '2026-03-02', 'III'), '2031-03-02')
+  })
+
   it('validates group and type of a qualification document', () => {
     assert.equal(validateQualificationFields({}), null)
     assert.match(validateQualificationFields({ group: 'II' }) ?? '', /только для допуска/)
+    assert.match(validateQualificationFields({ voltage: 'up_to_1000' }) ?? '', /Напряжение/)
     assert.match(validateQualificationFields({ qualificationTypeId: 'fly' }) ?? '', /Неизвестный/)
     assert.match(validateQualificationFields({ qualificationTypeId: 'gas', group: 'II' }) ?? '', /не указывается/)
     assert.equal(validateQualificationFields({ qualificationTypeId: 'electrical', group: 'III' }), null)
+    assert.equal(validateQualificationFields({ qualificationTypeId: 'electrical', group: '5', voltage: 'above_1000' }), null)
+    assert.match(validateQualificationFields({ qualificationTypeId: 'electrical', group: '6' }) ?? '', /1–5/)
+    assert.match(validateQualificationFields({ qualificationTypeId: 'confined', group: '4' }) ?? '', /1–3/)
+    assert.equal(validateQualificationFields({ qualificationTypeId: 'confined', group: '2' }), null)
+    assert.match(validateQualificationFields({ qualificationTypeId: 'gas', voltage: 'up_to_1000' }) ?? '', /Напряжение/)
   })
 
   it('takes the document that stays valid the longest', () => {

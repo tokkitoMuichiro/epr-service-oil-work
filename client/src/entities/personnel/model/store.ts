@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { todayIso } from '@shared/dates'
 import { errorMessage } from '@/shared/api'
 import { reloadStatus } from '@/shared/lib/load-status'
-import { personnelApi, type DocumentUpload } from '../api/personnel'
+import { personnelApi, type DocumentUpdate, type DocumentUpload } from '../api/personnel'
 import { workerAttention, type EmploymentStatus, type Worker, type WorkerDraft } from './types'
 
 export type WorkerSortKey = 'fullName' | 'position' | 'brigade' | 'phone' | 'status' | 'employment'
@@ -109,6 +109,10 @@ export const usePersonnelStore = defineStore('personnel', () => {
     })
   }
 
+  function updateDocument(id: string, docId: string, patch: DocumentUpdate) {
+    return mutate(async () => replace(await personnelApi.updateDocument(id, docId, patch)))
+  }
+
   function removeDocument(id: string, docId: string) {
     return mutate(async () => replace(await personnelApi.removeDocument(id, docId)))
   }
@@ -150,6 +154,7 @@ export const usePersonnelStore = defineStore('personnel', () => {
     removeWorker,
     setEmployment,
     uploadDocuments,
+    updateDocument,
     removeDocument,
     downloadDocument,
     setPhoto,

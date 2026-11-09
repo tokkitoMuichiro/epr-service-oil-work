@@ -1,5 +1,6 @@
 import { addMonthsIso, formatIsoDate, isIsoDate } from './dates.js'
 import type { Brigade, Worker, WorkerDocument } from './personnel.js'
+import { VOLTAGE_LABEL, type ElectricalVoltage } from './training.js'
 
 export type QualificationTypeId =
   | 'labor_safety'
@@ -12,6 +13,8 @@ export type QualificationTypeId =
   | 'respiratory'
   | 'medical'
   | 'industrial'
+  | 'psych'
+  | 'environmental'
 
 export interface QualificationType {
   id: QualificationTypeId
@@ -20,7 +23,7 @@ export interface QualificationType {
   defaultValidityMonths: number
   /** Critical for hazardous works: blocks assignment when missing or expired. */
   isCritical: boolean
-  /** The document carries a group (электробезопасность, работы на высоте). */
+  /** The document carries a group (электробезопасность, работы на высоте, замкнутые пространства). */
   hasGroup: boolean
 }
 
@@ -30,12 +33,29 @@ export const QUALIFICATION_TYPES: QualificationType[] = [
   { id: 'fire', name: 'Пожарная безопасность', shortName: 'ПожБ', defaultValidityMonths: 36, isCritical: false, hasGroup: false },
   { id: 'height', name: 'Работы на высоте', shortName: 'Высота', defaultValidityMonths: 36, isCritical: true, hasGroup: true },
   { id: 'gas', name: 'Газоопасные работы', shortName: 'ГОР', defaultValidityMonths: 12, isCritical: true, hasGroup: false },
-  { id: 'confined', name: 'Работы в замкнутых пространствах', shortName: 'ЗП', defaultValidityMonths: 12, isCritical: true, hasGroup: false },
+  { id: 'confined', name: 'Работы в замкнутых пространствах', shortName: 'ЗП', defaultValidityMonths: 36, isCritical: true, hasGroup: true },
   { id: 'first_aid', name: 'Первая помощь', shortName: 'ПП', defaultValidityMonths: 36, isCritical: false, hasGroup: false },
   { id: 'respiratory', name: 'СИЗОД', shortName: 'СИЗОД', defaultValidityMonths: 12, isCritical: true, hasGroup: false },
   { id: 'medical', name: 'Периодический медосмотр', shortName: 'Медосмотр', defaultValidityMonths: 12, isCritical: true, hasGroup: false },
+  { id: 'psych', name: 'Психиатрическое освидетельствование', shortName: 'Псих', defaultValidityMonths: 60, isCritical: true, hasGroup: false },
+  { id: 'environmental', name: 'Экологическая безопасность', shortName: 'ЭкоБ', defaultValidityMonths: 36, isCritical: false, hasGroup: false },
   { id: 'industrial', name: 'Промышленная безопасность', shortName: 'ПБ', defaultValidityMonths: 60, isCritical: false, hasGroup: false },
 ]
+
+/** Groups for height and confined-space admissions. */
+export const ADMISSION_GROUPS = ['1', '2', '3'] as const
+/** Groups for electrical safety admissions. */
+export const ELECTRICAL_ADMISSION_GROUPS = ['1', '2', '3', '4', '5'] as const
+
+export function isElectricalVoltage(value: unknown): value is ElectricalVoltage {
+  return typeof value === 'string' && value in VOLTAGE_LABEL
+}
+
+/** Normalizes «III» / «3 группа» to the select value «3». */
+export function admissionGroupValue(group: string | undefined): string {
+  const n = qualificationGroupNumber(group)
+  return n ? String(n) : ''
+}
 
 export const OTHER_QUALIFICATION_LABEL = 'Прочее'
 
@@ -69,8 +89,36 @@ export function qualificationLabel(id: string | undefined): string {
   return qualificationType(id)?.name ?? OTHER_QUALIFICATION_LABEL
 }
 
-export function defaultExpiry(typeId: QualificationTypeId, issuedAt: string): string {
-  return addMonthsIso(issuedAt, TYPES.get(typeId)?.defaultValidityMonths ?? 12)
+const ROMAN_GROUP: Record<string, number> = { i: 1, ii: 2, iii: 3, iv: 4, v: 5 }
+
+/** Reads 1–5 from «3», «III», «3 группа». */
+export function qualificationGroupNumber(group: string | undefined): number | null {
+  if (!group) return null
+  const normalized = group
+    .trim()
+    .toLowerCase()
+    .replace(/группа/g, '')
+    .replace(/гр\.?/g, '')
+    .replace(/\s+/g, '')
+  if (/^\d+$/.test(normalized)) {
+    const n = Number(normalized)
+    return n > 0 ? n : null
+  }
+  return ROMAN_GROUP[normalized] ?? null
+}
+
+/** Confined spaces: 3 years for groups 1–2, 5 years for group 3. */
+export function defaultValidityMonthsFor(typeId: QualificationTypeId, group?: string): number {
+  const fallback = TYPES.get(typeId)?.defaultValidityMonths ?? 12
+  if (typeId !== 'confined') return fallback
+  const n = qualificationGroupNumber(group)
+  if (n === 3) return 60
+  if (n === 1 || n === 2) return 36
+  return fallback
+}
+
+export function defaultExpiry(typeId: QualificationTypeId, issuedAt: string, group?: string): string {
+  return addMonthsIso(issuedAt, defaultValidityMonthsFor(typeId, group))
 }
 
 /** The document that keeps the qualification valid the longest; a document without expiry never expires. */
@@ -125,11 +173,32 @@ export function describeAssignmentIssue(issue: AssignmentIssue): string {
   return `${issue.workerName} — ${name} — ${when}`
 }
 
-export function validateQualificationFields(meta: { qualificationTypeId?: string; group?: string; issuedAt?: string }): string | null {
-  if (!meta.qualificationTypeId) return meta.group ? 'Группа указывается только для допуска' : null
+export function validateQualificationFields(meta: {
+  qualificationTypeId?: string
+  group?: string
+  issuedAt?: string
+  voltage?: string
+}): string | null {
+  if (!meta.qualificationTypeId) {
+    if (meta.group) return 'Группа указывается только для допуска'
+    if (meta.voltage) return 'Напряжение указывается только для электробезопасности'
+    return null
+  }
   const type = qualificationType(meta.qualificationTypeId)
   if (!type) return 'Неизвестный вид допуска'
   if (meta.group && !type.hasGroup) return `Для допуска «${type.name}» группа не указывается`
+  if (meta.group) {
+    const n = qualificationGroupNumber(meta.group)
+    if (type.id === 'electrical') {
+      if (!n || n > 5) return 'Укажите группу 1–5'
+    } else if (!n || n > 3) {
+      return 'Укажите группу 1–3'
+    }
+  }
+  if (meta.voltage) {
+    if (type.id !== 'electrical') return 'Напряжение указывается только для электробезопасности'
+    if (!isElectricalVoltage(meta.voltage)) return 'Некорректное напряжение'
+  }
   if (meta.issuedAt && !isIsoDate(meta.issuedAt)) return 'Некорректная дата выдачи'
   return null
 }

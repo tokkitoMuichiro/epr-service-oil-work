@@ -44,6 +44,8 @@ export interface QualificationFields {
   issuedAt?: string
   issuer?: string
   group?: string
+  /** Electrical safety only: up_to_1000 | above_1000. */
+  voltage?: string
 }
 
 export interface WorkerDocument extends QualificationFields {

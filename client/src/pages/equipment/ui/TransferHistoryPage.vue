@@ -44,6 +44,10 @@ function tone(value: TransferStatus) {
   if (value === 'COMPLETED') return 'ok'
   return 'bad'
 }
+
+function nameTip(t: { equipmentName: string; factoryNumber?: string | null }) {
+  return t.factoryNumber ? `${t.equipmentName} · ${t.factoryNumber}` : t.equipmentName
+}
 </script>
 
 <template>
@@ -71,22 +75,22 @@ function tone(value: TransferStatus) {
       <div v-else :ref="list.bindList" class="ui-fill-scroll" @scroll.passive="list.onListScroll">
         <div class="ui-rows history-rows">
           <div class="ui-rows__head">
-            <span class="ui-rows__cell" :aria-sort="ariaSort('date')">
+            <span class="ui-rows__cell cell--date" :aria-sort="ariaSort('date')">
               <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'date' }" @click="toggleSort('date')">
                 Дата<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('date') }}</span>
               </button>
             </span>
-            <span class="ui-rows__cell ui-rows__cell--name" :aria-sort="ariaSort('name')">
+            <span class="ui-rows__cell ui-rows__cell--name cell--name" :aria-sort="ariaSort('name')">
               <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'name' }" @click="toggleSort('name')">
                 Позиция<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('name') }}</span>
               </button>
             </span>
-            <span class="ui-rows__cell" :aria-sort="ariaSort('from')">
+            <span class="ui-rows__cell cell--from" :aria-sort="ariaSort('from')">
               <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'from' }" @click="toggleSort('from')">
                 Откуда<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('from') }}</span>
               </button>
             </span>
-            <span class="ui-rows__cell" :aria-sort="ariaSort('to')">
+            <span class="ui-rows__cell cell--to" :aria-sort="ariaSort('to')">
               <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'to' }" @click="toggleSort('to')">
                 Куда<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('to') }}</span>
               </button>
@@ -96,24 +100,24 @@ function tone(value: TransferStatus) {
                 Кол-во<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('qty') }}</span>
               </button>
             </span>
-            <span class="ui-rows__cell" :aria-sort="ariaSort('actor')">
+            <span class="ui-rows__cell cell--actor" :aria-sort="ariaSort('actor')">
               <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'actor' }" @click="toggleSort('actor')">
-                Кто передал<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('actor') }}</span>
+                Кто<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('actor') }}</span>
               </button>
             </span>
-            <span class="ui-rows__cell" :aria-sort="ariaSort('status')">
+            <span class="ui-rows__cell cell--status" :aria-sort="ariaSort('status')">
               <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'status' }" @click="toggleSort('status')">
                 Статус<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('status') }}</span>
               </button>
             </span>
           </div>
           <ul class="ui-rows__list" aria-label="История передач">
-            <li v-for="t in list.pageItems" :key="t.id" class="ui-rows__item ui-rows__item--wrap">
+            <li v-for="t in list.pageItems" :key="t.id" class="ui-rows__item">
               <span class="ui-rows__cell cell--date">
                 <UiClipText :text="formatDateTimeRu(t.createdAt)" />
               </span>
               <span class="ui-rows__cell ui-rows__cell--name cell--name">
-                <UiClipText tag="strong" :text="t.equipmentName" />
+                <UiClipText tag="strong" :text="t.equipmentName" :tip="nameTip(t)" />
                 <UiClipText v-if="t.factoryNumber" class="muted" :text="t.factoryNumber" />
               </span>
               <span class="ui-rows__cell cell--from">
@@ -182,25 +186,81 @@ function tone(value: TransferStatus) {
 
 .count {
   margin: var(--space-3) 0;
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
 }
 
 .history-rows {
-  --ui-rows-columns: minmax(6.5rem, 0.9fr) minmax(6rem, 1.4fr) minmax(4.5rem, 1fr) minmax(4.5rem, 1fr) minmax(3.5rem, 4.5rem) minmax(4.5rem, 0.9fr) minmax(5.5rem, 7rem);
+  --ui-rows-columns:
+    minmax(6.25rem, 8rem)
+    minmax(5rem, 1.5fr)
+    minmax(4rem, 1fr)
+    minmax(4rem, 1fr)
+    minmax(3rem, 3.5rem)
+    minmax(4rem, 0.9fr)
+    8rem;
+  font-size: var(--font-size-xs);
+}
+
+.history-rows .ui-rows__head,
+.history-rows .ui-rows__item {
+  min-height: var(--control-height-sm);
+  max-height: var(--control-height-sm);
+}
+
+.history-rows .ui-rows__cell {
+  min-width: 0;
 }
 
 .cell--date {
-  min-width: 6.5rem;
-  max-width: 10rem;
+  min-width: 0;
+  max-width: 8rem;
   font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.cell--name {
+  min-width: 0;
+  max-width: none;
+}
+
+.cell--name .muted {
+  flex: 0 1 4.5rem;
+  min-width: 0;
+  max-width: 5.5rem;
+  color: var(--text-secondary);
+  font-size: var(--font-size-2xs);
+}
+
+.cell--from,
+.cell--to,
+.cell--actor {
+  min-width: 0;
+  max-width: none;
 }
 
 .cell--qty {
-  min-width: 3.5rem;
-  max-width: 4.5rem;
+  justify-content: center;
+  min-width: 0;
+  max-width: none;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+.cell--qty :deep(.ui-sort) {
+  justify-content: center;
+}
+
+.cell--status {
+  flex: none;
+  justify-content: flex-end;
+  min-width: 8rem;
+  max-width: 8rem;
+  overflow: visible;
+}
+
+.cell--status .ui-badge {
+  flex: none;
 }
 
 .cell--route {
@@ -209,7 +269,6 @@ function tone(value: TransferStatus) {
 
 .muted {
   color: var(--text-secondary);
-  font-size: var(--font-size-xs);
 }
 
 @media (max-width: 860px) {
@@ -228,79 +287,40 @@ function tone(value: TransferStatus) {
 
   .count {
     margin: var(--space-2) 0;
-    font-size: var(--font-size-xs);
+    font-size: var(--font-size-2xs);
   }
 
   .history-rows {
-    --ui-rows-columns: minmax(0, 1fr) max-content;
+    --ui-rows-columns: minmax(0, 1fr) max-content max-content;
   }
 
   .history-rows .ui-rows__item {
-    grid-template-areas:
-      'name date'
-      'route status';
-    align-items: start;
-    max-height: none;
-    height: auto;
-    padding-block: var(--space-2);
+    grid-template-columns: var(--ui-rows-columns);
+    grid-template-areas: 'name route status';
+    max-height: var(--control-height);
   }
 
   .cell--name {
     grid-area: name;
-    flex-direction: column;
-    align-items: flex-start;
-    min-width: 0;
-    max-height: none;
-    overflow: visible;
-  }
-
-  .cell--name :deep(.clip-text__label) {
-    white-space: normal;
-    overflow: visible;
-    text-overflow: unset;
-    overflow-wrap: anywhere;
-    word-break: break-word;
   }
 
   .cell--name .muted {
     display: none;
   }
 
-  .cell--status {
-    grid-area: status;
-    justify-content: flex-end;
-  }
-
   .cell--route {
     display: flex;
     grid-area: route;
     min-width: 0;
-    max-width: none;
+    max-width: 10rem;
     color: var(--text-secondary);
-    font-size: var(--font-size-sm);
   }
 
-  .cell--route :deep(.clip-text__label) {
-    white-space: normal;
-    overflow: visible;
-    text-overflow: unset;
-    overflow-wrap: anywhere;
+  .cell--status {
+    grid-area: status;
   }
 
-  .cell--date {
-    grid-area: date;
-    min-width: 0;
-    max-width: none;
-    justify-content: flex-end;
-    color: var(--text-secondary);
-    font-size: var(--font-size-sm);
-  }
-
-  .cell--date :deep(.clip-text__label) {
-    overflow: visible;
-    text-overflow: unset;
-  }
-
+  .cell--date,
   .cell--from,
   .cell--to,
   .cell--qty,

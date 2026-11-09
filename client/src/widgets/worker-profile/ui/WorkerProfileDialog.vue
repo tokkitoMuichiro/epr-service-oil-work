@@ -3,18 +3,30 @@ import { computed, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useBrigadesStore } from '@/entities/brigade'
 import {
+  ADMISSION_GROUPS,
+  ELECTRICAL_ADMISSION_GROUPS,
   EMPLOYMENT_STATUS_LABEL,
+  OTHER_QUALIFICATION_LABEL,
+  QUALIFICATION_TYPES,
   SNILS_MASK,
   TrainingStateBadge,
+  VOLTAGE_LABEL,
   WorkerStatusBadge,
+  admissionGroupValue,
   personnelApi,
   qualificationLabel,
+  qualificationType,
   trainingDocState,
   usePersonnelStore,
+  validateDocumentMeta,
+  validateQualificationFields,
   validateWorkerDraft,
+  type DocumentUpdate,
   type DocumentUpload,
   type EmploymentStatus,
+  type QualificationTypeId,
   type Worker,
+  type WorkerDocument,
   type WorkerDraft,
 } from '@/entities/personnel'
 import { useAccessStore, useRoleStore } from '@/entities/role'
@@ -22,8 +34,19 @@ import { formatDateRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
 import { initialsOf } from '@/shared/lib/initials'
 import { useEscape, useScrollLock } from '@/shared/lib/scroll-lock'
-import { IconClose, UiButton, askConfirm } from '@/shared/ui'
+import { IconClose, IconPencil, UiButton, askConfirm } from '@/shared/ui'
 import DocumentDropzone from './DocumentDropzone.vue'
+
+interface DocumentEditForm {
+  title: string
+  typeId: '' | QualificationTypeId
+  number: string
+  issuedAt: string
+  issuer: string
+  group: string
+  voltage: string
+  expiresAt: string
+}
 
 interface ProfileTab {
   id: string
@@ -53,6 +76,18 @@ const photoInput = ref<HTMLInputElement | null>(null)
 const dropzone = ref<InstanceType<typeof DocumentDropzone> | null>(null)
 
 const form = reactive({ fullName: '', position: '', phone: '', snils: '' })
+const editingDocId = ref<string | null>(null)
+const docForm = reactive<DocumentEditForm>({
+  title: '',
+  typeId: '',
+  number: '',
+  issuedAt: '',
+  issuer: '',
+  group: '',
+  voltage: '',
+  expiresAt: '',
+})
+const docEditError = ref('')
 const activeTab = ref(MAIN_TAB)
 
 const allTabs = computed<ProfileTab[]>(() => [MAIN, ...props.tabs, DOCS])
@@ -76,16 +111,73 @@ const brigadeRole = computed(() => {
 
 const photoUrl = computed(() => (worker.value ? personnelApi.photoUrl(worker.value) : null))
 
-function documentMeta(doc: { qualificationTypeId?: string; number?: string; group?: string; issuedAt?: string; issuer?: string }) {
+function documentMeta(doc: {
+  qualificationTypeId?: string
+  number?: string
+  group?: string
+  voltage?: string
+  issuedAt?: string
+  issuer?: string
+}) {
   return [
     qualificationLabel(doc.qualificationTypeId),
     doc.number ? `№ ${doc.number}` : '',
     doc.group ? `группа ${doc.group}` : '',
+    doc.voltage && doc.voltage in VOLTAGE_LABEL ? VOLTAGE_LABEL[doc.voltage as keyof typeof VOLTAGE_LABEL] : '',
     doc.issuedAt ? `выдан ${formatDateRu(doc.issuedAt)}` : '',
     doc.issuer ?? '',
   ]
     .filter(Boolean)
     .join(' · ')
+}
+
+function docHasGroup() {
+  return Boolean(qualificationType(docForm.typeId || undefined)?.hasGroup)
+}
+
+function docIsElectrical() {
+  return docForm.typeId === 'electrical'
+}
+
+function docGroupOptions() {
+  return docIsElectrical() ? ELECTRICAL_ADMISSION_GROUPS : ADMISSION_GROUPS
+}
+
+function onDocTypeChange() {
+  if (!docHasGroup()) docForm.group = ''
+  if (!docIsElectrical()) docForm.voltage = ''
+}
+
+function startDocEdit(doc: WorkerDocument) {
+  editingDocId.value = doc.id
+  docEditError.value = ''
+  personnel.actionError = ''
+  docForm.title = doc.title
+  docForm.typeId = (doc.qualificationTypeId as QualificationTypeId | undefined) ?? ''
+  docForm.number = doc.number ?? ''
+  docForm.issuedAt = doc.issuedAt ?? ''
+  docForm.issuer = doc.issuer ?? ''
+  docForm.group = admissionGroupValue(doc.group)
+  docForm.voltage = doc.voltage ?? ''
+  docForm.expiresAt = doc.expiresAt ?? ''
+}
+
+function cancelDocEdit() {
+  editingDocId.value = null
+  docEditError.value = ''
+}
+
+function toDocUpdate(): DocumentUpdate {
+  return {
+    title: docForm.title.trim(),
+    qualificationTypeId: docForm.typeId || undefined,
+    number: docForm.number.trim() || undefined,
+    issuedAt: docForm.issuedAt || undefined,
+    issuer: docForm.issuer.trim() || undefined,
+    group: docForm.group.trim() || undefined,
+    voltage: docForm.voltage || undefined,
+    expiresAt: docForm.expiresAt || undefined,
+  }
 }
 
 function documentState(expiresAt: string | undefined) {
@@ -117,6 +209,8 @@ watch(
   () => worker.value?.id,
   () => {
     isEditing.value = false
+    editingDocId.value = null
+    docEditError.value = ''
     activeTab.value = MAIN_TAB
     dropzone.value?.clear()
   },
@@ -166,10 +260,24 @@ async function upload(uploads: DocumentUpload[]) {
   if (await personnel.uploadDocuments(worker.value.id, uploads)) dropzone.value?.clear()
 }
 
+async function saveDocument() {
+  if (!worker.value || !editingDocId.value) return
+  const patch = toDocUpdate()
+  const problem =
+    validateDocumentMeta({ ...patch, fileName: 'x' }) ?? validateQualificationFields(patch)
+  if (problem) {
+    docEditError.value = problem
+    return
+  }
+  docEditError.value = ''
+  if (await personnel.updateDocument(worker.value.id, editingDocId.value, patch)) cancelDocEdit()
+}
+
 async function removeDocument(docId: string, title: string) {
   if (!worker.value) return
   const workerId = worker.value.id
   if (!(await askConfirm({ title: `Удалить документ «${title}»?`, confirmText: 'Удалить документ' }))) return
+  if (editingDocId.value === docId) cancelDocEdit()
   await personnel.removeDocument(workerId, docId)
 }
 
@@ -215,7 +323,8 @@ async function removeWorker() {
 useEscape(
   () => Boolean(worker.value),
   () => {
-    if (isEditing.value) isEditing.value = false
+    if (editingDocId.value) cancelDocEdit()
+    else if (isEditing.value) isEditing.value = false
     else close()
   },
 )
@@ -383,7 +492,7 @@ useEscape(
             <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
             <p v-if="!worker.documents.length" class="muted">Документы ещё не загружены.</p>
             <ul v-else class="docs__list">
-              <li v-for="doc in worker.documents" :key="doc.id" class="doc">
+              <li v-for="doc in worker.documents" :key="doc.id" class="doc" :class="{ 'doc--editing': editingDocId === doc.id }">
                 <svg class="doc__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
                   <path
                     d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5zm0 0v5h5"
@@ -393,7 +502,66 @@ useEscape(
                     stroke-linejoin="round"
                   />
                 </svg>
-                <div class="doc__main">
+                <div v-if="editingDocId === doc.id" class="doc__main">
+                  <div class="doc__fields">
+                    <label class="doc__wide">
+                      <span>Вид документа</span>
+                      <select v-model="docForm.typeId" class="ui-control" @change="onDocTypeChange">
+                        <option value="">{{ OTHER_QUALIFICATION_LABEL }}</option>
+                        <option v-for="t in QUALIFICATION_TYPES" :key="t.id" :value="t.id">{{ t.name }}</option>
+                      </select>
+                    </label>
+                    <label class="doc__wide">
+                      <span>Название</span>
+                      <textarea v-model="docForm.title" class="ui-control doc__title" rows="2" />
+                    </label>
+                    <template v-if="docForm.typeId">
+                      <label>
+                        <span>Номер</span>
+                        <input v-model="docForm.number" class="ui-control" size="1" />
+                      </label>
+                      <label v-if="docHasGroup()">
+                        <span>Группа</span>
+                        <select v-model="docForm.group" class="ui-control">
+                          <option value="">Не указана</option>
+                          <option v-for="g in docGroupOptions()" :key="g" :value="g">{{ g }}</option>
+                        </select>
+                      </label>
+                      <label v-if="docIsElectrical()">
+                        <span>Напряжение</span>
+                        <select v-model="docForm.voltage" class="ui-control">
+                          <option value="">Не указано</option>
+                          <option v-for="(label, key) in VOLTAGE_LABEL" :key="key" :value="key">{{ label }}</option>
+                        </select>
+                      </label>
+                      <label>
+                        <span>Дата выдачи</span>
+                        <input v-model="docForm.issuedAt" class="ui-control" type="date" />
+                      </label>
+                      <label>
+                        <span>Действует до</span>
+                        <input v-model="docForm.expiresAt" class="ui-control" type="date" />
+                      </label>
+                      <label class="doc__wide">
+                        <span>Кем выдан</span>
+                        <input v-model="docForm.issuer" class="ui-control" size="1" />
+                      </label>
+                    </template>
+                    <label v-else>
+                      <span>Действует до</span>
+                      <input v-model="docForm.expiresAt" class="ui-control" type="date" />
+                    </label>
+                  </div>
+                  <small class="doc__note">Если дата окончания не указана — документ действует бессрочно.</small>
+                  <p v-if="docEditError" class="error" role="alert">{{ docEditError }}</p>
+                  <div class="doc__edit-actions">
+                    <UiButton type="button" variant="ghost" :disabled="busy" @click="cancelDocEdit">Отмена</UiButton>
+                    <UiButton type="button" variant="primary" :disabled="busy" @click="saveDocument">
+                      {{ busy ? 'Сохранение…' : 'Сохранить' }}
+                    </UiButton>
+                  </div>
+                </div>
+                <div v-else class="doc__main">
                   <button
                     type="button"
                     class="doc__link"
@@ -416,17 +584,28 @@ useEscape(
                     <TrainingStateBadge :state="documentState(doc.expiresAt)" />
                   </div>
                 </div>
-                <button
-                  v-if="canEdit"
-                  type="button"
-                  class="doc__remove"
-                  :aria-label="`Удалить ${doc.title}`"
-                  title="Удалить документ"
-                  :disabled="busy"
-                  @click="removeDocument(doc.id, doc.title)"
-                >
-                  <IconClose :size="18" />
-                </button>
+                <div v-if="canEdit && editingDocId !== doc.id" class="doc__actions">
+                  <button
+                    type="button"
+                    class="doc__action"
+                    :aria-label="`Редактировать ${doc.title}`"
+                    title="Редактировать"
+                    :disabled="busy"
+                    @click="startDocEdit(doc)"
+                  >
+                    <IconPencil :size="18" />
+                  </button>
+                  <button
+                    type="button"
+                    class="doc__action"
+                    :aria-label="`Удалить ${doc.title}`"
+                    title="Удалить документ"
+                    :disabled="busy"
+                    @click="removeDocument(doc.id, doc.title)"
+                  >
+                    <IconClose :size="18" />
+                  </button>
+                </div>
               </li>
             </ul>
 
@@ -571,7 +750,12 @@ useEscape(
     text-decoration: underline;
   }
 
-  .doc__remove:hover {
+  .doc__action:hover {
+    background: var(--surface-sunken);
+    color: var(--text-primary);
+  }
+
+  .doc__action[title='Удалить документ']:hover {
     background: var(--status-bad-bg);
     color: var(--status-bad-fg);
   }
@@ -834,7 +1018,13 @@ useEscape(
   flex: none;
 }
 
-.doc__remove {
+.doc__actions {
+  flex: none;
+  display: flex;
+  gap: var(--space-1);
+}
+
+.doc__action {
   flex: none;
   display: inline-grid;
   place-items: center;
@@ -845,6 +1035,58 @@ useEscape(
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
+}
+
+.doc__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.doc__wide {
+  grid-column: 1 / -1;
+}
+
+.doc__fields label {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.doc__fields label span {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.doc__fields input,
+.doc__fields select,
+.doc__fields textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.doc__title {
+  min-height: calc(var(--control-height) * 2);
+  padding-block: 8px;
+  overflow-wrap: anywhere;
+  resize: vertical;
+  field-sizing: fixed;
+}
+
+.doc__note {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.doc__edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 .link {
@@ -871,6 +1113,10 @@ useEscape(
 }
 
 @media (max-width: 560px) {
+  .doc__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .overlay {
     overflow: hidden;
   }

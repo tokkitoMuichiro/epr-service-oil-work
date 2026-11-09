@@ -198,13 +198,13 @@ async function remove(w: Warehouse) {
                 Всего<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('total') }}</span>
               </button>
             </span>
-            <span v-if="canManage" class="cell cell--actions" />
+            <span v-if="canManage" class="cell cell--actions" aria-hidden="true" />
           </div>
           <ul class="rows__list" aria-label="Производственные базы">
             <li
               v-for="w in pageItems"
               :key="w.id"
-              class="rows__item rows__item--wrap"
+              class="rows__item"
               tabindex="0"
               :data-state="rowState(w)"
               :title="itemTip(w)"
@@ -228,24 +228,20 @@ async function remove(w: Warehouse) {
                 <UiClipText class="mono" :text="positionsLabel(store.itemsOnWarehouse(w.id).length)" />
               </span>
               <span v-if="canManage" class="cell cell--actions" @click.stop>
-                <button type="button" class="link action-text" @click="openForm(w)">Изменить</button>
-                <button v-if="!w.isSystem" type="button" class="link action-text" :disabled="store.busy" @click="remove(w)">
-                  Удалить
+                <button type="button" class="icon-btn" aria-label="Изменить" title="Изменить" @click="openForm(w)">
+                  <IconPencil :size="14" />
                 </button>
-                <UiButton class="action-icon" size="icon" variant="ghost" aria-label="Изменить" @click="openForm(w)">
-                  <IconPencil :size="16" />
-                </UiButton>
-                <UiButton
+                <button
                   v-if="!w.isSystem"
-                  class="action-icon"
-                  size="icon"
-                  variant="ghost"
+                  type="button"
+                  class="icon-btn"
                   aria-label="Удалить"
+                  title="Удалить"
                   :disabled="store.busy"
                   @click="remove(w)"
                 >
-                  <IconTrash :size="16" />
-                </UiButton>
+                  <IconTrash :size="14" />
+                </button>
               </span>
             </li>
           </ul>
@@ -297,11 +293,11 @@ async function remove(w: Warehouse) {
 }
 
 .rows {
-  --name-col: minmax(6rem, 2.2fr);
-  --address-col: minmax(4.5rem, 1.2fr);
-  --keepers-col: minmax(4.5rem, 1.1fr);
-  --total-col: minmax(4.5rem, 7rem);
-  --actions-col: 9rem;
+  --name-col: minmax(5rem, 1.5fr);
+  --address-col: minmax(4rem, 1.2fr);
+  --keepers-col: minmax(4rem, 1fr);
+  --total-col: minmax(3.5rem, 5.5rem);
+  --actions-col: calc(var(--control-height-sm) * 2 + 4px);
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -311,6 +307,7 @@ async function remove(w: Warehouse) {
   border-radius: var(--radius);
   background: var(--surface-card);
   overflow: hidden;
+  font-size: var(--font-size-xs);
 }
 
 .rows__head,
@@ -338,12 +335,10 @@ async function remove(w: Warehouse) {
   position: sticky;
   top: 0;
   z-index: 1;
-  min-height: var(--control-height-sm);
-  max-height: var(--control-height-sm);
   border-bottom: 1px solid var(--border-subtle);
   background: var(--table-head-bg);
   color: var(--text-secondary);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-2xs);
   font-weight: 700;
 }
 
@@ -379,34 +374,32 @@ async function remove(w: Warehouse) {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  min-width: 4rem;
+  min-width: 0;
   max-width: 100%;
   max-height: 100%;
   overflow: hidden;
 }
 
 .cell--name {
-  min-width: 6rem;
+  min-width: 0;
 }
 
-.cell--address {
-  min-width: 4.5rem;
-  max-width: 14rem;
-}
-
+.cell--address,
 .cell--keepers {
-  min-width: 4.5rem;
-  max-width: 12rem;
+  min-width: 0;
+  color: var(--text-secondary);
 }
 
 .cell--total {
-  min-width: 4.5rem;
-  max-width: 7rem;
+  min-width: 0;
+  max-width: 5.5rem;
+  justify-content: flex-end;
 }
 
 .cell--actions {
   justify-content: flex-end;
-  min-width: 5.5rem;
+  gap: 2px;
+  min-width: 0;
   max-width: var(--actions-col);
 }
 
@@ -423,9 +416,12 @@ async function remove(w: Warehouse) {
 .tag {
   flex: 0 1 auto;
   min-width: 0;
-  max-width: 6.5rem;
+  max-width: 5.5rem;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: var(--font-size-2xs);
+  min-height: 18px;
+  padding: 0 6px;
 }
 
 .mono {
@@ -434,27 +430,23 @@ async function remove(w: Warehouse) {
   color: var(--text-link);
 }
 
-.link {
-  max-width: 100%;
-  min-height: var(--control-height-sm);
-  padding: 0 var(--space-2);
+.icon-btn {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  padding: 0;
   border: 0;
   border-radius: var(--radius);
   background: transparent;
-  color: var(--text-link);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
+  color: var(--text-secondary);
   cursor: pointer;
-  white-space: nowrap;
 }
 
-.link:disabled {
+.icon-btn:disabled {
   color: var(--text-disabled);
   cursor: not-allowed;
-}
-
-.action-icon {
-  display: none;
 }
 
 .list__sentinel {
@@ -487,8 +479,14 @@ async function remove(w: Warehouse) {
     background: var(--row-hover-bg);
   }
 
-  .link:not(:disabled):hover {
-    background: var(--accent-subtle);
+  .icon-btn:not(:disabled):hover {
+    background: var(--surface-sunken);
+    color: var(--text-primary);
+  }
+
+  .icon-btn[aria-label='Удалить']:not(:disabled):hover {
+    background: var(--status-bad-bg);
+    color: var(--status-bad-fg);
   }
 
   .scroll-top:hover {
@@ -498,11 +496,9 @@ async function remove(w: Warehouse) {
 
 @media (max-width: 860px) {
   .rows {
-    --name-col: minmax(4.5rem, 1.6fr);
-    --address-col: minmax(3.25rem, 0.9fr);
-    --keepers-col: minmax(3.25rem, 0.9fr);
-    --total-col: minmax(3.5rem, 5.25rem);
-    --actions-col: 6.5rem;
+    --name-col: minmax(0, 1fr);
+    --total-col: max-content;
+    --actions-col: calc(var(--control-height-sm) * 2 + 2px);
     border: 0;
     background: none;
     overflow: visible;
@@ -514,105 +510,25 @@ async function remove(w: Warehouse) {
 
   .rows .rows__item,
   .rows--manage .rows__item {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    grid-template-areas:
-      'name total actions'
-      'address keepers actions';
-    align-items: start;
-    gap: var(--space-1);
-    max-height: none;
-    height: auto;
+    grid-template-columns: var(--name-col) var(--total-col) var(--actions-col);
     margin-bottom: var(--space-1);
-    padding: var(--space-2);
+    padding: 0 var(--space-2);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius);
   }
 
   .rows:not(.rows--manage) .rows__item {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      'name total'
-      'address keepers';
+    grid-template-columns: var(--name-col) var(--total-col);
   }
 
   .rows__list .rows__item:first-child {
     border-top: 1px solid var(--border-subtle);
   }
 
-  .cell {
-    min-width: 0;
-    max-height: none;
-  }
-
-  .cell--name {
-    grid-area: name;
-    min-width: 0;
-    max-width: none;
-    overflow: visible;
-  }
-
-  .name :deep(.clip-text__label),
-  .cell--address :deep(.clip-text__label),
-  .cell--keepers :deep(.clip-text__label) {
-    white-space: normal;
-    overflow: visible;
-    text-overflow: unset;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
-
-  .cell--total {
-    grid-area: total;
-    min-width: 0;
-    max-width: none;
-    justify-content: flex-end;
-  }
-
-  .cell--address {
-    grid-area: address;
-    min-width: 0;
-    max-width: none;
-    color: var(--text-secondary);
-    font-size: var(--font-size-sm);
-  }
-
-  .cell--keepers {
-    grid-area: keepers;
-    min-width: 0;
-    max-width: none;
-    justify-content: flex-end;
-    color: var(--text-secondary);
-    font-size: var(--font-size-sm);
-  }
-
-  .cell--actions {
-    grid-area: actions;
-    align-self: stretch;
-    align-items: center;
-    min-width: 0;
-    max-width: none;
-  }
-
-  .action-text {
-    display: none;
-  }
-
-  .action-icon {
-    display: inline-grid;
-  }
-
-  .cell--actions :deep(.btn) {
-    min-height: var(--tap-size);
-  }
-
+  .cell--address,
+  .cell--keepers,
   .tag {
     display: none;
-  }
-}
-
-@media (max-width: 560px) {
-  .rows {
-    --actions-col: 6.25rem;
   }
 }
 </style>

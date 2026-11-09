@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import {
+  ADMISSION_GROUPS,
+  ELECTRICAL_ADMISSION_GROUPS,
   OTHER_QUALIFICATION_LABEL,
   QUALIFICATION_TYPES,
-  defaultExpiry,
+  VOLTAGE_LABEL,
   qualificationType,
   validateDocumentMeta,
   validateQualificationFields,
@@ -29,8 +31,8 @@ interface Pending {
   issuedAt: string
   issuer: string
   group: string
+  voltage: string
   expiresAt: string
-  isExpiryTouched: boolean
 }
 
 const pending = ref<Pending[]>([])
@@ -49,8 +51,8 @@ function add(files: File[]) {
       issuedAt: '',
       issuer: '',
       group: '',
+      voltage: '',
       expiresAt: '',
-      isExpiryTouched: false,
     })
   }
 }
@@ -59,15 +61,18 @@ function hasGroup(item: Pending) {
   return Boolean(qualificationType(item.typeId || undefined)?.hasGroup)
 }
 
-function syncExpiry(item: Pending) {
-  if (item.isExpiryTouched || !item.typeId || !item.issuedAt) return
-  item.expiresAt = defaultExpiry(item.typeId, item.issuedAt)
+function isElectrical(item: Pending) {
+  return item.typeId === 'electrical'
+}
+
+function groupOptions(item: Pending) {
+  return isElectrical(item) ? ELECTRICAL_ADMISSION_GROUPS : ADMISSION_GROUPS
 }
 
 function onTypeChange(item: Pending) {
   if (!item.isTitleTouched && item.typeId) item.title = qualificationType(item.typeId)?.name ?? item.title
   if (!hasGroup(item)) item.group = ''
-  syncExpiry(item)
+  if (!isElectrical(item)) item.voltage = ''
 }
 
 function removePending(key: string) {
@@ -83,6 +88,7 @@ function toUpload(p: Pending): DocumentUpload {
     issuedAt: p.issuedAt || undefined,
     issuer: p.issuer.trim() || undefined,
     group: p.group.trim() || undefined,
+    voltage: p.voltage || undefined,
     expiresAt: p.expiresAt || undefined,
   }
 }
@@ -153,15 +159,25 @@ defineExpose({ clear })
             </label>
             <label v-if="hasGroup(item)">
               <span>Группа</span>
-              <input v-model="item.group" class="ui-control" size="1" placeholder="III" />
+              <select v-model="item.group" class="ui-control">
+                <option value="">Не указана</option>
+                <option v-for="g in groupOptions(item)" :key="g" :value="g">{{ g }}</option>
+              </select>
+            </label>
+            <label v-if="isElectrical(item)">
+              <span>Напряжение</span>
+              <select v-model="item.voltage" class="ui-control">
+                <option value="">Не указано</option>
+                <option v-for="(label, key) in VOLTAGE_LABEL" :key="key" :value="key">{{ label }}</option>
+              </select>
             </label>
             <label>
               <span>Дата выдачи</span>
-              <input v-model="item.issuedAt" class="ui-control" type="date" @change="syncExpiry(item)" />
+              <input v-model="item.issuedAt" class="ui-control" type="date" />
             </label>
             <label>
               <span>Действует до</span>
-              <input v-model="item.expiresAt" class="ui-control" type="date" @input="item.isExpiryTouched = true" />
+              <input v-model="item.expiresAt" class="ui-control" type="date" />
             </label>
             <label class="pending__wide">
               <span>Кем выдан</span>
@@ -170,12 +186,10 @@ defineExpose({ clear })
           </template>
           <label v-else>
             <span>Действует до</span>
-            <input v-model="item.expiresAt" class="ui-control" type="date" @input="item.isExpiryTouched = true" />
+            <input v-model="item.expiresAt" class="ui-control" type="date" />
           </label>
         </div>
-        <small v-if="item.typeId && !item.isExpiryTouched" class="pending__note">
-          Срок рассчитывается от даты выдачи: {{ qualificationType(item.typeId)?.defaultValidityMonths }} мес.
-        </small>
+        <small class="pending__note">Если дата окончания не указана — документ действует бессрочно.</small>
       </li>
     </ul>
 
