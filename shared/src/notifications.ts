@@ -106,8 +106,16 @@ export function equipmentIncomingNotificationId(itemId: string) {
 export const EQUIPMENT_NEEDS_FIX_NOTIFICATION_ID = NOTIFICATION_TYPE.EQUIPMENT_NEEDS_FIX
 export const EQUIPMENT_PENDING_REVIEW_NOTIFICATION_ID = NOTIFICATION_TYPE.EQUIPMENT_PENDING_REVIEW
 
+function isSafePathId(id: string): boolean {
+  return /^[\w-]+$/.test(id)
+}
+
 function deepLinkForIncoming(transfer: Transfer): string {
-  if (transfer.toOwnerType === 'WAREHOUSE' && transfer.toWarehouseId) {
+  if (
+    transfer.toOwnerType === 'WAREHOUSE' &&
+    transfer.toWarehouseId &&
+    isSafePathId(transfer.toWarehouseId)
+  ) {
     return `/equipment/warehouses/${transfer.toWarehouseId}`
   }
   return '/equipment/mine'

@@ -2,9 +2,9 @@ import { computed, onMounted, onScopeDispose, reactive, ref, watch, type Compute
 import { useRouter, type Router } from 'vue-router'
 import { buildEquipmentNotifications, type NotificationItem } from '@shared/notifications'
 import { useEquipmentStore } from '@/entities/equipment'
-import { useAccessStore } from '@/entities/role'
+import { useAccessStore, useRoleStore } from '@/entities/role'
 import { MOCK_NOTIFICATIONS, USE_MOCK_NOTIFICATIONS } from './mock-notifications'
-import { loadReadIds, persistReadIds } from './read-state'
+import { clearReadIds, loadReadIds, persistReadIds } from './read-state'
 
 const TOAST_MAX = 3
 
@@ -19,12 +19,13 @@ export interface ToastEntry {
 }
 
 const panelOpen = ref(false)
-const readIds = ref<Set<string>>(loadReadIds())
-/** In-memory only: prevents re-queue while the SPA stays open. Cleared on full app reload so unread toasts show again. */
+const readIds = ref<Set<string>>(new Set())
+/** In-memory only: prevents re-queue while the SPA stays open. Cleared on full app reload / user switch. */
 const toastSeenIds = ref<Set<string>>(new Set())
 const activeToasts = ref<ToastEntry[]>([])
 const toastQueue = ref<NotificationItem[]>([])
 
+let currentUserId: string | null = null
 let subscribers = 0
 let routerRef: Router | null = null
 let stopWatches: (() => void) | null = null
@@ -40,7 +41,7 @@ function pruneRead(activeIds: Set<string>) {
   }
   if (changed) {
     readIds.value = new Set(readIds.value)
-    persistReadIds(readIds.value)
+    persistReadIds(currentUserId, readIds.value)
   }
 }
 
@@ -52,6 +53,30 @@ function markToastSeen(id: string) {
 function dismissToast(id: string) {
   activeToasts.value = activeToasts.value.filter((toast) => toast.id !== id)
   flushToastQueue()
+}
+
+/** Drop toasts/queue for signals that no longer exist (e.g. after accept / fix). */
+function dismissGoneToasts(activeIds: Set<string>) {
+  for (const toast of [...activeToasts.value]) {
+    if (!activeIds.has(toast.id)) dismissToast(toast.id)
+  }
+  toastQueue.value = toastQueue.value.filter((item) => activeIds.has(item.id))
+  let seenChanged = false
+  for (const id of [...toastSeenIds.value]) {
+    if (activeIds.has(id)) continue
+    toastSeenIds.value.delete(id)
+    seenChanged = true
+  }
+  if (seenChanged) toastSeenIds.value = new Set(toastSeenIds.value)
+}
+
+function isStableInboxSource(): boolean {
+  if (USE_MOCK_NOTIFICATIONS) return true
+  const equipment = useEquipmentStore()
+  const session = useRoleStore()
+  if (!session.user?.id || !equipment.isReady) return false
+  if (equipment.persona.id && equipment.persona.id !== session.user.id) return false
+  return true
 }
 
 function dismissAllToasts() {
@@ -94,9 +119,34 @@ function remapDeepLink(path: string, isEmbed: boolean): string {
   return path
 }
 
+function isAllowedDeepLink(path: string): boolean {
+  return (
+    path === '/equipment' ||
+    path.startsWith('/equipment/') ||
+    path === '/e/equipment' ||
+    path.startsWith('/e/equipment/')
+  )
+}
+
+function syncSession(userId: string | null) {
+  if (userId === currentUserId) return
+  currentUserId = userId
+  clearReadIds() // drop legacy unscoped key only; per-user keys stay isolated
+  readIds.value = loadReadIds(userId)
+  toastSeenIds.value = new Set()
+  toastQueue.value = []
+  activeToasts.value = []
+  panelOpen.value = false
+}
+
 function ensureLoaded() {
   if (!canShowRef?.value) return
+  const session = useRoleStore()
+  if (!session.user?.id) return
   const equipment = useEquipmentStore()
+  if (equipment.isReady && equipment.persona.id && equipment.persona.id !== session.user.id) {
+    equipment.reset()
+  }
   if (equipment.status === 'idle' || equipment.status === 'error') void equipment.load()
 }
 
@@ -111,13 +161,17 @@ function subscribe() {
 
   const equipment = useEquipmentStore()
   const access = useAccessStore()
+  const session = useRoleStore()
   routerRef = useRouter()
 
   canShowRef = computed(() => access.canView('equipment') || USE_MOCK_NOTIFICATIONS)
   itemsRef = computed(() => {
     const mocks = USE_MOCK_NOTIFICATIONS ? MOCK_NOTIFICATIONS : []
     if (!canShowRef?.value) return []
-    if (!equipment.isReady) return mocks
+    const userId = session.user?.id
+    if (!userId || !equipment.isReady) return mocks
+    // Stale store after identity switch: never render the previous persona's inbox.
+    if (equipment.persona.id && equipment.persona.id !== userId) return mocks
     return [
       ...mocks,
       ...buildEquipmentNotifications({
@@ -132,7 +186,11 @@ function subscribe() {
   const stopItems = watch(
     itemsRef,
     (list) => {
-      pruneRead(new Set(list.map((item) => item.id)))
+      // While equipment is still loading, itemsRef is [] — do not wipe read-state or toasts.
+      if (!isStableInboxSource()) return
+      const activeIds = new Set(list.map((item) => item.id))
+      pruneRead(activeIds)
+      dismissGoneToasts(activeIds)
       enqueueToasts(list)
     },
     { immediate: true },
@@ -142,9 +200,19 @@ function subscribe() {
     if (allowed) ensureLoaded()
   })
 
+  const stopSession = watch(
+    () => session.user?.id ?? null,
+    (userId) => {
+      syncSession(userId)
+      if (userId) ensureLoaded()
+    },
+    { immediate: true },
+  )
+
   stopWatches = () => {
     stopItems()
     stopCanShow()
+    stopSession()
   }
 
   ensureLoaded()
@@ -193,7 +261,7 @@ export function useNotifications() {
   function markRead(id: string) {
     if (readIds.value.has(id)) return
     readIds.value = new Set(readIds.value).add(id)
-    persistReadIds(readIds.value)
+    persistReadIds(currentUserId, readIds.value)
     dismissToast(id)
   }
 
@@ -202,7 +270,7 @@ export function useNotifications() {
     const next = new Set(readIds.value)
     for (const item of items.value) next.add(item.id)
     readIds.value = next
-    persistReadIds(readIds.value)
+    persistReadIds(currentUserId, readIds.value)
     for (const toast of [...activeToasts.value]) dismissToast(toast.id)
     toastQueue.value = []
   }
@@ -211,6 +279,7 @@ export function useNotifications() {
     markRead(item.id)
     closePanel()
     const path = remapDeepLink(item.deepLink, isEmbed)
+    if (!isAllowedDeepLink(path)) return
     await (routerRef ?? useRouter()).push(path)
   }
 

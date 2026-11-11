@@ -805,11 +805,10 @@ onUnmounted(() => {
 }
 
 .shell--rail .nav__label,
-.shell--rail .nav__chevron {
-  max-width: 0;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
+.shell--rail .nav__chevron,
+.shell--rail .nav__badge {
+  /* Must leave the flex flow — max-width:0 still shifts icons left via gap. */
+  display: none;
 }
 
 .shell--rail .nav__sub {
@@ -822,6 +821,7 @@ onUnmounted(() => {
 
 .shell--rail .nav__link {
   justify-content: center;
+  gap: 0;
   padding: 0;
   transition:
     background-color 0.15s ease,

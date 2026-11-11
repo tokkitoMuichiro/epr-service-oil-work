@@ -1,4 +1,8 @@
-const READ_KEY = 'erp-notifications-read'
+const LEGACY_READ_KEY = 'erp-notifications-read'
+
+function storageKey(userId: string): string {
+  return `erp-notifications-read:${userId}`
+}
 
 function readSet(key: string): Set<string> {
   if (typeof sessionStorage === 'undefined') return new Set()
@@ -18,10 +22,19 @@ function writeSet(key: string, ids: Set<string>) {
   sessionStorage.setItem(key, JSON.stringify([...ids]))
 }
 
-export function loadReadIds(): Set<string> {
-  return readSet(READ_KEY)
+export function loadReadIds(userId: string | null | undefined): Set<string> {
+  if (!userId) return new Set()
+  return readSet(storageKey(userId))
 }
 
-export function persistReadIds(ids: Set<string>) {
-  writeSet(READ_KEY, ids)
+export function persistReadIds(userId: string | null | undefined, ids: Set<string>) {
+  if (!userId) return
+  writeSet(storageKey(userId), ids)
+}
+
+/** Drop legacy unscoped key and optionally the current user's set. */
+export function clearReadIds(userId?: string | null) {
+  if (typeof sessionStorage === 'undefined') return
+  sessionStorage.removeItem(LEGACY_READ_KEY)
+  if (userId) sessionStorage.removeItem(storageKey(userId))
 }
