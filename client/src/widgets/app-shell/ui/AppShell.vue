@@ -408,20 +408,24 @@ onUnmounted(() => {
       </nav>
 
       <div class="shell__footer">
-        <NotificationBell v-if="!isMobile" inverse />
-        <ThemeSwitch v-if="isRail" compact />
-        <button
-          v-if="isRail"
-          type="button"
-          class="rail__avatar"
-          :title="`${displayName} · ${roleStore.currentRoleLabel}`"
-          :aria-label="`${displayName}, роль ${roleStore.currentRoleLabel}. Развернуть меню`"
-          @click="toggleCollapsed"
-        >
-          <UiAvatar :name="displayName" size="md" inverse />
-        </button>
+        <template v-if="isRail">
+          <NotificationBell v-if="!isMobile" inverse />
+          <ThemeSwitch compact />
+          <button
+            type="button"
+            class="rail__avatar"
+            :title="`${displayName} · ${roleStore.currentRoleLabel}`"
+            :aria-label="`${displayName}, роль ${roleStore.currentRoleLabel}. Развернуть меню`"
+            @click="toggleCollapsed"
+          >
+            <UiAvatar :name="displayName" size="md" inverse />
+          </button>
+        </template>
         <RoleSwitcher v-else>
-          <template #actions><ThemeSwitch compact /></template>
+          <template #actions>
+            <NotificationBell v-if="!isMobile" inverse />
+            <ThemeSwitch compact />
+          </template>
         </RoleSwitcher>
       </div>
 
