@@ -4,7 +4,6 @@ import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { authFor, canViewAllList, useEquipmentStore } from '@/entities/equipment'
 import { equipmentPermissionsOf, useAccessStore, useRoleStore } from '@/entities/role'
 import { IconClose, PageHeader, UiButton, UiState } from '@/shared/ui'
-import { EquipmentAlerts } from '@/widgets/equipment-board'
 import { useEquipmentRouteName } from '@/shared/lib/equipment-routes'
 
 const store = useEquipmentStore()
@@ -76,7 +75,6 @@ watch(
       <UiButton variant="primary" @click="store.load()">Повторить</UiButton>
     </UiState>
     <template v-else-if="store.status !== 'idle'">
-      <EquipmentAlerts class="ui-fill-chrome" />
       <RouterView v-slot="{ Component }">
         <component :is="Component" class="shell__view" />
       </RouterView>

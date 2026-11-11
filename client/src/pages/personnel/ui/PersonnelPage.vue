@@ -51,7 +51,7 @@ const { currentRole, piiVisible } = storeToRefs(roleStore)
 const access = useAccessStore()
 const training = useTrainingStore()
 const showTraining = computed(() => access.canView('training'))
-const profileTabs = computed(() => (showTraining.value ? [{ id: 'quals', label: 'Допуски' }] : []))
+const profileTabs = computed(() => (showTraining.value ? [{ id: 'quals', label: 'Тестирование' }] : []))
 const testingByWorker = computed(
   () => new Map((training.summary?.rows ?? []).map((row) => [row.workerId, testingMark(row.statuses)])),
 )
@@ -248,30 +248,30 @@ function openCreateBrigade() {
 
         <UiState v-if="!rows.length" title="Ничего не найдено" :icon="IconSearch" text="Измените поиск или фильтры." />
 
-        <div v-else :ref="workerList.bindList" class="ui-fill-scroll" @scroll.passive="workerList.onListScroll">
-          <div class="ui-rows workers-rows" :class="{ 'workers-rows--testing': showTraining }">
-            <div class="ui-rows__head">
-              <span
-                v-for="column in COLUMNS"
-                :key="column.key"
-                class="ui-rows__cell"
-                :class="[`cell--${column.key}`, { 'ui-rows__cell--name': column.key === 'fullName' }]"
-                :aria-sort="ariaSort(column.key)"
+        <div v-else class="ui-rows workers-rows" :class="{ 'workers-rows--testing': showTraining }">
+          <div class="ui-rows__head">
+            <span
+              v-for="column in COLUMNS"
+              :key="column.key"
+              class="ui-rows__cell"
+              :class="[`cell--${column.key}`, { 'ui-rows__cell--name': column.key === 'fullName' }]"
+              :aria-sort="ariaSort(column.key)"
+            >
+              <button
+                type="button"
+                class="sort"
+                :class="{ 'sort--active': sortKey === column.key }"
+                @click="list.toggleSort(column.key)"
               >
-                <button
-                  type="button"
-                  class="sort"
-                  :class="{ 'sort--active': sortKey === column.key }"
-                  @click="list.toggleSort(column.key)"
-                >
-                  {{ column.label }}
-                  <span class="sort__arrow" aria-hidden="true">
-                    {{ sortKey === column.key ? (sortDirection === 'asc' ? '▲' : '▼') : '↕' }}
-                  </span>
-                </button>
-              </span>
-              <span v-if="showTraining" class="ui-rows__cell cell--testing">Проверка</span>
-            </div>
+                {{ column.label }}
+                <span class="sort__arrow" aria-hidden="true">
+                  {{ sortKey === column.key ? (sortDirection === 'asc' ? '▲' : '▼') : '↕' }}
+                </span>
+              </button>
+            </span>
+            <span v-if="showTraining" class="ui-rows__cell cell--testing">Проверка</span>
+          </div>
+          <div :ref="workerList.bindList" class="ui-rows__body ui-fill-scroll" @scroll.passive="workerList.onListScroll">
             <ul class="ui-rows__list" aria-label="Сотрудники">
               <li
                 v-for="w in workerList.pageItems"
@@ -306,8 +306,8 @@ function openCreateBrigade() {
                 </span>
               </li>
             </ul>
+            <div v-if="workerList.infinite.hasMore" :ref="workerList.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
           </div>
-          <div v-if="workerList.infinite.hasMore" :ref="workerList.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
         </div>
         <UiPagination
           v-if="!workerList.isMobile && workerList.pager.isPaged"
@@ -343,29 +343,29 @@ function openCreateBrigade() {
         <div class="legend legend--brigades ui-fill-chrome">
           <span class="legend__count">Бригад: {{ brigadeRows.length }}</span>
         </div>
-        <div :ref="brigadeWindow.bindList" class="ui-fill-scroll" @scroll.passive="brigadeWindow.onListScroll">
-          <div class="ui-rows brigades-rows">
-            <div class="ui-rows__head">
-              <span
-                v-for="column in BRIGADE_COLUMNS"
-                :key="column.key"
-                class="ui-rows__cell"
-                :class="[`cell--${column.key}`, { 'ui-rows__cell--name': column.key === 'name' }]"
-                :aria-sort="brigadeAriaSort(column.key)"
+        <div class="ui-rows brigades-rows">
+          <div class="ui-rows__head">
+            <span
+              v-for="column in BRIGADE_COLUMNS"
+              :key="column.key"
+              class="ui-rows__cell"
+              :class="[`cell--${column.key}`, { 'ui-rows__cell--name': column.key === 'name' }]"
+              :aria-sort="brigadeAriaSort(column.key)"
+            >
+              <button
+                type="button"
+                class="sort"
+                :class="{ 'sort--active': brigadeSortKey === column.key }"
+                @click="brigadeList.toggleSort(column.key)"
               >
-                <button
-                  type="button"
-                  class="sort"
-                  :class="{ 'sort--active': brigadeSortKey === column.key }"
-                  @click="brigadeList.toggleSort(column.key)"
-                >
-                  {{ column.label }}
-                  <span class="sort__arrow" aria-hidden="true">
-                    {{ brigadeSortKey === column.key ? (brigadeSortDirection === 'asc' ? '▲' : '▼') : '↕' }}
-                  </span>
-                </button>
-              </span>
-            </div>
+                {{ column.label }}
+                <span class="sort__arrow" aria-hidden="true">
+                  {{ brigadeSortKey === column.key ? (brigadeSortDirection === 'asc' ? '▲' : '▼') : '↕' }}
+                </span>
+              </button>
+            </span>
+          </div>
+          <div :ref="brigadeWindow.bindList" class="ui-rows__body ui-fill-scroll" @scroll.passive="brigadeWindow.onListScroll">
             <ul class="ui-rows__list" aria-label="Бригады">
               <li
                 v-for="row in brigadeWindow.pageItems"
@@ -393,8 +393,8 @@ function openCreateBrigade() {
                 </span>
               </li>
             </ul>
+            <div v-if="brigadeWindow.infinite.hasMore" :ref="brigadeWindow.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
           </div>
-          <div v-if="brigadeWindow.infinite.hasMore" :ref="brigadeWindow.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
         </div>
         <UiPagination
           v-if="!brigadeWindow.isMobile && brigadeWindow.pager.isPaged"

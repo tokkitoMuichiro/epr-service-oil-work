@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch, type Component 
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { authFor, canViewAllList, useEquipmentStore } from '@/entities/equipment'
 import { equipmentPermissionsOf, useAccessStore, useRoleStore, type AccessBlock } from '@/entities/role'
+import { NotificationBell, NotificationsPanel, NotificationToasts } from '@/features/notifications'
 import { ThemeSwitch } from '@/features/theme-switch'
 import { APP_NAME } from '@/shared/config'
 import { useIsMobile } from '@/shared/lib/media'
@@ -271,6 +272,7 @@ onUnmounted(() => {
         </span>
       </button>
       <div class="topbar__title">{{ pageTitle }}</div>
+      <NotificationBell v-if="isMobile" class="topbar__bell" inverse />
       <button
         class="topbar__button topbar__avatar-button"
         type="button"
@@ -406,19 +408,24 @@ onUnmounted(() => {
       </nav>
 
       <div class="shell__footer">
-        <ThemeSwitch v-if="isRail" compact />
-        <button
-          v-if="isRail"
-          type="button"
-          class="rail__avatar"
-          :title="`${displayName} · ${roleStore.currentRoleLabel}`"
-          :aria-label="`${displayName}, роль ${roleStore.currentRoleLabel}. Развернуть меню`"
-          @click="toggleCollapsed"
-        >
-          <UiAvatar :name="displayName" size="md" inverse />
-        </button>
+        <template v-if="isRail">
+          <NotificationBell v-if="!isMobile" inverse />
+          <ThemeSwitch compact />
+          <button
+            type="button"
+            class="rail__avatar"
+            :title="`${displayName} · ${roleStore.currentRoleLabel}`"
+            :aria-label="`${displayName}, роль ${roleStore.currentRoleLabel}. Развернуть меню`"
+            @click="toggleCollapsed"
+          >
+            <UiAvatar :name="displayName" size="md" inverse />
+          </button>
+        </template>
         <RoleSwitcher v-else>
-          <template #actions><ThemeSwitch compact /></template>
+          <template #actions>
+            <NotificationBell v-if="!isMobile" inverse />
+            <ThemeSwitch compact />
+          </template>
         </RoleSwitcher>
       </div>
 
@@ -431,6 +438,9 @@ onUnmounted(() => {
       </p>
       <RouterView />
     </main>
+
+    <NotificationsPanel />
+    <NotificationToasts />
   </div>
 </template>
 
@@ -446,6 +456,7 @@ onUnmounted(() => {
   overflow-x: clip;
   overscroll-behavior-x: none;
   background: var(--surface-app);
+  transition: grid-template-columns 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .shell--rail {
@@ -472,6 +483,7 @@ onUnmounted(() => {
   overflow: auto;
   overscroll-behavior: contain;
   border-right: 1px solid var(--border-inverse);
+  transition: padding 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .shell__sidebar :focus-visible {
@@ -499,6 +511,10 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
+.brand__collapse :deep(svg) {
+  transition: transform 0.25s ease;
+}
+
 .brand__collapse-icon--open {
   transform: scaleX(-1);
 }
@@ -506,6 +522,10 @@ onUnmounted(() => {
 .brand__text {
   min-width: 0;
   flex: 1;
+  transition:
+    opacity 0.2s ease,
+    max-width 0.32s ease,
+    flex-basis 0.32s ease;
 }
 
 .brand__title {
@@ -554,6 +574,7 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: opacity 0.2s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -772,11 +793,24 @@ onUnmounted(() => {
   flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-1) 0 var(--space-2);
+  transition: padding 0.32s ease;
 }
 
-.shell--rail .brand__text,
+.shell--rail .brand__text {
+  flex: 0 0 0;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .shell--rail .nav__label,
 .shell--rail .nav__chevron,
+.shell--rail .nav__badge {
+  /* Must leave the flex flow — max-width:0 still shifts icons left via gap. */
+  display: none;
+}
+
 .shell--rail .nav__sub {
   display: none;
 }
@@ -787,7 +821,12 @@ onUnmounted(() => {
 
 .shell--rail .nav__link {
   justify-content: center;
+  gap: 0;
   padding: 0;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    padding 0.32s ease;
 }
 
 .shell--rail .shell__footer {
@@ -796,6 +835,10 @@ onUnmounted(() => {
   padding: 0;
   border: 0;
   background: transparent;
+}
+
+.topbar__bell {
+  flex: 0 0 auto;
 }
 
 .shell--rail .rail__avatar {
@@ -859,6 +902,11 @@ onUnmounted(() => {
     z-index: var(--z-drawer);
   }
 
+  .shell,
+  .shell--rail {
+    transition: none;
+  }
+
   .shell__sidebar,
   .shell--rail .shell__sidebar {
     position: fixed;
@@ -874,8 +922,9 @@ onUnmounted(() => {
     transform: translateX(-105%);
     visibility: hidden;
     transition:
-      transform 0.2s ease,
-      visibility 0s linear 0.2s;
+      transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      visibility 0s linear 0.28s,
+      padding 0s;
     box-shadow: var(--shadow-modal);
   }
 
@@ -883,7 +932,7 @@ onUnmounted(() => {
     transform: translateX(0);
     visibility: visible;
     transition:
-      transform 0.2s ease,
+      transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
       visibility 0s;
   }
 

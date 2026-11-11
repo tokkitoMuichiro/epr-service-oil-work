@@ -231,8 +231,9 @@ useEscape(isOpen, () => {
 
 <template>
   <Teleport to="body">
-    <div v-if="isOpen" class="ui-overlay overlay" @click.self="close">
-      <article class="ui-sheet card" role="dialog" aria-modal="true" :aria-label="brigade?.name ?? 'Новая бригада'">
+    <Transition name="dialog-fade">
+      <div v-if="isOpen" class="ui-overlay overlay" @click.self="close">
+        <article class="ui-sheet card" role="dialog" aria-modal="true" :aria-label="brigade?.name ?? 'Новая бригада'">
         <div class="ui-sheet__head card__bar">
           <span class="card__caption">{{ isCreating ? 'Новая бригада' : 'Карточка бригады' }}</span>
           <template v-if="canPlan && brigade && !isEditing">
@@ -400,8 +401,9 @@ useEscape(isOpen, () => {
             <li v-for="n in notices" :key="n">{{ n }}</li>
           </ul>
         </div>
-      </article>
-    </div>
+        </article>
+      </div>
+    </Transition>
 
     <AssignmentDialog
       v-if="brigade"

@@ -35,6 +35,10 @@ async function logout() {
 
 <template>
   <div class="user">
+    <div v-if="$slots.actions" class="user__tools">
+      <slot name="actions" />
+    </div>
+
     <div class="user__head">
       <UiAvatar :name="displayName" size="md" inverse />
       <div class="user__info">
@@ -44,7 +48,6 @@ async function logout() {
           {{ session.piiVisible ? 'ПДн видны' : 'ПДн скрыты' }}
         </span>
       </div>
-      <slot name="actions" />
       <button type="button" class="user__logout" aria-label="Выйти" title="Выйти" @click="logout">
         <IconLogout :size="20" />
       </button>
@@ -67,6 +70,14 @@ async function logout() {
 .user {
   display: grid;
   gap: var(--space-3);
+}
+
+.user__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-1);
 }
 
 .user__head {

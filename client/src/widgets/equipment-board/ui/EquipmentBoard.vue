@@ -268,59 +268,59 @@ function onTransferred() {
     />
 
     <template v-else>
-      <div :ref="bindList" class="list ui-fill-scroll" @scroll.passive="onListScroll">
-        <div class="rows" :class="{ 'rows--no-owner': !showOwner }">
-          <div class="rows__head">
-            <span class="cell cell--check">
-              <input
-                type="checkbox"
-                :checked="isAllSelected"
-                :disabled="!selectable.length"
-                aria-label="Выбрать все доступные для передачи"
-                @change="toggleAll"
-              />
-            </span>
-            <span class="cell cell--name" :aria-sort="ariaSort('name')">
-              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'name' }" @click="toggleSort('name')">
-                Наименование<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('name') }}</span>
-              </button>
-            </span>
-            <span class="cell cell--id" :aria-sort="ariaSort('identity')">
-              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'identity' }" @click="toggleSort('identity')">
-                № / кол-во<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('identity') }}</span>
-              </button>
-            </span>
-            <span class="cell cell--condition" :aria-sort="ariaSort('condition')">
-              <button
-                type="button"
-                class="ui-sort"
-                :class="{ 'ui-sort--active': sortKey === 'condition' }"
-                title="Состояние"
-                aria-label="Состояние"
-                @click="toggleSort('condition')"
-              >
-                Сост.<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('condition') }}</span>
-              </button>
-            </span>
-            <span class="cell cell--docs" :aria-sort="ariaSort('documents')">
-              <button
-                type="button"
-                class="ui-sort"
-                :class="{ 'ui-sort--active': sortKey === 'documents' }"
-                title="Документы"
-                aria-label="Документы"
-                @click="toggleSort('documents')"
-              >
-                Док.<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('documents') }}</span>
-              </button>
-            </span>
-            <span v-if="showOwner" class="cell cell--owner" :aria-sort="ariaSort('owner')">
-              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'owner' }" @click="toggleSort('owner')">
-                Владелец<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('owner') }}</span>
-              </button>
-            </span>
-            <span class="cell cell--actions" />
-          </div>
+      <div class="rows" :class="{ 'rows--no-owner': !showOwner }">
+        <div class="rows__head">
+          <span class="cell cell--check">
+            <input
+              type="checkbox"
+              :checked="isAllSelected"
+              :disabled="!selectable.length"
+              aria-label="Выбрать все доступные для передачи"
+              @change="toggleAll"
+            />
+          </span>
+          <span class="cell cell--name" :aria-sort="ariaSort('name')">
+            <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'name' }" @click="toggleSort('name')">
+              Наименование<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('name') }}</span>
+            </button>
+          </span>
+          <span class="cell cell--id" :aria-sort="ariaSort('identity')">
+            <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'identity' }" @click="toggleSort('identity')">
+              № / кол-во<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('identity') }}</span>
+            </button>
+          </span>
+          <span class="cell cell--condition" :aria-sort="ariaSort('condition')">
+            <button
+              type="button"
+              class="ui-sort"
+              :class="{ 'ui-sort--active': sortKey === 'condition' }"
+              title="Состояние"
+              aria-label="Состояние"
+              @click="toggleSort('condition')"
+            >
+              Сост.<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('condition') }}</span>
+            </button>
+          </span>
+          <span class="cell cell--docs" :aria-sort="ariaSort('documents')">
+            <button
+              type="button"
+              class="ui-sort"
+              :class="{ 'ui-sort--active': sortKey === 'documents' }"
+              title="Документы"
+              aria-label="Документы"
+              @click="toggleSort('documents')"
+            >
+              Док.<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('documents') }}</span>
+            </button>
+          </span>
+          <span v-if="showOwner" class="cell cell--owner" :aria-sort="ariaSort('owner')">
+            <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'owner' }" @click="toggleSort('owner')">
+              Владелец<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('owner') }}</span>
+            </button>
+          </span>
+          <span class="cell cell--actions" />
+        </div>
+        <div :ref="bindList" class="rows__body list ui-fill-scroll" @scroll.passive="onListScroll">
           <ul class="rows__list">
             <li
               v-for="item in pageItems"
@@ -392,8 +392,8 @@ function onTransferred() {
               </span>
             </li>
           </ul>
+          <div v-if="infinite.hasMore" :ref="bindSentinel" class="list__sentinel" aria-hidden="true" />
         </div>
-        <div v-if="infinite.hasMore" :ref="bindSentinel" class="list__sentinel" aria-hidden="true" />
       </div>
       <UiPagination
         v-if="!isMobile && pager.isPaged"
@@ -513,8 +513,10 @@ function onTransferred() {
   --actions-col: 6.25rem;
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   width: 100%;
   min-width: 0;
+  min-height: 0;
   max-width: 100%;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
@@ -557,9 +559,7 @@ function onTransferred() {
 }
 
 .rows__head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
+  flex: 0 0 auto;
   min-height: var(--control-height-sm);
   max-height: var(--control-height-sm);
   border-bottom: 1px solid var(--border-subtle);
@@ -567,6 +567,12 @@ function onTransferred() {
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
   font-weight: 700;
+}
+
+.rows__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
 }
 
 .rows__list {

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoleStore } from '@/entities/role'
 import { errorMessage as toMessage } from '@/shared/api'
 import { reloadStatus } from '@/shared/lib/load-status'
 import { equipmentApi } from '../api/equipment'
@@ -29,6 +30,7 @@ import {
 const NOBODY: EquipmentPerson = { id: '', fullName: '—', role: 'office', warehouseIds: [] }
 
 export const useEquipmentStore = defineStore('equipment', () => {
+  const roleStore = useRoleStore()
   const persona = ref<EquipmentPerson>(NOBODY)
   const permissions = ref<EquipmentPermission[]>([])
   const people = ref<EquipmentPerson[]>([])
@@ -43,6 +45,29 @@ export const useEquipmentStore = defineStore('equipment', () => {
 
   const auth = computed(() => authFor(persona.value, permissions.value))
   const isReady = computed(() => status.value === 'ready')
+
+  function reset() {
+    persona.value = NOBODY
+    permissions.value = []
+    people.value = []
+    warehouses.value = []
+    items.value = []
+    transfers.value = []
+    status.value = 'idle'
+    errorMessage.value = ''
+    actionError.value = ''
+    busy.value = false
+    lastBitrixExport.value = null
+  }
+
+  // Drop cached state on logout / user or role switch so inbox and badges never show the previous persona.
+  watch(
+    () => (roleStore.user ? `${roleStore.user.id}:${roleStore.user.role}` : null),
+    (key, previous) => {
+      if (key === previous) return
+      reset()
+    },
+  )
 
   const repairWarehouse = computed(() => warehouses.value.find((w) => w.slug === REPAIR_WAREHOUSE_SLUG) ?? null)
 
@@ -238,6 +263,7 @@ export const useEquipmentStore = defineStore('equipment', () => {
     pendingReview,
     myItems,
     load,
+    reset,
     clearActionError,
     findItem,
     personName,

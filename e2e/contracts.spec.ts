@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { dismissToasts } from './support/notifications'
 
 const CUSTOMER = 'ООО «Проверка»'
 
@@ -16,6 +17,7 @@ test('новый договор с объектом и ежедневный от
   const object = unique('РВС-5000 E2E')
 
   await page.goto('/contracts')
+  await dismissToasts(page)
   await page.getByRole('button', { name: 'Новый контракт' }).click()
   const contractDialog = page.getByRole('dialog', { name: 'Новый контракт' })
   await contractDialog.getByLabel('Название контракта').fill(contract)
@@ -77,11 +79,13 @@ test('удаление объекта и контракта спрашивает
   const contractName = unique('Договор E2E-удаление')
   const objectName = unique('РВС-700 E2E-удаление')
   await page.goto('/contracts')
+  await dismissToasts(page)
   await page.getByRole('button', { name: 'Новый контракт' }).click()
   const contractDialog = page.getByRole('dialog', { name: 'Новый контракт' })
   await contractDialog.getByLabel('Название контракта').fill(contractName)
   await contractDialog.getByLabel('Заказчик').fill(CUSTOMER)
   await contractDialog.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(contractDialog).toBeHidden()
 
   const objectDialog = page.getByRole('dialog', { name: 'Новый объект' })
   await objectDialog.getByLabel('Объект').fill(objectName)
@@ -94,8 +98,10 @@ test('удаление объекта и контракта спрашивает
   const list = page.getByRole('navigation', { name: 'Договоры' })
   const escapedObject = objectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const objectButton = list.getByRole('button', { name: new RegExp(escapedObject) })
+  await expect(objectButton).toBeVisible()
   await objectButton.click()
 
+  await dismissToasts(page)
   const confirm = page.getByRole('alertdialog')
   await page.getByRole('button', { name: 'Редактировать объект' }).click()
   await page.getByRole('menuitem', { name: 'Удалить объект' }).click()

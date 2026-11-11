@@ -180,13 +180,13 @@ function onAssigned() {
     </UiState>
     <UiState v-else-if="!visible.length" title="Назначений нет" :icon="IconTraining" text="Измените фильтры или назначьте проверку." />
     <div v-else class="assignments__list ui-fill-panel">
-      <div :ref="list.bindList" class="ui-fill-scroll" @scroll.passive="list.onListScroll">
-        <div class="ui-rows assignments-rows" :class="{ 'assignments-rows--manage': canAssign }">
-          <div class="ui-rows__head">
-            <span class="ui-rows__cell ui-rows__cell--name cell--name">Сотрудник</span>
-            <span class="ui-rows__cell cell--test">Тест</span>
-            <span class="ui-rows__cell cell--kind">Тип</span>
-          </div>
+      <div class="ui-rows assignments-rows" :class="{ 'assignments-rows--manage': canAssign }">
+        <div class="ui-rows__head">
+          <span class="ui-rows__cell ui-rows__cell--name cell--name">Сотрудник</span>
+          <span class="ui-rows__cell cell--test">Тест</span>
+          <span class="ui-rows__cell cell--kind">Тип</span>
+        </div>
+        <div :ref="list.bindList" class="ui-rows__body ui-fill-scroll" @scroll.passive="list.onListScroll">
           <ul class="ui-rows__list" aria-label="Назначения">
             <li
               v-for="a in list.pageItems"
@@ -267,8 +267,8 @@ function onAssigned() {
               </span>
             </li>
           </ul>
+          <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
         </div>
-        <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
       </div>
       <UiPagination
         v-if="!list.isMobile && list.pager.isPaged"

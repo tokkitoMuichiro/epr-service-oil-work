@@ -72,45 +72,45 @@ function nameTip(t: { equipmentName: string; factoryNumber?: string | null }) {
 
       <UiState v-if="!rows.length" title="Передач нет" :icon="IconEquipment" text="Измените фильтры или дождитесь первых передач." />
 
-      <div v-else :ref="list.bindList" class="ui-fill-scroll" @scroll.passive="list.onListScroll">
-        <div class="ui-rows history-rows">
-          <div class="ui-rows__head">
-            <span class="ui-rows__cell cell--date" :aria-sort="ariaSort('date')">
-              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'date' }" @click="toggleSort('date')">
-                Дата<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('date') }}</span>
-              </button>
-            </span>
-            <span class="ui-rows__cell ui-rows__cell--name cell--name" :aria-sort="ariaSort('name')">
-              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'name' }" @click="toggleSort('name')">
-                Позиция<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('name') }}</span>
-              </button>
-            </span>
-            <span class="ui-rows__cell cell--from" :aria-sort="ariaSort('from')">
-              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'from' }" @click="toggleSort('from')">
-                Откуда<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('from') }}</span>
-              </button>
-            </span>
-            <span class="ui-rows__cell cell--to" :aria-sort="ariaSort('to')">
-              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'to' }" @click="toggleSort('to')">
-                Куда<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('to') }}</span>
-              </button>
-            </span>
-            <span class="ui-rows__cell cell--qty" :aria-sort="ariaSort('qty')">
-              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'qty' }" @click="toggleSort('qty')">
-                Кол-во<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('qty') }}</span>
-              </button>
-            </span>
-            <span class="ui-rows__cell cell--actor" :aria-sort="ariaSort('actor')">
-              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'actor' }" @click="toggleSort('actor')">
-                Кто<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('actor') }}</span>
-              </button>
-            </span>
-            <span class="ui-rows__cell cell--status" :aria-sort="ariaSort('status')">
-              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'status' }" @click="toggleSort('status')">
-                Статус<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('status') }}</span>
-              </button>
-            </span>
-          </div>
+      <div v-else class="ui-rows history-rows">
+        <div class="ui-rows__head">
+          <span class="ui-rows__cell cell--date" :aria-sort="ariaSort('date')">
+            <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'date' }" @click="toggleSort('date')">
+              Дата<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('date') }}</span>
+            </button>
+          </span>
+          <span class="ui-rows__cell ui-rows__cell--name cell--name" :aria-sort="ariaSort('name')">
+            <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'name' }" @click="toggleSort('name')">
+              Позиция<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('name') }}</span>
+            </button>
+          </span>
+          <span class="ui-rows__cell cell--from" :aria-sort="ariaSort('from')">
+            <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'from' }" @click="toggleSort('from')">
+              Откуда<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('from') }}</span>
+            </button>
+          </span>
+          <span class="ui-rows__cell cell--to" :aria-sort="ariaSort('to')">
+            <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'to' }" @click="toggleSort('to')">
+              Куда<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('to') }}</span>
+            </button>
+          </span>
+          <span class="ui-rows__cell cell--qty" :aria-sort="ariaSort('qty')">
+            <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'qty' }" @click="toggleSort('qty')">
+              Кол-во<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('qty') }}</span>
+            </button>
+          </span>
+          <span class="ui-rows__cell cell--actor" :aria-sort="ariaSort('actor')">
+            <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'actor' }" @click="toggleSort('actor')">
+              Кто<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('actor') }}</span>
+            </button>
+          </span>
+          <span class="ui-rows__cell cell--status" :aria-sort="ariaSort('status')">
+            <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'status' }" @click="toggleSort('status')">
+              Статус<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('status') }}</span>
+            </button>
+          </span>
+        </div>
+        <div :ref="list.bindList" class="ui-rows__body ui-fill-scroll" @scroll.passive="list.onListScroll">
           <ul class="ui-rows__list" aria-label="История передач">
             <li v-for="t in list.pageItems" :key="t.id" class="ui-rows__item">
               <span class="ui-rows__cell cell--date">
@@ -142,8 +142,8 @@ function nameTip(t: { equipmentName: string; factoryNumber?: string | null }) {
               </span>
             </li>
           </ul>
+          <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
         </div>
-        <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
       </div>
       <UiPagination
         v-if="!list.isMobile && list.pager.isPaged"

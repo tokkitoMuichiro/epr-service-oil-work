@@ -191,13 +191,13 @@ function openMaterial(material: TrainingMaterial) {
 
     <UiState v-if="!visible.length" title="Материалов нет" :icon="IconTraining" text="Загрузите файл или добавьте ссылку на файл в Битрикс." />
     <div v-else class="materials__list ui-fill-panel">
-      <div :ref="list.bindList" class="ui-fill-scroll" @scroll.passive="list.onListScroll">
-        <div class="ui-rows materials-rows">
-          <div class="ui-rows__head">
-            <span class="ui-rows__cell cell--title">Материал</span>
-            <span class="ui-rows__cell cell--program">Программы</span>
-            <span class="ui-rows__cell ui-rows__cell--actions cell--actions" />
-          </div>
+      <div class="ui-rows materials-rows">
+        <div class="ui-rows__head">
+          <span class="ui-rows__cell cell--title">Материал</span>
+          <span class="ui-rows__cell cell--program">Программы</span>
+          <span class="ui-rows__cell ui-rows__cell--actions cell--actions" />
+        </div>
+        <div :ref="list.bindList" class="ui-rows__body ui-fill-scroll" @scroll.passive="list.onListScroll">
           <ul class="ui-rows__list" aria-label="Материалы">
             <li
               v-for="m in list.pageItems"
@@ -240,8 +240,8 @@ function openMaterial(material: TrainingMaterial) {
               </span>
             </li>
           </ul>
+          <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
         </div>
-        <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
       </div>
       <UiPagination
         v-if="!list.isMobile && list.pager.isPaged"

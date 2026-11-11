@@ -30,26 +30,28 @@ watch(isOpen, async (open) => {
 
 <template>
   <Teleport to="body">
-    <div v-if="request" class="ui-overlay confirm-overlay" @click.self="answer(false)">
-      <div
-        class="ui-sheet confirm"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="ui-confirm-title"
-        :aria-describedby="request.message ? 'ui-confirm-message' : undefined"
-      >
-        <div class="confirm__body">
-          <h2 id="ui-confirm-title" class="confirm__title">{{ request.title }}</h2>
-          <p v-if="request.message" id="ui-confirm-message" class="confirm__message">{{ request.message }}</p>
+    <Transition name="dialog-fade">
+      <div v-if="request" class="ui-overlay confirm-overlay" @click.self="answer(false)">
+        <div
+          class="ui-sheet confirm"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="ui-confirm-title"
+          :aria-describedby="request.message ? 'ui-confirm-message' : undefined"
+        >
+          <div class="confirm__body">
+            <h2 id="ui-confirm-title" class="confirm__title">{{ request.title }}</h2>
+            <p v-if="request.message" id="ui-confirm-message" class="confirm__message">{{ request.message }}</p>
+          </div>
+          <footer class="confirm__actions">
+            <UiButton ref="cancelButton" variant="ghost" @click="answer(false)">{{ request.cancelText ?? 'Отмена' }}</UiButton>
+            <UiButton :variant="request.tone === 'default' ? 'primary' : 'danger'" @click="answer(true)">
+              {{ request.confirmText ?? 'Удалить' }}
+            </UiButton>
+          </footer>
         </div>
-        <footer class="confirm__actions">
-          <UiButton ref="cancelButton" variant="ghost" @click="answer(false)">{{ request.cancelText ?? 'Отмена' }}</UiButton>
-          <UiButton :variant="request.tone === 'default' ? 'primary' : 'danger'" @click="answer(true)">
-            {{ request.confirmText ?? 'Удалить' }}
-          </UiButton>
-        </footer>
       </div>
-    </div>
+    </Transition>
   </Teleport>
 </template>
 

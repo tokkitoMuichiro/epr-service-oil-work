@@ -619,7 +619,15 @@ defineExpose({ applyInitial })
   display: grid;
   grid-template-columns: 1fr 1fr auto;
   gap: var(--space-2);
+  /* Align with the time inputs, not the labels. */
   align-items: end;
+}
+
+.drone__row :deep(.btn--icon) {
+  width: var(--control-height);
+  min-width: var(--control-height);
+  height: var(--control-height);
+  min-height: var(--control-height);
 }
 
 .works {

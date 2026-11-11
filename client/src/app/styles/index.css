@@ -739,8 +739,10 @@ textarea::placeholder {
   --ui-rows-columns: minmax(6rem, 1fr);
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   width: 100%;
   min-width: 0;
+  min-height: 0;
   max-width: 100%;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
@@ -764,10 +766,9 @@ textarea::placeholder {
   overflow: hidden;
 }
 
+/* Header lives outside the scrollport — not sticky. */
 .ui-rows__head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
+  flex: 0 0 auto;
   min-height: var(--control-height-sm);
   max-height: var(--control-height);
   border-bottom: 1px solid var(--border-subtle);
@@ -775,6 +776,16 @@ textarea::placeholder {
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
   font-weight: 700;
+}
+
+.ui-rows__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overflow-x: clip;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: none;
 }
 
 .ui-rows__list {
@@ -1080,6 +1091,34 @@ textarea::placeholder {
   background: var(--surface-overlay);
 }
 
+/* Shared enter/leave for UiDialog / confirm / custom overlays */
+.dialog-fade-enter-active,
+.dialog-fade-leave-active {
+  transition: opacity 0.22s ease;
+}
+
+.dialog-fade-enter-active .ui-sheet,
+.dialog-fade-leave-active .ui-sheet {
+  transition:
+    transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.22s ease;
+}
+
+.dialog-fade-enter-from,
+.dialog-fade-leave-to {
+  opacity: 0;
+}
+
+.dialog-fade-enter-from .ui-sheet {
+  opacity: 0;
+  transform: translateY(14px) scale(0.98);
+}
+
+.dialog-fade-leave-to .ui-sheet {
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+}
+
 .ui-sheet {
   position: relative;
   display: flex;
@@ -1186,7 +1225,14 @@ textarea::placeholder {
     height: 100dvh;
     max-height: none;
     border-radius: 0;
-    animation: ui-sheet-in 0.2s ease-out;
+  }
+
+  .dialog-fade-enter-from .ui-sheet {
+    transform: translateY(28px);
+  }
+
+  .dialog-fade-leave-to .ui-sheet {
+    transform: translateY(20px);
   }
 
   .ui-sheet__head {
@@ -1215,18 +1261,6 @@ textarea::placeholder {
 
   .ui-sheet:has(.ui-sheet__foot) .ui-sheet__body {
     padding-bottom: var(--space-4);
-  }
-}
-
-@keyframes ui-sheet-in {
-  from {
-    transform: translateY(24px);
-    opacity: 0;
-  }
-
-  to {
-    transform: none;
-    opacity: 1;
   }
 }
 

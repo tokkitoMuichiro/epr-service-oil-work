@@ -191,43 +191,45 @@ function archiveProgram(program: TrainingProgram) {
           <span class="ui-rows__cell cell--period">Периодичность</span>
           <span class="ui-rows__cell ui-rows__cell--actions" />
         </div>
-        <ul class="ui-rows__list" :aria-label="`Программы: ${d.name}`">
-          <li
-            v-for="p in programsOf(d)"
-            :key="p.id"
-            class="ui-rows__item ui-rows__item--click ui-rows__item--wrap"
-            :class="{ 'is-archived': p.isArchived }"
-            tabindex="0"
-            @click="editProgram(d, p)"
-            @keydown.enter.prevent="editProgram(d, p)"
-          >
-            <span class="ui-rows__cell ui-rows__cell--name cell--name">
-              <strong class="direction__label">{{ store.labelOf(p.id) }}</strong>
-              <span class="direction__sub direction__sub--desktop">{{ p.name }}</span>
-            </span>
-            <span class="ui-rows__cell cell--sub">
-              <span class="direction__sub">{{ p.name }}</span>
-            </span>
-            <span class="ui-rows__cell cell--period">
-              {{ p.periodMonths }} мес.
-            </span>
-            <span class="ui-rows__cell ui-rows__cell--actions cell--actions" @click.stop>
-              <UiButton variant="ghost" size="icon" aria-label="Изменить программу" title="Изменить" @click="editProgram(d, p)">
-                <IconPencil :size="16" />
-              </UiButton>
-              <UiButton
-                variant="ghost"
-                size="icon"
-                :aria-label="p.isArchived ? 'Вернуть программу из архива' : 'В архив'"
-                :title="p.isArchived ? 'Вернуть из архива' : 'В архив'"
-                @click="archiveProgram(p)"
-              >
-                <IconUndo v-if="p.isArchived" :size="16" />
-                <IconArchive v-else :size="16" />
-              </UiButton>
-            </span>
-          </li>
-        </ul>
+        <div class="ui-rows__body">
+          <ul class="ui-rows__list" :aria-label="`Программы: ${d.name}`">
+            <li
+              v-for="p in programsOf(d)"
+              :key="p.id"
+              class="ui-rows__item ui-rows__item--click ui-rows__item--wrap"
+              :class="{ 'is-archived': p.isArchived }"
+              tabindex="0"
+              @click="editProgram(d, p)"
+              @keydown.enter.prevent="editProgram(d, p)"
+            >
+              <span class="ui-rows__cell ui-rows__cell--name cell--name">
+                <strong class="direction__label">{{ store.labelOf(p.id) }}</strong>
+                <span class="direction__sub direction__sub--desktop">{{ p.name }}</span>
+              </span>
+              <span class="ui-rows__cell cell--sub">
+                <span class="direction__sub">{{ p.name }}</span>
+              </span>
+              <span class="ui-rows__cell cell--period">
+                {{ p.periodMonths }} мес.
+              </span>
+              <span class="ui-rows__cell ui-rows__cell--actions cell--actions" @click.stop>
+                <UiButton variant="ghost" size="icon" aria-label="Изменить программу" title="Изменить" @click="editProgram(d, p)">
+                  <IconPencil :size="16" />
+                </UiButton>
+                <UiButton
+                  variant="ghost"
+                  size="icon"
+                  :aria-label="p.isArchived ? 'Вернуть программу из архива' : 'В архив'"
+                  :title="p.isArchived ? 'Вернуть из архива' : 'В архив'"
+                  @click="archiveProgram(p)"
+                >
+                  <IconUndo v-if="p.isArchived" :size="16" />
+                  <IconArchive v-else :size="16" />
+                </UiButton>
+              </span>
+            </li>
+          </ul>
+        </div>
       </div>
       <p v-else class="direction__empty">Программ пока нет.</p>
     </article>
@@ -355,6 +357,7 @@ function archiveProgram(program: TrainingProgram) {
 
 .direction-rows {
   --ui-rows-columns: minmax(6rem, 1.6fr) minmax(4.5rem, 8rem) 6.5rem;
+  flex: 0 0 auto;
   border: 1px solid var(--border-subtle);
 }
 

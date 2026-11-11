@@ -175,31 +175,31 @@ async function remove(w: Warehouse) {
     <UiState v-if="!bases.length" title="Баз пока нет" :icon="IconEquipment" text="Создайте первую производственную базу." />
 
     <div v-else class="panel ui-fill-panel">
-      <div :ref="bindList" class="list ui-fill-scroll" @scroll.passive="onListScroll">
-        <div class="rows" :class="{ 'rows--manage': canManage }">
-          <div class="rows__head">
-            <span class="cell cell--name" :aria-sort="ariaSort('name')">
-              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'name' }" @click="toggleSort('name')">
-                Название<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('name') }}</span>
-              </button>
-            </span>
-            <span class="cell cell--address" :aria-sort="ariaSort('address')">
-              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'address' }" @click="toggleSort('address')">
-                Адрес<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('address') }}</span>
-              </button>
-            </span>
-            <span class="cell cell--keepers" :aria-sort="ariaSort('keepers')">
-              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'keepers' }" @click="toggleSort('keepers')">
-                Кладовщики<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('keepers') }}</span>
-              </button>
-            </span>
-            <span class="cell cell--total" :aria-sort="ariaSort('total')">
-              <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'total' }" @click="toggleSort('total')">
-                Всего<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('total') }}</span>
-              </button>
-            </span>
-            <span v-if="canManage" class="cell cell--actions" aria-hidden="true" />
-          </div>
+      <div class="rows" :class="{ 'rows--manage': canManage }">
+        <div class="rows__head">
+          <span class="cell cell--name" :aria-sort="ariaSort('name')">
+            <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'name' }" @click="toggleSort('name')">
+              Название<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('name') }}</span>
+            </button>
+          </span>
+          <span class="cell cell--address" :aria-sort="ariaSort('address')">
+            <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'address' }" @click="toggleSort('address')">
+              Адрес<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('address') }}</span>
+            </button>
+          </span>
+          <span class="cell cell--keepers" :aria-sort="ariaSort('keepers')">
+            <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'keepers' }" @click="toggleSort('keepers')">
+              Кладовщики<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('keepers') }}</span>
+            </button>
+          </span>
+          <span class="cell cell--total" :aria-sort="ariaSort('total')">
+            <button type="button" class="ui-sort" :class="{ 'ui-sort--active': sortKey === 'total' }" @click="toggleSort('total')">
+              Всего<span class="ui-sort__arrow" aria-hidden="true">{{ arrow('total') }}</span>
+            </button>
+          </span>
+          <span v-if="canManage" class="cell cell--actions" aria-hidden="true" />
+        </div>
+        <div :ref="bindList" class="rows__body list ui-fill-scroll" @scroll.passive="onListScroll">
           <ul class="rows__list" aria-label="Производственные базы">
             <li
               v-for="w in pageItems"
@@ -245,8 +245,8 @@ async function remove(w: Warehouse) {
               </span>
             </li>
           </ul>
+          <div v-if="infinite.hasMore" :ref="bindSentinel" class="list__sentinel" aria-hidden="true" />
         </div>
-        <div v-if="infinite.hasMore" :ref="bindSentinel" class="list__sentinel" aria-hidden="true" />
       </div>
       <UiPagination
         v-if="!isMobile && pager.isPaged"
@@ -300,8 +300,10 @@ async function remove(w: Warehouse) {
   --actions-col: calc(var(--control-height-sm) * 2 + 4px);
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   width: 100%;
   min-width: 0;
+  min-height: 0;
   max-width: 100%;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
@@ -332,14 +334,18 @@ async function remove(w: Warehouse) {
 }
 
 .rows__head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
+  flex: 0 0 auto;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--table-head-bg);
   color: var(--text-secondary);
   font-size: var(--font-size-2xs);
   font-weight: 700;
+}
+
+.rows__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
 }
 
 .rows__list {
@@ -382,6 +388,7 @@ async function remove(w: Warehouse) {
 
 .cell--name {
   min-width: 0;
+  padding-right: var(--space-3);
 }
 
 .cell--address,
@@ -414,14 +421,13 @@ async function remove(w: Warehouse) {
 }
 
 .tag {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 5.5rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 0 0 auto;
+  max-width: none;
+  white-space: nowrap;
   font-size: var(--font-size-2xs);
   min-height: 18px;
-  padding: 0 6px;
+  padding: 0 8px;
+  margin-right: var(--space-1);
 }
 
 .mono {
