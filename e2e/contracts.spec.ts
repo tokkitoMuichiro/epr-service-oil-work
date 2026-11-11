@@ -85,6 +85,7 @@ test('удаление объекта и контракта спрашивает
   await contractDialog.getByLabel('Название контракта').fill(contractName)
   await contractDialog.getByLabel('Заказчик').fill(CUSTOMER)
   await contractDialog.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(contractDialog).toBeHidden()
 
   const objectDialog = page.getByRole('dialog', { name: 'Новый объект' })
   await objectDialog.getByLabel('Объект').fill(objectName)
@@ -97,8 +98,10 @@ test('удаление объекта и контракта спрашивает
   const list = page.getByRole('navigation', { name: 'Договоры' })
   const escapedObject = objectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const objectButton = list.getByRole('button', { name: new RegExp(escapedObject) })
+  await expect(objectButton).toBeVisible()
   await objectButton.click()
 
+  await dismissToasts(page)
   const confirm = page.getByRole('alertdialog')
   await page.getByRole('button', { name: 'Редактировать объект' }).click()
   await page.getByRole('menuitem', { name: 'Удалить объект' }).click()
