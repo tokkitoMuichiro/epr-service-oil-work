@@ -143,14 +143,14 @@ function openTest(id: string) {
 
     <UiState v-if="!visible.length" title="Тестов нет" :icon="IconTraining" text="Создайте тест: добавьте вопросы и опубликуйте его." />
     <div v-else class="tests__list ui-fill-panel">
-      <div :ref="list.bindList" class="ui-fill-scroll" @scroll.passive="list.onListScroll">
-        <div class="ui-rows tests-rows">
-          <div class="ui-rows__head">
-            <span class="ui-rows__cell ui-rows__cell--name">Тест</span>
-            <span class="ui-rows__cell">Программа</span>
-            <span class="ui-rows__cell cell--status">Статус</span>
-            <span class="ui-rows__cell cell--questions">Вопросов</span>
-          </div>
+      <div class="ui-rows tests-rows">
+        <div class="ui-rows__head">
+          <span class="ui-rows__cell ui-rows__cell--name">Тест</span>
+          <span class="ui-rows__cell">Программа</span>
+          <span class="ui-rows__cell cell--status">Статус</span>
+          <span class="ui-rows__cell cell--questions">Вопросов</span>
+        </div>
+        <div :ref="list.bindList" class="ui-rows__body ui-fill-scroll" @scroll.passive="list.onListScroll">
           <ul class="ui-rows__list" aria-label="Тесты">
             <li
               v-for="t in list.pageItems"
@@ -177,8 +177,8 @@ function openTest(id: string) {
               </span>
             </li>
           </ul>
+          <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
         </div>
-        <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
       </div>
       <UiPagination
         v-if="!list.isMobile && list.pager.isPaged"

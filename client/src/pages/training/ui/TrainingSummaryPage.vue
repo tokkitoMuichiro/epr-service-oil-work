@@ -170,18 +170,18 @@ function onAssigned() {
 
       <UiState v-if="!visible.length" title="Никого нет" :icon="IconSearch" text="По выбранным фильтрам сотрудников нет." />
       <div v-else class="summary__list ui-fill-panel">
-        <div :ref="list.bindList" class="ui-fill-scroll" @scroll.passive="list.onListScroll">
-          <div class="ui-rows summary-rows" :class="{ 'summary-rows--assign': canAssign }">
-            <div class="ui-rows__head">
-              <span v-if="canAssign" class="ui-rows__cell ui-rows__cell--check">
-                <input type="checkbox" aria-label="Выбрать все" :checked="isAllSelected" @change="toggleAll" />
-              </span>
-              <span class="ui-rows__cell ui-rows__cell--name">Сотрудник</span>
-              <span class="ui-rows__cell">Программа</span>
-              <span class="ui-rows__cell">Статус</span>
-              <span class="ui-rows__cell cell--due">Срок</span>
-              <span v-if="canAssign" class="ui-rows__cell ui-rows__cell--actions" />
-            </div>
+        <div class="ui-rows summary-rows" :class="{ 'summary-rows--assign': canAssign }">
+          <div class="ui-rows__head">
+            <span v-if="canAssign" class="ui-rows__cell ui-rows__cell--check">
+              <input type="checkbox" aria-label="Выбрать все" :checked="isAllSelected" @change="toggleAll" />
+            </span>
+            <span class="ui-rows__cell ui-rows__cell--name">Сотрудник</span>
+            <span class="ui-rows__cell">Программа</span>
+            <span class="ui-rows__cell">Статус</span>
+            <span class="ui-rows__cell cell--due">Срок</span>
+            <span v-if="canAssign" class="ui-rows__cell ui-rows__cell--actions" />
+          </div>
+          <div :ref="list.bindList" class="ui-rows__body ui-fill-scroll" @scroll.passive="list.onListScroll">
             <ul class="ui-rows__list" aria-label="Сводка обучения">
               <li
                 v-for="item in list.pageItems"
@@ -226,8 +226,8 @@ function onAssigned() {
                 </span>
               </li>
             </ul>
+            <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
           </div>
-          <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
         </div>
         <UiPagination
           v-if="!list.isMobile && list.pager.isPaged"

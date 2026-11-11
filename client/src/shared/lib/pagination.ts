@@ -106,14 +106,18 @@ export function useFitPagination<T>(items: MaybeRefOrGetter<readonly T[]>, optio
     if (port < 16) return
 
     const measured = measureRowHeight(root)
-    if (measured > 0) lockedRowPx = measured
+    // Lock once: the first row on later pages may be taller/shorter (badges, wrap),
+    // and re-fitting from that would change pageSize / invent extra pages while paging.
+    if (lockedRowPx === 0 && measured > 0) lockedRowPx = measured
     // Wrapped titles make rows much taller than a compact control. Using that height
     // collapses pageSize toward FIT_MIN and splits a short list across pages; keep
     // capacity on the compact estimate and let the scrollport absorb wrap overflow.
     const rowHeight =
       lockedRowPx > 0 && lockedRowPx <= estimateRowPx * 1.35 ? lockedRowPx : estimateRowPx
 
-    const head = root.querySelector('thead, .ui-rows__head')
+    // Column headers (`.ui-rows__head` / `.rows__head`) sit outside the scrollport.
+    // Only subtract when a legacy sticky head / `<thead>` is still inside the measured root.
+    const head = root.querySelector('thead, .ui-rows__head, .rows__head')
     const headH = head instanceof HTMLElement ? head.offsetHeight : 0
     const available = Math.max(0, port - headH)
     const next = Math.min(maxSize, Math.max(minSize, Math.floor(available / rowHeight) || minSize))

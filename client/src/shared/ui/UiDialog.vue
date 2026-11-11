@@ -72,33 +72,35 @@ onBeforeUnmount(restoreFocus)
 
 <template>
   <Teleport to="body">
-    <div v-if="open" class="ui-overlay" @click.self="requestClose">
-      <div
-        ref="panel"
-        class="ui-sheet ui-dialog"
-        :class="{ 'ui-sheet--wide': wide }"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="title"
-        tabindex="-1"
-      >
-        <header class="ui-sheet__head">
-          <h2 class="ui-sheet__title">{{ title }}</h2>
-          <div class="ui-sheet__head-actions">
-            <slot name="header-actions" />
-            <button class="ui-icon-button" type="button" aria-label="Закрыть" title="Закрыть" @click="requestClose">
-              <IconClose />
-            </button>
+    <Transition name="dialog-fade">
+      <div v-if="open" class="ui-overlay" @click.self="requestClose">
+        <div
+          ref="panel"
+          class="ui-sheet ui-dialog"
+          :class="{ 'ui-sheet--wide': wide }"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="title"
+          tabindex="-1"
+        >
+          <header class="ui-sheet__head">
+            <h2 class="ui-sheet__title">{{ title }}</h2>
+            <div class="ui-sheet__head-actions">
+              <slot name="header-actions" />
+              <button class="ui-icon-button" type="button" aria-label="Закрыть" title="Закрыть" @click="requestClose">
+                <IconClose />
+              </button>
+            </div>
+          </header>
+          <div class="ui-sheet__body">
+            <slot />
           </div>
-        </header>
-        <div class="ui-sheet__body">
-          <slot />
+          <footer v-if="$slots.footer" class="ui-sheet__foot">
+            <slot name="footer" />
+          </footer>
         </div>
-        <footer v-if="$slots.footer" class="ui-sheet__foot">
-          <slot name="footer" />
-        </footer>
       </div>
-    </div>
+    </Transition>
   </Teleport>
 </template>
 

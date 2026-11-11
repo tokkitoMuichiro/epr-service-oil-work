@@ -332,8 +332,9 @@ useEscape(
 
 <template>
   <Teleport to="body">
-    <div v-if="worker" class="ui-overlay overlay" @click.self="close">
-      <article class="ui-sheet ui-sheet--wide profile" role="dialog" aria-modal="true" :aria-label="worker.fullName">
+    <Transition name="dialog-fade">
+      <div v-if="worker" class="ui-overlay overlay" @click.self="close">
+        <article class="ui-sheet ui-sheet--wide profile" role="dialog" aria-modal="true" :aria-label="worker.fullName">
         <div class="ui-sheet__head profile__bar">
           <span class="profile__caption">{{ isMainTab ? 'Карточка сотрудника' : worker.fullName }}</span>
           <button
@@ -612,8 +613,9 @@ useEscape(
             <DocumentDropzone v-if="canEdit" ref="dropzone" :busy="busy" @upload="upload" />
           </section>
         </div>
-      </article>
-    </div>
+        </article>
+      </div>
+    </Transition>
   </Teleport>
 </template>
 

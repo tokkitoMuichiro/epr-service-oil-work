@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { APP_NAME } from '@/shared/config'
 import { AppLogo } from '@/shared/ui'
+import { NotificationBell, NotificationsPanel, NotificationToasts } from '@/features/notifications'
 import { ThemeSwitch } from '@/features/theme-switch'
 import { useRoleStore } from '@/entities/role'
 
@@ -14,6 +15,8 @@ const title = computed(() => {
   if (route.path.startsWith('/e/equipment')) return 'Оборудование'
   return APP_NAME
 })
+
+const showEquipmentNotifications = computed(() => route.path.startsWith('/e/equipment'))
 </script>
 
 <template>
@@ -27,6 +30,7 @@ const title = computed(() => {
         </div>
       </div>
       <div class="embed__meta">
+        <NotificationBell v-if="showEquipmentNotifications" />
         <span v-if="session.user" class="embed__user">{{ session.user.fullName }}</span>
         <ThemeSwitch compact />
       </div>
@@ -34,6 +38,10 @@ const title = computed(() => {
     <main class="embed__main">
       <RouterView />
     </main>
+    <template v-if="showEquipmentNotifications">
+      <NotificationsPanel />
+      <NotificationToasts />
+    </template>
   </div>
 </template>
 

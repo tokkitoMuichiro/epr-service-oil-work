@@ -67,19 +67,19 @@ onMounted(load)
       <UiButton size="sm" variant="ghost" @click="load">Повторить</UiButton>
     </p>
     <template v-else>
-      <div :ref="list.bindList" class="users__list" @scroll.passive="list.onListScroll">
-        <div
-          class="ui-rows"
-          style="--ui-rows-columns: minmax(6rem, 1.4fr) minmax(4.5rem, 1fr) minmax(4.5rem, 0.8fr) minmax(5rem, 7rem) minmax(5rem, 6.5rem) minmax(5.5rem, 7rem)"
-        >
-          <div class="ui-rows__head">
-            <span class="ui-rows__cell ui-rows__cell--name">Пользователь</span>
-            <span class="ui-rows__cell">Логин</span>
-            <span class="ui-rows__cell cell--role">Роль</span>
-            <span class="ui-rows__cell cell--created">Создан</span>
-            <span class="ui-rows__cell">Статус</span>
-            <span class="ui-rows__cell ui-rows__cell--actions" />
-          </div>
+      <div
+        class="ui-rows users__rows"
+        style="--ui-rows-columns: minmax(6rem, 1.4fr) minmax(4.5rem, 1fr) minmax(4.5rem, 0.8fr) minmax(5rem, 7rem) minmax(5rem, 6.5rem) minmax(5.5rem, 7rem)"
+      >
+        <div class="ui-rows__head">
+          <span class="ui-rows__cell ui-rows__cell--name">Пользователь</span>
+          <span class="ui-rows__cell">Логин</span>
+          <span class="ui-rows__cell cell--role">Роль</span>
+          <span class="ui-rows__cell cell--created">Создан</span>
+          <span class="ui-rows__cell">Статус</span>
+          <span class="ui-rows__cell ui-rows__cell--actions" />
+        </div>
+        <div :ref="list.bindList" class="ui-rows__body users__list" @scroll.passive="list.onListScroll">
           <ul class="ui-rows__list" aria-label="Пользователи">
             <li
               v-for="u in list.pageItems"
@@ -111,8 +111,8 @@ onMounted(load)
               </span>
             </li>
           </ul>
+          <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
         </div>
-        <div v-if="list.infinite.hasMore" :ref="list.bindSentinel" class="ui-rows__sentinel" aria-hidden="true" />
       </div>
       <UiPagination
         v-if="!list.isMobile && list.pager.isPaged"
@@ -141,8 +141,15 @@ onMounted(load)
   gap: var(--space-3);
 }
 
-.users__list {
+.users__rows {
+  /* Fixed height so a short last page does not shrink the scrollport and re-fit pageSize. */
+  height: min(52vh, 28rem);
   max-height: min(52vh, 28rem);
+  min-height: 0;
+}
+
+.users__list {
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   overflow-x: clip;
