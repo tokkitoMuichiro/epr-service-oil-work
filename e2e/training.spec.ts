@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { dismissToasts } from './support/notifications'
 import { openWorker } from './support/personnel'
 import { NO_SESSION } from './support/session'
 
@@ -16,7 +17,8 @@ const PHONE = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch:
 
 async function assignTest(page: Page) {
   const card = await openWorker(page, WORKER)
-  await card.getByRole('tab', { name: 'Допуски' }).click()
+  await dismissToasts(page)
+  await card.getByRole('tab', { name: 'Тестирование' }).click()
   await card.getByRole('button', { name: 'Назначить тестирование' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'Назначить проверку знаний' })
@@ -84,7 +86,8 @@ test('назначенный тест проходят по ссылке с те
   await phone.close()
 
   const card = await openWorker(page, WORKER)
-  await card.getByRole('tab', { name: 'Допуски' }).click()
+  await dismissToasts(page)
+  await card.getByRole('tab', { name: 'Тестирование' }).click()
   await expect(card.getByText(/— сдано, 100 %/)).toBeVisible()
   await expect(card.getByText('Активные назначения')).toHaveCount(0)
 })
@@ -92,6 +95,7 @@ test('назначенный тест проходят по ссылке с те
 test('новый тест сохраняется черновиком и открывается, длинный вопрос не выходит за карточку предпросмотра', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/training/tests/new')
+  await dismissToasts(page)
   await page.getByLabel('Название').fill('E2E: длинные вопросы')
   await page.getByLabel('Программа').selectOption({ index: 1 })
   await page.getByRole('tab', { name: /Вопросы/ }).click()

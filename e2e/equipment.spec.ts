@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { shortFullName } from '../shared/src/person-name'
 import { listRow } from './support/lists'
+import { dismissToasts } from './support/notifications'
 import { NO_SESSION, signIn } from './support/session'
 import { createUser } from './support/users'
 
@@ -12,6 +13,7 @@ test('передача оборудования: отправитель пере
   await createUser(page.request, KEEPER)
 
   await page.goto('/equipment/all')
+  await dismissToasts(page)
   await page.getByRole('searchbox', { name: 'Поиск' }).fill('Рукав')
   const row = listRow(page, ITEM)
   await row.getByRole('button', { name: 'Передать' }).click()
@@ -29,10 +31,11 @@ test('передача оборудования: отправитель пере
   await expect(keeperPage).toHaveURL(/\/login\?redirect=\/equipment\/mine$/)
   await signIn(keeperPage, KEEPER.login, KEEPER.password)
   await expect(keeperPage).toHaveURL(/\/equipment\/mine$/)
-  const incoming = keeperPage.getByRole('status').filter({ hasText: 'Ожидают вашего принятия' })
-  await expect(incoming).toContainText(ITEM)
-  await incoming.getByRole('button', { name: 'Принять' }).click()
-  await expect(incoming).toHaveCount(0)
+  await dismissToasts(keeperPage)
+  const incomingRow = listRow(keeperPage, ITEM)
+  await expect(incomingRow.getByRole('button', { name: 'Принять' })).toBeVisible()
+  await incomingRow.getByRole('button', { name: 'Принять' }).click()
+  await expect(incomingRow.getByRole('button', { name: 'Принять' })).toHaveCount(0)
   await expect(listRow(keeperPage, ITEM)).toContainText('24 шт.')
   await context.close()
 

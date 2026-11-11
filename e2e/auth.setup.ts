@@ -1,5 +1,6 @@
 import { expect, test as setup } from '@playwright/test'
 import { ADMIN, ADMIN_STATE } from './support/env'
+import { dismissToasts } from './support/notifications'
 import { signIn } from './support/session'
 
 setup('вход администратора по логину и паролю', async ({ page }) => {
@@ -10,5 +11,6 @@ setup('вход администратора по логину и паролю',
 
   await expect(page).toHaveURL(/\/personnel$/)
   await expect(page.getByRole('heading', { name: 'Персонал', level: 1 })).toBeVisible()
+  await dismissToasts(page)
   await page.context().storageState({ path: ADMIN_STATE })
 })
