@@ -15,7 +15,7 @@ defineProps<{
     >
       <span class="ui-spinner ui-spinner--sm" aria-hidden="true" />
       <div class="file-busy-chip__text">
-        <strong>Скачиваем файл…</strong>
+        <strong>Идёт скачивание…</strong>
         <span class="file-busy-chip__name">{{ fileName }}</span>
       </div>
     </div>

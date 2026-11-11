@@ -170,7 +170,7 @@ async function onImage(event: Event) {
       <template v-else>
         <input ref="fileInput" type="file" accept=".jpg,.jpeg,.png" hidden @change="onImage" />
         <UiButton variant="ghost" size="sm" :disabled="!testId || isUploading" @click="fileInput?.click()">
-          {{ isUploading ? 'Загружаем…' : 'Добавить картинку' }}
+          {{ isUploading ? 'Идёт загрузка…' : 'Добавить картинку' }}
         </UiButton>
         <small v-if="!testId" class="ui-form__note">Сохраните черновик, чтобы добавить картинку.</small>
       </template>

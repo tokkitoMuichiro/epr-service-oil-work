@@ -22,7 +22,7 @@ onMounted(() => {
       v-if="store.status === 'loading' || store.status === 'idle'"
       kind="loading"
       title="Загрузка…"
-      text="Получаем программы и тесты."
+      text="Подождите."
     />
     <UiState v-else-if="store.status === 'error'" kind="error" title="Не удалось загрузить" :text="store.errorText">
       <UiButton variant="primary" @click="store.load()">Повторить</UiButton>

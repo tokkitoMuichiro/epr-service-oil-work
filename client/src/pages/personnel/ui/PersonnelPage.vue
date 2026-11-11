@@ -193,7 +193,7 @@ function openCreateBrigade() {
       <button type="button" aria-label="Скрыть" @click="brigadesStore.actionError = ''"><IconClose :size="16" /></button>
     </p>
 
-    <UiState v-if="status === 'loading'" kind="loading" title="Загрузка персонала…" text="Получаем карточки с сервера ERP." />
+    <UiState v-if="status === 'loading'" kind="loading" title="Загрузка персонала…" text="Подождите." />
 
     <UiState v-else-if="status === 'error'" kind="error" title="Не удалось загрузить" :text="errorText">
       <UiButton variant="primary" @click="personnel.load()">Повторить</UiButton>

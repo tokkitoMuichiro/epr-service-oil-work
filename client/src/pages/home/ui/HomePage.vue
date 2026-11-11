@@ -158,7 +158,7 @@ const description = computed(() =>
       </template>
     </PageHeader>
 
-    <UiState v-if="status === 'idle' || (status === 'loading' && !data)" kind="loading" title="Собираем сводку…" :rows="6" />
+    <UiState v-if="status === 'idle' || (status === 'loading' && !data)" kind="loading" title="Загрузка сводки…" :rows="6" />
     <UiState v-else-if="status === 'error' && !data" kind="error" title="Не удалось загрузить обзор" :text="errorText">
       <UiButton variant="primary" @click="load()">Повторить</UiButton>
     </UiState>

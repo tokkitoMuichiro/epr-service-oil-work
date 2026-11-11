@@ -177,7 +177,7 @@ function onAssigned() {
       </span>
     </h3>
 
-    <p v-if="status === 'loading'" class="certs__muted">Загружаем…</p>
+    <p v-if="status === 'loading'" class="certs__muted">Идёт загрузка…</p>
     <p v-else-if="status === 'error'" class="ui-form__hint" role="alert">
       {{ errorText }} <button type="button" class="certs__link" @click="load">Повторить</button>
     </p>

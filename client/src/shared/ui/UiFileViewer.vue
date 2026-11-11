@@ -50,8 +50,8 @@ const errorDetail = computed(() => {
           <span class="viewer__bar viewer__bar--md" />
         </div>
         <span class="ui-spinner" aria-hidden="true" />
-        <strong class="viewer__title">Готовим файл…</strong>
-        <p class="viewer__hint">Подтягиваем с сервера. Можно закрыть окно.</p>
+        <strong class="viewer__title">Идёт загрузка…</strong>
+        <p class="viewer__hint">Подождите. Окно можно закрыть.</p>
       </div>
 
       <UiState

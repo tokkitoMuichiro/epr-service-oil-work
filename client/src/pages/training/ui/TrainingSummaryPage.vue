@@ -132,7 +132,7 @@ function onAssigned() {
 
 <template>
   <div class="summary ui-fill-page">
-    <UiState v-if="store.summaryStatus === 'loading' && !store.summary" kind="loading" title="Считаем сводку…" />
+    <UiState v-if="store.summaryStatus === 'loading' && !store.summary" kind="loading" title="Загрузка сводки…" />
     <UiState v-else-if="store.summaryStatus === 'error'" kind="error" title="Не удалось загрузить сводку" :text="store.summaryError">
       <UiButton variant="primary" @click="store.loadSummary()">Повторить</UiButton>
     </UiState>
