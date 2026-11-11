@@ -92,17 +92,45 @@ export function apiUrl(path: string) {
   return buildUrl(path)
 }
 
-export async function downloadFile(path: string, fallbackName: string) {
-  const response = await send(path)
-  const disposition = response.headers.get('Content-Disposition') ?? ''
-  const match = /filename\*=UTF-8''([^;]+)/.exec(disposition)
-  const name = match ? decodeURIComponent(match[1]) : fallbackName
-  const url = URL.createObjectURL(await response.blob())
+export type FileDisposition = 'inline' | 'attachment'
+
+export interface FetchedFile {
+  blob: Blob
+  fileName: string
+  mimeType: string
+}
+
+function isNamedAttachmentPath(path: string): boolean {
+  return path.split('?')[0].endsWith('/file')
+}
+
+function saveBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = name
+  link.download = fileName
   link.click()
   URL.revokeObjectURL(url)
+}
+
+/** Fetch a binary API response; named `/file` routes get an explicit disposition query. */
+export async function fetchFileBlob(
+  path: string,
+  disposition: FileDisposition = 'attachment',
+): Promise<FetchedFile> {
+  const query: Query = isNamedAttachmentPath(path) ? { disposition } : {}
+  const response = await send(path, {}, query)
+  const header = response.headers.get('Content-Disposition') ?? ''
+  const match = /filename\*=UTF-8''([^;]+)/.exec(header)
+  const fileName = match ? decodeURIComponent(match[1]) : ''
+  const mimeType =
+    response.headers.get('Content-Type')?.split(';')[0]?.trim() || 'application/octet-stream'
+  return { blob: await response.blob(), fileName, mimeType }
+}
+
+export async function downloadFile(path: string, fallbackName: string) {
+  const file = await fetchFileBlob(path, 'attachment')
+  saveBlob(file.blob, file.fileName || fallbackName)
 }
 
 export const http = {

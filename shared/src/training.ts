@@ -1,4 +1,5 @@
 import { addMonthsIso, daysBetweenIso, formatIsoDate, isIsoDate } from './dates.js'
+import { fileExtension } from './files.js'
 import type { EmploymentStatus } from './personnel.js'
 
 export const TRAINING_ROOT_FOLDER = 'Учебные материалы'
@@ -207,11 +208,6 @@ export const MATERIAL_TYPES: Record<string, string> = {
 export const MATERIAL_ACCEPT = Object.keys(MATERIAL_TYPES)
   .map((ext) => `.${ext}`)
   .join(',')
-
-export function fileExtension(fileName: string): string {
-  const match = /\.([a-z0-9]+)$/i.exec(fileName.trim())
-  return match ? match[1].toLowerCase() : ''
-}
 
 /** MIME type of an allowed training file by its extension; null for other files. */
 export function materialMimeType(fileName: string): string | null {

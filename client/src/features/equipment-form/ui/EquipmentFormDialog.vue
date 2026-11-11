@@ -24,6 +24,11 @@ import {
   type OwnerType,
   type VehicleKind,
 } from '@/entities/equipment'
+import {
+  DOCUMENT_UPLOAD_ACCEPT,
+  DOCUMENT_UPLOAD_ERROR,
+  documentUploadMimeType,
+} from '@shared/files'
 import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { formatFileSize } from '@/shared/lib/file'
 import { IconClose, UiButton, UiDialog, UiFileDrop } from '@/shared/ui'
@@ -55,6 +60,7 @@ const form = reactive({
   ownerWarehouseId: '',
 })
 const files = ref<File[]>([])
+const filesError = ref('')
 const isSubmitted = ref(false)
 const { isDirty } = useDialogDirty(
   () => ({
@@ -109,6 +115,7 @@ function reset() {
   store.clearActionError()
   isSubmitted.value = false
   files.value = []
+  filesError.value = ''
   const item = props.item
   form.name = item?.name ?? ''
   form.type = item?.type ?? 'SERIAL'
@@ -139,7 +146,14 @@ function setType(type: EquipmentType) {
 }
 
 function addFiles(picked: File[]) {
-  files.value = [...files.value, ...picked]
+  const allowed: File[] = []
+  const denied: string[] = []
+  for (const file of picked) {
+    if (documentUploadMimeType(file.name)) allowed.push(file)
+    else denied.push(file.name)
+  }
+  filesError.value = denied.length ? `${DOCUMENT_UPLOAD_ERROR}: ${denied.join(', ')}` : ''
+  if (allowed.length) files.value = [...files.value, ...allowed]
 }
 
 function removeFile(index: number) {
@@ -277,13 +291,20 @@ async function save() {
 
         <div v-if="!isCard" class="files">
           <p class="ui-form__section">Документы</p>
-          <UiFileDrop :max-bytes="EQUIPMENT_DOCUMENT_MAX_BYTES" compact @pick="addFiles" />
+          <UiFileDrop
+            :max-bytes="EQUIPMENT_DOCUMENT_MAX_BYTES"
+            :accept="DOCUMENT_UPLOAD_ACCEPT"
+            hint="PDF, JPG, PNG, DOCX"
+            compact
+            @pick="addFiles"
+          />
           <ul v-if="files.length" class="files__list">
             <li v-for="(file, index) in files" :key="`${file.name}-${index}`">
               <span>{{ file.name }} · {{ formatFileSize(file.size) }}</span>
               <button type="button" :aria-label="`Убрать ${file.name}`" @click="removeFile(index)"><IconClose :size="16" /></button>
             </li>
           </ul>
+          <p v-if="filesError" class="ui-form__hint" role="alert">{{ filesError }}</p>
         </div>
       </template>
 

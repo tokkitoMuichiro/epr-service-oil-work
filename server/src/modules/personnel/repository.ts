@@ -17,6 +17,8 @@ import {
   permissionLabel,
   rangeContains,
   todayIso,
+  DOCUMENT_UPLOAD_ERROR,
+  documentUploadMimeType,
   validateAssignmentDraft,
   validateBrigadeDraft,
   validateDocumentMeta,
@@ -402,7 +404,8 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
       const meta = parseDocumentMeta(body)
       if (!file.data.length) badRequest('Файл пустой')
       if (file.data.length > DOCUMENT_MAX_BYTES) badRequest('Файл больше 20 МБ')
-      const mimeType = file.mimeType || 'application/octet-stream'
+      const mimeType = documentUploadMimeType(meta.fileName)
+      if (!mimeType) badRequest(DOCUMENT_UPLOAD_ERROR)
       const { record, uploaded } = await uploadFor(workerId, meta.fileName || meta.title, { data: file.data, mimeType })
       record.documents.unshift({
         id: uid('doc'),

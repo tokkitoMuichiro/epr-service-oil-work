@@ -12,9 +12,11 @@ import {
 } from '../../http.js'
 import {
   CONDITION_LABEL,
+  DOCUMENT_UPLOAD_ERROR,
   REPAIR_WAREHOUSE_SLUG,
   ROLE_PERMISSIONS,
   assetDisplayName,
+  documentUploadMimeType,
   authFor,
   canAcceptTransfer,
   canBrowse,
@@ -577,8 +579,10 @@ export function createEquipmentService(storage: Storage, deps: EquipmentDeps) {
       const fileName = trimmed(meta.fileName).replace(/[\\/:*?"<>|]+/g, '_')
       if (!fileName) badRequest('Укажите имя файла')
       if (!file.data.length) badRequest('Файл пустой')
+      const mimeType = documentUploadMimeType(fileName)
+      if (!mimeType) badRequest(DOCUMENT_UPLOAD_ERROR)
       const folder = await ensurePath(disk, [EQUIPMENT_FOLDER, equipmentFolderName(target)])
-      const uploaded = await disk.upload(folder, fileName, file)
+      const uploaded = await disk.upload(folder, fileName, { data: file.data, mimeType })
       const item = state.items.find((i) => i.id === id)
       if (!item) {
         await disk.trash(uploaded.fileId)
@@ -587,7 +591,7 @@ export function createEquipmentService(storage: Storage, deps: EquipmentDeps) {
       const doc: EquipmentDocumentRecord = {
         id: uid('doc'),
         fileName,
-        mimeType: file.mimeType,
+        mimeType,
         size: file.data.length,
         storagePath: uploaded.path,
         addedAt: nowIso(),

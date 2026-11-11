@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
+import { DOCUMENT_UPLOAD_ERROR, documentUploadMimeType } from '@shared/files'
 import { useRoleStore } from '@/entities/role'
 import { errorMessage as toMessage } from '@/shared/api'
 import { reloadStatus } from '@/shared/lib/load-status'
@@ -210,7 +211,10 @@ export const useEquipmentStore = defineStore('equipment', () => {
 
   function addDocuments(id: string, files: File[]) {
     return mutate(async () => {
-      for (const file of files) await equipmentApi.addDocument(id, file)
+      for (const file of files) {
+        if (!documentUploadMimeType(file.name)) throw new Error(DOCUMENT_UPLOAD_ERROR)
+        await equipmentApi.addDocument(id, file)
+      }
     }, 'Не удалось загрузить документ')
   }
 

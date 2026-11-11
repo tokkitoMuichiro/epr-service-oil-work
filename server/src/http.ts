@@ -1,6 +1,12 @@
 import express, { type ErrorRequestHandler, type Request, type Response } from 'express'
 import { log } from './log.js'
-import type { RoleId, User } from './shared.js'
+import { isPreviewableMime, isUnsafeInlineMime, type RoleId, type User } from './shared.js'
+
+export type FileDisposition = 'inline' | 'attachment'
+
+export interface SendFileOptions {
+  disposition?: FileDisposition
+}
 
 export interface StoredFile {
   data: Buffer
@@ -91,14 +97,25 @@ export function uploadedFile(req: Request): StoredFile {
   return { data: req.body, mimeType: trimmed(req.query.mimeType) || 'application/octet-stream' }
 }
 
-export function sendFile(res: Response, file: StoredFile, fileName?: string) {
+/** Parse `?disposition=inline|attachment`; anything else → attachment. */
+export function requestDisposition(req: Request): FileDisposition {
+  return trimmed(req.query.disposition) === 'inline' ? 'inline' : 'attachment'
+}
+
+export function sendFile(res: Response, file: StoredFile, fileName?: string, options?: SendFileOptions) {
+  const requested = options?.disposition === 'inline' ? 'inline' : 'attachment'
+  const disposition =
+    requested === 'inline' && isPreviewableMime(file.mimeType) && !isUnsafeInlineMime(file.mimeType)
+      ? 'inline'
+      : 'attachment'
   res.setHeader('Content-Type', file.mimeType)
   res.setHeader('Content-Length', String(file.data.length))
+  res.setHeader('X-Content-Type-Options', 'nosniff')
   if (fileName) {
     const ascii = fileName.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, "'")
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+      `${disposition}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
     )
   }
   res.end(file.data)

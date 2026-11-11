@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { param, rawBody, requestUser, sendFile, trimmed, uploadedFile } from '../../http.js'
+import { param, rawBody, requestDisposition, requestUser, sendFile, trimmed, uploadedFile } from '../../http.js'
 import { EQUIPMENT_DOCUMENT_MAX_BYTES, todayIso, type EquipmentCondition } from '../../shared.js'
 import { XLSX_MIME } from '../../excel.js'
 import { equipmentWorkbook } from './excel.js'
@@ -90,7 +90,7 @@ export function equipmentRouter(service: EquipmentService) {
 
   router.get('/:id/documents/:docId/file', async (req, res) => {
     const { doc, file } = await service.documentFile(requestUser(req), param(req, 'id'), param(req, 'docId'))
-    sendFile(res, file, doc.fileName)
+    sendFile(res, file, doc.fileName, { disposition: requestDisposition(req) })
   })
 
   router.delete('/:id/documents/:docId', async (req, res) => {

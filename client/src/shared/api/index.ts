@@ -1,1 +1,11 @@
-export { ApiError, apiUrl, downloadFile, errorMessage, http, onUnauthorized } from './http'
+export {
+  ApiError,
+  apiUrl,
+  downloadFile,
+  errorMessage,
+  fetchFileBlob,
+  http,
+  onUnauthorized,
+  type FetchedFile,
+  type FileDisposition,
+} from './http'

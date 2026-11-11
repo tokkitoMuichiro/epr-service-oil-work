@@ -20,13 +20,26 @@ import {
   pendingOfferLabel,
   repairOrigin,
   useEquipmentStore,
+  type EquipmentDocument,
   type EquipmentHistoryEntry,
   type EquipmentItem,
 } from '@/entities/equipment'
+import { DOCUMENT_UPLOAD_ACCEPT } from '@shared/files'
 import { ConditionSelect } from '@/features/equipment-condition'
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
-import { IconClose, IconPencil, IconTrash, UiButton, UiDialog, UiFileDrop, askConfirm } from '@/shared/ui'
+import { useFileViewer } from '@/shared/lib/use-file-viewer'
+import {
+  FileBusyChip,
+  IconClose,
+  IconPencil,
+  IconTrash,
+  UiButton,
+  UiDialog,
+  UiFileDrop,
+  UiFileViewer,
+  askConfirm,
+} from '@/shared/ui'
 
 const props = defineProps<{ itemId: string | null }>()
 const emit = defineEmits<{
@@ -44,6 +57,33 @@ const historyError = ref('')
 const item = computed(() => store.findItem(props.itemId))
 const auth = computed(() => store.auth)
 const transfers = computed(() => store.transfers)
+const {
+  isOpen: viewerOpen,
+  isLoading: viewerLoading,
+  isDownloadBusy,
+  downloadBusyName,
+  error: viewerError,
+  fileName: viewerFileName,
+  mimeType: viewerMimeType,
+  objectUrl: viewerObjectUrl,
+  openPath: openViewerPath,
+  close: closeViewer,
+  download: downloadViewer,
+  retry: retryViewer,
+} = useFileViewer()
+
+async function openDocument(doc: EquipmentDocument) {
+  if (!item.value) return
+  store.actionError = ''
+  const result = await openViewerPath({
+    path: `/equipment/${item.value.id}/documents/${doc.id}/file`,
+    fileName: doc.fileName,
+    mimeType: doc.mimeType,
+  })
+  if (result.mode === 'error' && !viewerOpen.value) {
+    store.actionError = result.message
+  }
+}
 
 const offer = computed(() => (item.value ? pendingOfferLabel(item.value, transfers.value) : ''))
 const origin = computed(() =>
@@ -179,7 +219,7 @@ async function remove() {
         <p v-if="!item.documents.length" class="muted">Документов нет</p>
         <ul v-else class="docs">
           <li v-for="doc in item.documents" :key="doc.id">
-            <button type="button" class="docs__name" @click="store.downloadDocument(item.id, doc.id, doc.fileName)">
+            <button type="button" class="docs__name" :title="`Открыть ${doc.fileName}`" @click="openDocument(doc)">
               {{ doc.fileName }}
             </button>
             <span class="muted">
@@ -201,6 +241,8 @@ async function remove() {
         <UiFileDrop
           v-if="canEditDocuments(auth, item)"
           :max-bytes="EQUIPMENT_DOCUMENT_MAX_BYTES"
+          :accept="DOCUMENT_UPLOAD_ACCEPT"
+          hint="PDF, JPG, PNG, DOCX"
           :disabled="store.busy"
           compact
           @pick="store.addDocuments(item.id, $event)"
@@ -225,6 +267,19 @@ async function remove() {
       </section>
     </div>
   </UiDialog>
+
+  <UiFileViewer
+    :open="viewerOpen"
+    :file-name="viewerFileName"
+    :mime-type="viewerMimeType"
+    :object-url="viewerObjectUrl"
+    :loading="viewerLoading"
+    :error="viewerError"
+    @close="closeViewer"
+    @download="downloadViewer"
+    @retry="retryViewer"
+  />
+  <FileBusyChip :open="isDownloadBusy" :file-name="downloadBusyName" />
 </template>
 
 <style scoped>
