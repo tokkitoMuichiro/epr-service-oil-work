@@ -321,7 +321,7 @@ const title = computed(() => {
         <UiButton variant="ghost" size="sm" :disabled="!selected.length" @click="selected = []">Снять выбор</UiButton>
       </div>
 
-      <p v-if="store.summaryStatus === 'loading'" class="ui-form__note">Загружаем сотрудников…</p>
+      <p v-if="store.summaryStatus === 'loading'" class="ui-form__note">Идёт загрузка…</p>
       <p v-else-if="store.summaryStatus === 'error'" class="ui-form__hint">{{ store.summaryError }}</p>
       <ul v-else class="assign__people" aria-label="Сотрудники">
         <li v-for="row in visibleRows" :key="row.workerId">
@@ -343,7 +343,7 @@ const title = computed(() => {
       <div class="ui-form__actions">
         <UiButton variant="ghost" @click="emit('close')">Отмена</UiButton>
         <UiButton type="submit" variant="primary" :disabled="busy || !testId || !selected.length">
-          {{ busy ? 'Назначаем…' : `Назначить (${selected.length})` }}
+          {{ busy ? 'Назначение…' : `Назначить (${selected.length})` }}
         </UiButton>
       </div>
     </form>

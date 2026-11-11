@@ -50,7 +50,7 @@ watch(
 <template>
   <UiDialog :open="open" :title="title" @close="$emit('close')">
     <p class="object">{{ objectTitle }}</p>
-    <p v-if="status === 'loading'" class="state">Загружаем отчёт…</p>
+    <p v-if="status === 'loading'" class="state">Идёт загрузка…</p>
     <p v-else-if="status === 'missing'" class="state state--missing">
       Отчёт за выбранный день не отправлен.
     </p>

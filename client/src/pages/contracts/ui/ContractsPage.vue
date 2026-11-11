@@ -395,7 +395,7 @@ const isDialogOpen = computed(
       <button type="button" @click="brigadesStore.load()">↻</button>
     </p>
 
-    <UiState v-if="status === 'loading'" kind="loading" title="Загрузка контрактов…" text="Получаем данные с сервера ERP." />
+    <UiState v-if="status === 'loading'" kind="loading" title="Загрузка контрактов…" text="Подождите." />
 
     <UiState v-else-if="status === 'error'" kind="error" title="Не удалось загрузить" :text="errorText">
       <UiButton variant="primary" @click="store.load()">Повторить</UiButton>

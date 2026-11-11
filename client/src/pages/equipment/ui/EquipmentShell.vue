@@ -70,7 +70,7 @@ watch(
       </button>
     </p>
 
-    <UiState v-if="store.status === 'loading' && !store.items.length" kind="loading" title="Загрузка оборудования…" text="Подтягиваем данные учёта с сервера." />
+    <UiState v-if="store.status === 'loading' && !store.items.length" kind="loading" title="Загрузка оборудования…" text="Подождите." />
     <UiState v-else-if="store.status === 'error'" kind="error" title="Не удалось загрузить" :text="store.errorMessage">
       <UiButton variant="primary" @click="store.load()">Повторить</UiButton>
     </UiState>

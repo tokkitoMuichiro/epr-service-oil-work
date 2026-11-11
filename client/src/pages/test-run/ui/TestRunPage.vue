@@ -323,7 +323,7 @@ onBeforeUnmount(() => {
       <span>АММИР · Проверка знаний</span>
     </header>
 
-    <section v-if="screen === 'loading'" class="run__card" role="status">Загружаем…</section>
+    <section v-if="screen === 'loading'" class="run__card" role="status">Идёт загрузка…</section>
 
     <section v-else-if="screen === 'gone'" class="run__card">
       <h1 class="run__title">Ссылка недействительна</h1>
@@ -349,7 +349,7 @@ onBeforeUnmount(() => {
           <strong class="run__person-name">{{ view.workerName }}</strong>
         </div>
         <p v-if="message" class="run__error" role="alert">{{ message }}</p>
-        <UiButton variant="primary" class="run__wide" :disabled="busy" @click="confirm">{{ busy ? 'Открываем…' : 'Это я' }}</UiButton>
+        <UiButton variant="primary" class="run__wide" :disabled="busy" @click="confirm">{{ busy ? 'Открытие…' : 'Это я' }}</UiButton>
         <p class="run__hint">Если это не вы — закройте страницу и сообщите тому, кто прислал ссылку.</p>
       </section>
 
@@ -387,7 +387,7 @@ onBeforeUnmount(() => {
 
         <p v-if="message" class="run__error" role="alert">{{ message }}</p>
         <UiButton variant="primary" class="run__wide" :disabled="busy || !canStart" @click="begin">
-          {{ busy ? 'Запускаем…' : 'Начать тест' }}
+          {{ busy ? 'Запуск…' : 'Начать тест' }}
         </UiButton>
       </section>
 
@@ -492,7 +492,7 @@ onBeforeUnmount(() => {
             </p>
             <div class="run__nav">
               <UiButton variant="ghost" @click="isConfirmOpen = false">Вернуться</UiButton>
-              <UiButton variant="primary" :disabled="busy" @click="finish">{{ busy ? 'Завершаем…' : 'Завершить' }}</UiButton>
+              <UiButton variant="primary" :disabled="busy" @click="finish">{{ busy ? 'Завершение…' : 'Завершить' }}</UiButton>
             </div>
           </div>
         </div>

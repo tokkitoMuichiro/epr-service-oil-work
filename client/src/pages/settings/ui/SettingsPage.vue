@@ -23,7 +23,7 @@ const currentRoleHint = computed(() => {
   <section class="page">
     <PageHeader title="Настройки" description="Пользователи, роли и права по всей системе." />
 
-    <UiState v-if="access.status === 'loading' && !access.matrix" kind="loading" title="Загрузка прав…" text="Получаем матрицу с сервера." />
+    <UiState v-if="access.status === 'loading' && !access.matrix" kind="loading" title="Загрузка прав…" text="Подождите." />
     <UiState v-else-if="access.status === 'error'" kind="error" title="Не удалось загрузить права" :text="access.errorText">
       <UiButton variant="primary" @click="access.load()">Повторить</UiButton>
     </UiState>

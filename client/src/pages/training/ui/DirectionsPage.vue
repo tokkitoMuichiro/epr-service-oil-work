@@ -310,7 +310,7 @@ function archiveProgram(program: TrainingProgram) {
         <p v-if="formError" class="ui-form__hint" role="alert">{{ formError }}</p>
         <div class="ui-form__actions">
           <UiButton variant="ghost" @click="programForm = null">Отмена</UiButton>
-          <UiButton type="submit" variant="primary" :disabled="busy">{{ busy ? 'Сохраняем…' : 'Сохранить' }}</UiButton>
+          <UiButton type="submit" variant="primary" :disabled="busy">{{ busy ? 'Сохранение…' : 'Сохранить' }}</UiButton>
         </div>
       </form>
     </UiDialog>

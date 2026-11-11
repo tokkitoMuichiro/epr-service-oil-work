@@ -137,7 +137,7 @@ function changeObject() {
       v-if="status === 'loading'"
       kind="loading"
       title="Загрузка объектов…"
-      text="Подтягиваем объекты из контура контрактов."
+      text="Подождите."
     />
 
     <UiState v-else-if="status === 'error'" kind="error" title="Не удалось загрузить" :text="errorMessage">
