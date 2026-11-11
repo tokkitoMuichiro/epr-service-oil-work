@@ -1,5 +1,5 @@
 import { Router, type CookieOptions, type Request } from 'express'
-import { param, sendFile } from '../../http.js'
+import { param, requestDisposition, sendFile } from '../../http.js'
 import { rateLimit } from '../../security.js'
 import { TEST_SESSION_MS } from '../../shared.js'
 import type { TrainingRepository } from './repository.js'
@@ -58,7 +58,7 @@ export function publicTestRouter(repo: TrainingRepository, options: { secureCook
 
   router.get('/materials/:materialId/file', async (req, res) => {
     const { material, file } = await repo.publicMaterialFile(token(req), session(req), param(req, 'materialId'))
-    sendFile(res, file, material.fileName)
+    sendFile(res, file, material.fileName, { disposition: requestDisposition(req) })
   })
 
   router.get('/images/:fileId', async (req, res) => {

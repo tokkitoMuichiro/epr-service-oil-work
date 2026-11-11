@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import {
+  MATERIAL_ACCEPT,
   MATERIAL_MAX_BYTES,
   TRAINING_ROOT_FOLDER,
   materialMimeType,
@@ -13,6 +14,7 @@ import { errorMessage } from '@/shared/api'
 import { formatDateTimeRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
 import { useDialogDirty } from '@/shared/lib/dialog-dirty'
+import { useFileViewer } from '@/shared/lib/use-file-viewer'
 import { useScrollList } from '@/shared/lib/pagination'
 import {
   IconArchive,
@@ -21,10 +23,12 @@ import {
   IconTraining,
   IconTrash,
   IconUndo,
+  FileBusyChip,
   UiButton,
   UiClipText,
   UiDialog,
   UiFileDrop,
+  UiFileViewer,
   UiPagination,
   UiState,
   askConfirm,
@@ -48,6 +52,20 @@ const showArchived = ref(false)
 const form = ref<MaterialForm | null>(null)
 const formError = ref('')
 const actionError = ref('')
+const {
+  isOpen: viewerOpen,
+  isLoading: viewerLoading,
+  isDownloadBusy,
+  downloadBusyName,
+  error: viewerError,
+  fileName: viewerFileName,
+  mimeType: viewerMimeType,
+  objectUrl: viewerObjectUrl,
+  openPath: openViewerPath,
+  close: closeViewer,
+  download: downloadViewer,
+  retry: retryViewer,
+} = useFileViewer()
 const busy = ref(false)
 const { isDirty: isFormDirty } = useDialogDirty(
   () =>
@@ -160,12 +178,17 @@ async function remove(material: TrainingMaterial) {
   return act(() => trainingApi.removeMaterial(material.id))
 }
 
-function openHref(material: TrainingMaterial) {
-  return trainingApi.materialUrl(material.id)
-}
-
-function openMaterial(material: TrainingMaterial) {
-  window.open(openHref(material), '_blank', 'noopener')
+async function openMaterial(material: TrainingMaterial) {
+  if (material.isUnavailable) {
+    actionError.value = 'Файл недоступен'
+    return
+  }
+  const result = await openViewerPath({
+    path: `/training/materials/${material.id}/file`,
+    fileName: material.fileName,
+    mimeType: material.mimeType,
+  })
+  if (result.mode === 'error' && !viewerOpen.value) actionError.value = result.message
 }
 </script>
 
@@ -278,7 +301,8 @@ function openMaterial(material: TrainingMaterial) {
           <UiFileDrop
             :max-bytes="MATERIAL_MAX_BYTES"
             :multiple="false"
-            hint="PDF, DOCX, PPTX, XLSX, JPG, PNG, MP4 — до 20 МБ. Файл ляжет в папку программы в Битрикс."
+            :accept="MATERIAL_ACCEPT"
+            hint="PDF, DOCX, PPTX, XLSX, JPG, PNG, MP4. Файл ляжет в папку программы в Битрикс"
             @pick="pickFile"
           />
           <p v-if="form.file" class="ui-form__note">Выбран: {{ form.file.name }} ({{ formatFileSize(form.file.size) }})</p>
@@ -313,6 +337,19 @@ function openMaterial(material: TrainingMaterial) {
         </div>
       </form>
     </UiDialog>
+
+    <UiFileViewer
+      :open="viewerOpen"
+      :file-name="viewerFileName"
+      :mime-type="viewerMimeType"
+      :object-url="viewerObjectUrl"
+      :loading="viewerLoading"
+      :error="viewerError"
+      @close="closeViewer"
+      @download="downloadViewer"
+      @retry="retryViewer"
+    />
+    <FileBusyChip :open="isDownloadBusy" :file-name="downloadBusyName" />
   </div>
 </template>
 

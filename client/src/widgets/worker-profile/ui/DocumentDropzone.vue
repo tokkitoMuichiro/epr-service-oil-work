@@ -12,10 +12,16 @@ import {
   type DocumentUpload,
   type QualificationTypeId,
 } from '@/entities/personnel'
+import {
+  DOCUMENT_UPLOAD_ACCEPT,
+  DOCUMENT_UPLOAD_ERROR,
+  documentUploadMimeType,
+} from '@shared/files'
 import { fileTitle, formatFileSize } from '@/shared/lib/file'
 import { IconClose, UiButton, UiFileDrop } from '@/shared/ui'
 
 const MAX_BYTES = 20 * 1024 * 1024
+const UPLOAD_HINT = 'PDF, JPG, PNG, DOCX'
 
 defineProps<{ busy?: boolean }>()
 
@@ -40,7 +46,14 @@ const rejected = ref('')
 
 function add(files: File[]) {
   rejected.value = ''
+  const allowed: File[] = []
+  const denied: string[] = []
   for (const file of files) {
+    if (documentUploadMimeType(file.name)) allowed.push(file)
+    else denied.push(file.name)
+  }
+  if (denied.length) rejected.value = `${DOCUMENT_UPLOAD_ERROR}: ${denied.join(', ')}`
+  for (const file of allowed) {
     pending.value.push({
       key: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`,
       file,
@@ -117,7 +130,12 @@ defineExpose({ clear })
 
 <template>
   <div class="upload">
-    <UiFileDrop :max-bytes="MAX_BYTES" @pick="add" />
+    <UiFileDrop
+      :max-bytes="MAX_BYTES"
+      :accept="DOCUMENT_UPLOAD_ACCEPT"
+      :hint="UPLOAD_HINT"
+      @pick="add"
+    />
 
     <p v-if="rejected" class="upload__error" role="alert">{{ rejected }}</p>
 

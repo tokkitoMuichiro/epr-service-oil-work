@@ -214,7 +214,38 @@ describe('api', () => {
 
     const file = await call('GET', `/api/personnel/${worker.id}/documents/${doc.id}/file`)
     assert.equal(file.text, '%PDF-demo')
+    assert.match(file.headers.get('content-disposition') ?? '', /^attachment;/)
     assert.match(file.headers.get('content-disposition') ?? '', /filename\*=UTF-8''/)
+    assert.equal(file.headers.get('x-content-type-options'), 'nosniff')
+
+    const inlinePdf = await call('GET', `/api/personnel/${worker.id}/documents/${doc.id}/file?disposition=inline`)
+    assert.equal(inlinePdf.status, 200)
+    assert.match(inlinePdf.headers.get('content-disposition') ?? '', /^inline;/)
+
+    const docxQuery = new URLSearchParams({
+      title: 'Акт',
+      fileName: 'Акт.docx',
+      mimeType: 'application/octet-stream',
+    })
+    const docxCreated = await upload(`/api/personnel/${worker.id}/documents?${docxQuery}`, 'POST', 'PK')
+    assert.equal(docxCreated.status, 201)
+    const docxDoc = ((await docxCreated.json()) as { item: Worker }).item.documents[0]
+    assert.equal(
+      docxDoc.mimeType,
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    )
+    const inlineDocx = await call(
+      'GET',
+      `/api/personnel/${worker.id}/documents/${docxDoc.id}/file?disposition=inline`,
+    )
+    assert.match(inlineDocx.headers.get('content-disposition') ?? '', /^attachment;/)
+
+    const badTxt = new URLSearchParams({ title: 'Note', fileName: 'note.txt', mimeType: 'text/plain' })
+    const txtUpload = await upload(`/api/personnel/${worker.id}/documents?${badTxt}`, 'POST', 'hello')
+    assert.equal(txtUpload.status, 400)
+    assert.match(((await txtUpload.json()) as { error: string }).error, /Допустимы PDF, JPG, PNG и DOCX/)
+    const badHtml = new URLSearchParams({ title: 'Page', fileName: 'page.html', mimeType: 'text/html' })
+    assert.equal((await upload(`/api/personnel/${worker.id}/documents?${badHtml}`, 'POST', '<html>')).status, 400)
 
     const seeded = worker.documents[worker.documents.length - 1]
     const placeholder = await call('GET', `/api/personnel/${worker.id}/documents/${seeded.id}/file`)
@@ -609,7 +640,16 @@ describe('api', () => {
     assert.equal(uploaded.status, 201)
     const doc = ((await uploaded.json()) as { item: typeof item }).item.documents[0]
     assert.equal(doc.size, 7)
-    assert.equal((await call('GET', `/api/equipment/${item.id}/documents/${doc.id}/file`)).text, '%PDF-eq')
+    assert.equal(doc.mimeType, 'application/pdf')
+    const downloaded = await call('GET', `/api/equipment/${item.id}/documents/${doc.id}/file`)
+    assert.equal(downloaded.text, '%PDF-eq')
+    assert.match(downloaded.headers.get('content-disposition') ?? '', /^attachment;/)
+    const inlineEq = await call('GET', `/api/equipment/${item.id}/documents/${doc.id}/file?disposition=inline`)
+    assert.match(inlineEq.headers.get('content-disposition') ?? '', /^inline;/)
+    assert.equal(
+      (await upload(`/api/equipment/${item.id}/documents?fileName=note.txt&mimeType=text%2Fplain`, 'POST', 'x')).status,
+      400,
+    )
     assert.equal((await call('DELETE', `/api/equipment/${item.id}/documents/${doc.id}`)).status, 200)
 
     assert.equal((await call('POST', '/api/equipment/warehouses', 'master', { name: 'База Резерв' })).status, 403)
@@ -793,6 +833,8 @@ describe('authentication', () => {
       const hash = createHash('sha256').update(theme).digest('base64')
       assert.match(csp, new RegExp(`script-src 'self' 'sha256-${hash.replace(/[+/=]/g, '\\$&')}'(;|$)`))
       assert.match(csp, /object-src 'none'/)
+      assert.match(csp, /frame-src 'self' blob:/)
+      assert.match(csp, /media-src 'self' blob:/)
       assert.match(csp, /frame-ancestors 'self'/)
       assert.doesNotMatch(csp, /unsafe-eval/)
       assert.equal((await fetch(`${spa.base}/api/auth/session`)).headers.get('content-security-policy'), null, 'API files are not affected')

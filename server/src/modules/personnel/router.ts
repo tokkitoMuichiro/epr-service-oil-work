@@ -5,6 +5,7 @@ import {
   param,
   rawBody as rawBodyOf,
   requestAuth,
+  requestDisposition,
   requestRole,
   sendFile,
   trimmed,
@@ -67,7 +68,7 @@ export function personnelRouter(repo: PersonnelRepository) {
 
   router.get('/:id/documents/:docId/file', async (req, res) => {
     const { doc, file } = await repo.documentFile(param(req, 'id'), param(req, 'docId'))
-    sendFile(res, file, doc.fileName)
+    sendFile(res, file, doc.fileName, { disposition: requestDisposition(req) })
   })
 
   router.delete('/:id/documents/:docId', async (req, res) => {

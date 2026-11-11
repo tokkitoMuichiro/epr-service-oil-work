@@ -1029,6 +1029,28 @@ textarea::placeholder {
   }
 }
 
+.ui-spinner {
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid var(--border-subtle);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: ui-spin 0.7s linear infinite;
+}
+
+.ui-spinner--sm {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+}
+
+@keyframes ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Сегментированный переключатель */
 .ui-segmented {
   display: inline-flex;

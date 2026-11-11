@@ -1,6 +1,15 @@
 import { Router, type Request, type RequestHandler } from 'express'
 import { XLSX_MIME } from '../../excel.js'
-import { param, rawBody as rawBodyOf, requestAuth, requestRole, sendFile, trimmed, uploadedFile } from '../../http.js'
+import {
+  param,
+  rawBody as rawBodyOf,
+  requestAuth,
+  requestDisposition,
+  requestRole,
+  sendFile,
+  trimmed,
+  uploadedFile,
+} from '../../http.js'
 import { MATERIAL_MAX_BYTES, type Permission } from '../../shared.js'
 import type { AccessStore } from '../access/store.js'
 import type { Actor, TrainingRepository } from './repository.js'
@@ -99,7 +108,7 @@ export function trainingRouter(repo: TrainingRepository, access: AccessStore, op
 
   router.get('/materials/:id/file', async (req, res) => {
     const { material, file } = await repo.materialFile(param(req, 'id'))
-    sendFile(res, file, material.fileName)
+    sendFile(res, file, material.fileName, { disposition: requestDisposition(req) })
   })
 
   router.patch('/materials/:id', need('training_manage'), (req, res) => {

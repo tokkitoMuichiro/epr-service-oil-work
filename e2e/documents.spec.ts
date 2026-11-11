@@ -1,15 +1,18 @@
 import { expect, test } from '@playwright/test'
-import { downloadText, textFile } from './support/files'
+import { downloadFromViewer, pdfFile } from './support/files'
 import { listRow } from './support/lists'
+import { dismissToasts } from './support/notifications'
 import { openWorker } from './support/personnel'
 
-test('документ сотрудника загружается, скачивается и удаляется', async ({ page }, testInfo) => {
+test('документ сотрудника загружается, открывается в viewer, скачивается и удаляется', async ({ page }, testInfo) => {
   const card = await openWorker(page, 'Кузнецов Артём Дмитриевич')
+  await dismissToasts(page)
   await card.getByRole('tab', { name: 'Документы' }).click()
 
   const stamp = `${testInfo.workerIndex}-${testInfo.retry}-${Date.now()}`
+  const marker = `Удостоверение № E2E-1 ${stamp}`
   const title = `Удостоверение E2E ${stamp}`
-  const file = textFile(`Удостоверение e2e ${stamp}.txt`, 'Удостоверение № E2E-1')
+  const file = pdfFile(`Удостоверение e2e ${stamp}.pdf`, marker)
   await card.locator('input[type=file]').setInputFiles(file)
   await card.getByLabel('Название').fill(title)
   await card.getByRole('button', { name: 'Загрузить (1)' }).click()
@@ -21,9 +24,9 @@ test('документ сотрудника загружается, скачив
   await expect(row.getByText('бессрочно')).toBeVisible()
   await expect(row.getByText('Действует')).toBeVisible()
 
-  const downloaded = await downloadText(page, link)
+  const downloaded = await downloadFromViewer(page, link, file.name)
   expect(downloaded.name).toBe(file.name)
-  expect(downloaded.text).toBe('Удостоверение № E2E-1')
+  expect(downloaded.text).toContain(marker)
 
   await row.getByRole('button', { name: `Удалить ${title}` }).click()
   await page.getByRole('alertdialog', { name: `Удалить документ «${title}»?` }).getByRole('button', { name: 'Удалить документ' }).click()
@@ -35,24 +38,27 @@ test('документ сотрудника загружается, скачив
   await expect(reopened.getByRole('button', { name: title, exact: true })).toHaveCount(0)
 })
 
-test('документ оборудования загружается в папку позиции, скачивается и удаляется', async ({ page }) => {
+test('документ оборудования загружается в папку позиции, открывается в viewer, скачивается и удаляется', async ({ page }) => {
   await page.goto('/equipment/all')
+  await dismissToasts(page)
   await page.getByRole('searchbox', { name: 'Поиск' }).fill('НЦ-80')
   await listRow(page, /Насос центробежный НЦ-80/).click()
   const card = page.getByRole('dialog', { name: /Насос центробежный НЦ-80/ })
 
-  const passport = card.getByRole('button', { name: 'Паспорт НЦ-80.pdf', exact: true })
-  const seeded = await downloadText(page, passport)
+  const passportName = 'Паспорт НЦ-80.pdf'
+  const passport = card.getByRole('button', { name: passportName, exact: true })
+  const seeded = await downloadFromViewer(page, passport, passportName)
   expect(seeded.text).toContain('Позиция: Насос центробежный НЦ-80')
 
-  const file = textFile('Акт проверки e2e.txt', 'Насос проверен')
+  const marker = 'Насос проверен'
+  const file = pdfFile('Акт проверки e2e.pdf', marker)
   await card.locator('input[type=file]').setInputFiles(file)
   const link = card.getByRole('button', { name: file.name, exact: true })
   await expect(link).toBeVisible()
   await expect(card.locator('code', { hasText: file.name })).toContainText('Оборудование')
 
-  const downloaded = await downloadText(page, link)
-  expect(downloaded.text).toBe('Насос проверен')
+  const downloaded = await downloadFromViewer(page, link, file.name)
+  expect(downloaded.text).toContain(marker)
 
   await card.getByRole('button', { name: `Удалить ${file.name}` }).click()
   await expect(link).toHaveCount(0)

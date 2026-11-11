@@ -12,7 +12,8 @@ import {
 import { ApiError, errorMessage } from '@/shared/api'
 import { formatDateRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
-import { AppLogo, UiButton } from '@/shared/ui'
+import { useFileViewer } from '@/shared/lib/use-file-viewer'
+import { AppLogo, FileBusyChip, UiButton, UiFileViewer } from '@/shared/ui'
 import { useAutosave } from '../model/use-autosave'
 import RunResult from './RunResult.vue'
 
@@ -106,9 +107,33 @@ async function confirm() {
 const allOpened = computed(() => materials.value.filter((m) => !m.isUnavailable).every((m) => m.isOpened))
 const canStart = computed(() => !view.value?.test.isMaterialsRequired || allOpened.value)
 
-function openMaterial(material: PublicMaterial) {
-  window.open(publicTestApi.materialUrl(token.value, material.id), '_blank', 'noopener')
-  window.setTimeout(() => void refreshMaterials(), 1500)
+const {
+  isOpen: viewerOpen,
+  isLoading: viewerLoading,
+  isDownloadBusy,
+  downloadBusyName,
+  error: viewerError,
+  fileName: viewerFileName,
+  mimeType: viewerMimeType,
+  objectUrl: viewerObjectUrl,
+  openPath: openViewerPath,
+  close: closeViewer,
+  download: downloadViewer,
+  retry: retryViewer,
+} = useFileViewer()
+
+async function openMaterial(material: PublicMaterial) {
+  if (material.isUnavailable) return
+  const result = await openViewerPath({
+    path: `/public/test/${encodeURIComponent(token.value)}/materials/${encodeURIComponent(material.id)}/file`,
+    fileName: material.fileName,
+    mimeType: material.mimeType,
+  })
+  if (result.mode === 'error') {
+    if (!viewerOpen.value) fail(new Error(result.message))
+    return
+  }
+  await refreshMaterials()
 }
 
 async function refreshMaterials() {
@@ -480,6 +505,19 @@ onBeforeUnmount(() => {
       </section>
     </template>
   </main>
+
+  <UiFileViewer
+    :open="viewerOpen"
+    :file-name="viewerFileName"
+    :mime-type="viewerMimeType"
+    :object-url="viewerObjectUrl"
+    :loading="viewerLoading"
+    :error="viewerError"
+    @close="closeViewer"
+    @download="downloadViewer"
+    @retry="retryViewer"
+  />
+  <FileBusyChip :open="isDownloadBusy" :file-name="downloadBusyName" />
 </template>
 
 <style scoped>

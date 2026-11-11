@@ -32,9 +32,10 @@ import {
 import { useAccessStore, useRoleStore } from '@/entities/role'
 import { formatDateRu } from '@/shared/lib/date'
 import { formatFileSize } from '@/shared/lib/file'
+import { useFileViewer } from '@/shared/lib/use-file-viewer'
 import { initialsOf } from '@/shared/lib/initials'
 import { useEscape, useScrollLock } from '@/shared/lib/scroll-lock'
-import { IconClose, IconPencil, UiButton, askConfirm } from '@/shared/ui'
+import { FileBusyChip, IconClose, IconPencil, UiButton, UiFileViewer, askConfirm } from '@/shared/ui'
 import DocumentDropzone from './DocumentDropzone.vue'
 
 interface DocumentEditForm {
@@ -74,6 +75,20 @@ const isEditing = ref(false)
 const isPhotoOver = ref(false)
 const photoInput = ref<HTMLInputElement | null>(null)
 const dropzone = ref<InstanceType<typeof DocumentDropzone> | null>(null)
+const {
+  isOpen: viewerOpen,
+  isLoading: viewerLoading,
+  isDownloadBusy,
+  downloadBusyName,
+  error: viewerError,
+  fileName: viewerFileName,
+  mimeType: viewerMimeType,
+  objectUrl: viewerObjectUrl,
+  openPath: openViewerPath,
+  close: closeViewer,
+  download: downloadViewer,
+  retry: retryViewer,
+} = useFileViewer()
 
 const form = reactive({ fullName: '', position: '', phone: '', snils: '' })
 const editingDocId = ref<string | null>(null)
@@ -258,6 +273,19 @@ async function onEmploymentChange(event: Event) {
 async function upload(uploads: DocumentUpload[]) {
   if (!worker.value) return
   if (await personnel.uploadDocuments(worker.value.id, uploads)) dropzone.value?.clear()
+}
+
+async function openDocument(doc: WorkerDocument) {
+  if (!worker.value) return
+  personnel.actionError = ''
+  const result = await openViewerPath({
+    path: `/personnel/${worker.value.id}/documents/${doc.id}/file`,
+    fileName: doc.fileName,
+    mimeType: doc.mimeType,
+  })
+  if (result.mode === 'error' && !viewerOpen.value) {
+    personnel.actionError = result.message
+  }
 }
 
 async function saveDocument() {
@@ -566,9 +594,9 @@ useEscape(
                   <button
                     type="button"
                     class="doc__link"
-                    :title="`Скачать ${doc.fileName}`"
+                    :title="`Открыть ${doc.fileName}`"
                     :disabled="busy"
-                    @click="personnel.downloadDocument(worker.id, doc.id, doc.fileName)"
+                    @click="openDocument(doc)"
                   >
                     {{ doc.title }}
                   </button>
@@ -617,6 +645,19 @@ useEscape(
       </div>
     </Transition>
   </Teleport>
+
+  <UiFileViewer
+    :open="viewerOpen"
+    :file-name="viewerFileName"
+    :mime-type="viewerMimeType"
+    :object-url="viewerObjectUrl"
+    :loading="viewerLoading"
+    :error="viewerError"
+    @close="closeViewer"
+    @download="downloadViewer"
+    @retry="retryViewer"
+  />
+  <FileBusyChip :open="isDownloadBusy" :file-name="downloadBusyName" />
 </template>
 
 <style scoped>
