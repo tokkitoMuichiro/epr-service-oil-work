@@ -5,6 +5,8 @@ import ViewerZoomBar from './ViewerZoomBar.vue'
 
 const props = defineProps<{
   objectUrl: string
+  /** Prefer Blob — Safari/PWA often fails `fetch(blob:)` with TypeError "Load failed". */
+  blob?: Blob | null
 }>()
 
 const emit = defineEmits<{
@@ -39,13 +41,18 @@ let pinchStartFactor = 1
 let lastTapAt = 0
 let renderTimer: ReturnType<typeof setTimeout> | null = null
 
-/** Worker can't XHR blob: URLs in Safari/PWA — load bytes on the main thread. */
-async function readPdfBytes(url: string): Promise<Uint8Array> {
+/** Bytes for pdf.js without worker fetching blob: URLs (broken in Safari/PWA). */
+async function readPdfBytes(blob: Blob | null | undefined, url: string): Promise<Uint8Array> {
+  if (blob && blob.size > 0) {
+    return new Uint8Array(await blob.arrayBuffer())
+  }
   const response = await fetch(url)
   if (!response.ok) {
     throw new Error(`Не удалось прочитать файл (${response.status})`)
   }
-  return new Uint8Array(await response.arrayBuffer())
+  const data = new Uint8Array(await response.arrayBuffer())
+  if (!data.byteLength) throw new Error('Не удалось прочитать файл')
+  return data
 }
 
 function clampFactor(value: number) {
@@ -161,19 +168,19 @@ async function renderPages() {
   }
 }
 
-async function loadPdf(url: string) {
+async function loadPdf(url: string, blob: Blob | null | undefined) {
   const token = ++loadToken
   loadError.value = ''
   isReady.value = false
   await destroyDocument()
   if (token !== loadToken) return
   try {
-    const data = await readPdfBytes(url)
+    const data = await readPdfBytes(blob, url)
     if (token !== loadToken) return
     const pdfjs = await import('pdfjs-dist')
     const workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
     pdfjs.GlobalWorkerOptions.workerSrc = workerSrc
-    const task = pdfjs.getDocument({ data })
+    const task = pdfjs.getDocument({ data, disableStream: true, disableAutoFetch: true })
     loadingTask = task
     const doc = await task.promise
     if (token !== loadToken) {
@@ -191,7 +198,7 @@ async function loadPdf(url: string) {
     if (token !== loadToken) return
     const raw = error instanceof Error ? error.message : ''
     const message =
-      /unexpected server response|retrieving PDF|Failed to fetch|NetworkError/i.test(raw)
+      /unexpected server response|retrieving PDF|Failed to fetch|NetworkError|^Load failed$/i.test(raw)
         ? 'Не удалось открыть PDF. Попробуйте скачать файл.'
         : raw || 'Не удалось открыть PDF'
     loadError.value = message
@@ -252,9 +259,9 @@ function onPointerUp(event: PointerEvent) {
 }
 
 watch(
-  () => props.objectUrl,
-  (url) => {
-    if (url) void loadPdf(url)
+  () => [props.objectUrl, props.blob] as const,
+  ([url, blob]) => {
+    if (url || (blob && blob.size > 0)) void loadPdf(url, blob)
     else void destroyDocument()
   },
   { immediate: true },

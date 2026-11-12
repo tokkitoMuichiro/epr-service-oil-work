@@ -12,6 +12,7 @@ export function useFileViewer() {
   const fileName = ref('')
   const mimeType = ref('')
   const objectUrl = ref('')
+  const previewBlob = ref<Blob | null>(null)
 
   let downloadPath = ''
   let downloadName = ''
@@ -20,9 +21,11 @@ export function useFileViewer() {
   let downloadBusyCount = 0
 
   function revoke() {
-    if (!objectUrl.value) return
-    URL.revokeObjectURL(objectUrl.value)
-    objectUrl.value = ''
+    if (objectUrl.value) {
+      URL.revokeObjectURL(objectUrl.value)
+      objectUrl.value = ''
+    }
+    previewBlob.value = null
   }
 
   function discardPreviewResult(result: OpenFileResult) {
@@ -94,6 +97,7 @@ export function useFileViewer() {
 
     fileName.value = result.fileName
     mimeType.value = result.mimeType
+    previewBlob.value = result.blob
     objectUrl.value = result.objectUrl
     isLoading.value = false
     return result
@@ -129,6 +133,7 @@ export function useFileViewer() {
     fileName,
     mimeType,
     objectUrl,
+    previewBlob,
     openPath,
     close,
     download,

@@ -11,11 +11,11 @@ export interface OpenFileInput {
 }
 
 export type OpenFileResult =
-  | { mode: 'preview'; fileName: string; mimeType: string; objectUrl: string }
+  | { mode: 'preview'; fileName: string; mimeType: string; objectUrl: string; blob: Blob }
   | { mode: 'download'; fileName: string }
   | { mode: 'error'; message: string }
 
-/** Previewable → blob URL for the viewer; otherwise download + short notice. */
+/** Previewable → blob + object URL for the viewer; otherwise download + short notice. */
 export async function openOrDownloadFile(input: OpenFileInput): Promise<OpenFileResult> {
   const { path, fileName, mimeType } = input
   if (!isPreviewableFile(fileName, mimeType)) {
@@ -39,6 +39,7 @@ export async function openOrDownloadFile(input: OpenFileInput): Promise<OpenFile
       mode: 'preview',
       fileName: file.fileName || fileName,
       mimeType: file.mimeType || mimeType || 'application/octet-stream',
+      blob: file.blob,
       objectUrl: URL.createObjectURL(file.blob),
     }
   } catch (e) {
