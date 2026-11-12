@@ -84,6 +84,11 @@ export const personnelApi = {
     return downloadFile(`/personnel/${id}/documents/${docId}/file`, fileName)
   },
 
+  /** ZIP of all worker documents: `GET /personnel/:id/documents/archive`. */
+  downloadDocumentsArchive(id: string, fileName: string): Promise<void> {
+    return downloadFile(`/personnel/${id}/documents/archive`, fileName)
+  },
+
   photoUrl(worker: Pick<Worker, 'id' | 'photoUpdatedAt'>): string | null {
     return worker.photoUpdatedAt
       ? `${apiUrl(`/personnel/${worker.id}/photo`)}?v=${encodeURIComponent(worker.photoUpdatedAt)}`

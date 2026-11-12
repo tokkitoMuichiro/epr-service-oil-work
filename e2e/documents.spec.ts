@@ -4,6 +4,16 @@ import { listRow } from './support/lists'
 import { dismissToasts } from './support/notifications'
 import { openWorker } from './support/personnel'
 
+test('архив всех документов сотрудника скачивается ZIP', async ({ page }) => {
+  const card = await openWorker(page, 'Кузнецов Артём Дмитриевич')
+  await dismissToasts(page)
+  await card.getByRole('tab', { name: 'Документы' }).click()
+  const downloadAll = card.getByRole('button', { name: 'Скачать все' })
+  await expect(downloadAll).toBeVisible()
+  const [download] = await Promise.all([page.waitForEvent('download'), downloadAll.click()])
+  expect(download.suggestedFilename()).toMatch(/документы\.zip$/i)
+})
+
 test('документ сотрудника загружается, открывается в viewer, скачивается и удаляется', async ({ page }, testInfo) => {
   const card = await openWorker(page, 'Кузнецов Артём Дмитриевич')
   await dismissToasts(page)

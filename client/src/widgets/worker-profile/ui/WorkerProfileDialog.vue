@@ -92,6 +92,7 @@ const {
 
 const form = reactive({ fullName: '', position: '', phone: '', snils: '' })
 const editingDocId = ref<string | null>(null)
+const isArchiveDownloading = ref(false)
 const docForm = reactive<DocumentEditForm>({
   title: '',
   typeId: '',
@@ -104,6 +105,7 @@ const docForm = reactive<DocumentEditForm>({
 })
 const docEditError = ref('')
 const activeTab = ref(MAIN_TAB)
+const archiveBusyName = 'Все документы.zip'
 
 const allTabs = computed<ProfileTab[]>(() => [MAIN, ...props.tabs, DOCS])
 
@@ -225,6 +227,7 @@ watch(
   () => {
     isEditing.value = false
     editingDocId.value = null
+    isArchiveDownloading.value = false
     docEditError.value = ''
     activeTab.value = MAIN_TAB
     dropzone.value?.clear()
@@ -285,6 +288,17 @@ async function openDocument(doc: WorkerDocument) {
   })
   if (result.mode === 'error' && !viewerOpen.value) {
     personnel.actionError = result.message
+  }
+}
+
+async function downloadAllDocuments() {
+  const current = worker.value
+  if (!current?.documents.length || isArchiveDownloading.value) return
+  isArchiveDownloading.value = true
+  try {
+    await personnel.downloadDocumentsArchive(current.id, `${current.fullName} — документы.zip`)
+  } finally {
+    isArchiveDownloading.value = false
   }
 }
 
@@ -517,7 +531,19 @@ useEscape(
           </section>
 
           <section v-else-if="currentTab === DOCS_TAB" class="docs">
-            <h3>Документы <span class="muted">· {{ worker.documents.length }}</span></h3>
+            <div class="docs__head">
+              <h3>Документы <span class="muted">· {{ worker.documents.length }}</span></h3>
+              <UiButton
+                v-if="worker.documents.length"
+                type="button"
+                variant="ghost"
+                size="sm"
+                :disabled="busy || isArchiveDownloading"
+                @click="downloadAllDocuments"
+              >
+                {{ isArchiveDownloading ? 'Скачивание…' : 'Скачать все' }}
+              </UiButton>
+            </div>
             <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
             <p v-if="!worker.documents.length" class="muted">Документы ещё не загружены.</p>
             <ul v-else class="docs__list">
@@ -657,7 +683,10 @@ useEscape(
     @download="downloadViewer"
     @retry="retryViewer"
   />
-  <FileBusyChip :open="isDownloadBusy" :file-name="downloadBusyName" />
+  <FileBusyChip
+    :open="isDownloadBusy || isArchiveDownloading"
+    :file-name="isArchiveDownloading ? archiveBusyName : downloadBusyName"
+  />
 </template>
 
 <style scoped>
@@ -943,6 +972,14 @@ useEscape(
   gap: var(--space-3);
   min-width: 0;
   max-width: 100%;
+}
+
+.docs__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
 }
 
 .docs h3 {
