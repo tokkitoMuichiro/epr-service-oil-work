@@ -358,7 +358,10 @@ const isDialogOpen = computed(
   <section class="page">
     <PageHeader title="Контракты" description="Договоры, объекты, работы и линейный график с фактом по ежедневным отчётам.">
       <template v-if="canEdit" #actions>
-        <UiButton variant="primary" @click="openCreateContract">Новый контракт</UiButton>
+        <UiButton variant="primary" class="header-add" @click="openCreateContract">
+          <span class="header-add__full">Новый контракт</span>
+          <span class="header-add__short">Новый</span>
+        </UiButton>
       </template>
       <template #tabs>
         <div class="ui-segmented" role="tablist" aria-label="Активные и архивные объекты">
@@ -716,10 +719,53 @@ const isDialogOpen = computed(
   }
 }
 
+.header-add__short {
+  display: none;
+}
+
 @media (max-width: 860px) {
+  .page {
+    gap: var(--space-2);
+  }
+
+  .page :deep(.page-header) {
+    flex-wrap: nowrap;
+    align-items: stretch;
+  }
+
+  .page :deep(.page-header__tabs),
+  .page :deep(.page-header__actions) {
+    display: flex;
+    align-items: stretch;
+    height: var(--control-height);
+  }
+
+  .page :deep(.ui-segmented) {
+    width: 100%;
+  }
+
+  .page :deep(.ui-segmented > button) {
+    flex: 1;
+  }
+
+  .page :deep(.page-header__actions .btn) {
+    height: var(--control-height);
+    min-height: var(--control-height);
+    padding: 0 var(--space-3);
+  }
+
+  .header-add__full {
+    display: none;
+  }
+
+  .header-add__short {
+    display: inline;
+  }
+
   .layout,
   .layout--collapsed {
     grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
   }
 
   .picker {
@@ -728,7 +774,7 @@ const isDialogOpen = computed(
     top: 0;
     z-index: var(--z-sticky);
     margin: 0 calc(-1 * var(--space-3));
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-1) var(--space-3);
     background: var(--surface-app);
   }
 

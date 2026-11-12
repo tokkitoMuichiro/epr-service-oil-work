@@ -94,8 +94,17 @@ const emit = defineEmits<{
 
 @media (max-width: 860px) {
   .nav {
-    grid-template-columns: var(--tap-size) minmax(0, 1fr) var(--tap-size);
-    min-height: var(--tap-size);
+    grid-template-columns: var(--control-height) minmax(0, 1fr) var(--control-height);
+    min-height: var(--control-height);
+  }
+
+  .nav__arrow {
+    min-width: var(--control-height);
+    min-height: var(--control-height);
+  }
+
+  .nav__select {
+    padding: 0 var(--space-1);
   }
 }
 </style>

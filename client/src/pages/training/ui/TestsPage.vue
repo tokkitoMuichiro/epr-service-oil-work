@@ -338,7 +338,7 @@ function openTest(id: string) {
 
 @media (max-width: 860px) {
   .tests {
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
   .tests__toolbar {

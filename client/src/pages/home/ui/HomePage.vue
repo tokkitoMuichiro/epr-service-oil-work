@@ -632,7 +632,7 @@ const description = computed(() =>
 
 @media (max-width: 860px) {
   .overview {
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
   .kpis {

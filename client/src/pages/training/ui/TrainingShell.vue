@@ -51,7 +51,7 @@ onMounted(() => {
 
 @media (max-width: 860px) {
   .training {
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 }
 </style>

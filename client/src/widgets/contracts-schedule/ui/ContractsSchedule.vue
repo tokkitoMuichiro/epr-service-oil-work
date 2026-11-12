@@ -404,19 +404,21 @@ const backLabel = computed(() => {
         <p class="head__meta">
           <template v-if="object && status">
             <ObjectStatusBadge :status="status" />
-            <span v-if="health" :class="`text--${health.tone}`">{{ health.label }}</span>
-            <span class="head__item">{{ object.location || 'без адреса' }}</span>
+            <span v-if="health" class="ui-hide-mobile" :class="`text--${health.tone}`">{{ health.label }}</span>
+            <span class="head__item ui-hide-mobile">{{ object.location || 'без адреса' }}</span>
             <span class="head__item">{{ reportCountLabel(objectReportDays.length) }}</span>
           </template>
           <template v-else-if="contract && progress">
-            <span v-if="contract.customer" class="head__item">{{ contract.customer }}</span>
+            <span v-if="contract.customer" class="head__item ui-hide-mobile">{{ contract.customer }}</span>
             <span v-if="progress.total" class="head__item">
-              объектов {{ progress.total }}: в работе {{ progress.inProgress }}, план {{ progress.planned }}, завершено
-              {{ progress.done }}
+              объектов {{ progress.total }}
+              <span class="ui-hide-mobile">
+                : в работе {{ progress.inProgress }}, план {{ progress.planned }}, завершено {{ progress.done }}
+              </span>
             </span>
           </template>
           <span v-else class="head__item">Договоров: {{ contracts.length }} · объектов: {{ objectsTotal }}</span>
-          <span v-if="headerSpan" class="head__item">{{ headerSpan }}</span>
+          <span v-if="headerSpan" class="head__item ui-hide-mobile">{{ headerSpan }}</span>
           <span v-if="contract?.archived || object?.archived" class="ui-badge ui-badge--neutral">Архив</span>
         </p>
       </div>
@@ -1015,11 +1017,26 @@ button.crew strong {
 
 @media (max-width: 860px) {
   .head {
-    padding: var(--space-3);
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-2);
+  }
+
+  .head__title h2 {
+    font-size: var(--font-size-md);
+  }
+
+  .head__meta {
+    flex-wrap: nowrap;
+    gap: var(--space-1);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   .head__tools {
     width: 100%;
+    gap: var(--space-1);
   }
 
   .head__tools :deep(.nav) {
@@ -1027,12 +1044,14 @@ button.crew strong {
   }
 
   .head__primary,
-  .head__export {
-    min-height: var(--tap-size);
+  .head__export,
+  .head__view,
+  .head__edit {
+    min-height: var(--control-height);
   }
 
   .legend {
-    padding: 6px var(--space-3);
+    padding: var(--space-1) var(--space-2);
   }
 
   .back,
@@ -1042,7 +1061,7 @@ button.crew strong {
   }
 
   .back {
-    margin: -10px 0 -6px;
+    margin: calc(-1 * var(--space-1)) 0 0;
   }
 
   .extras {

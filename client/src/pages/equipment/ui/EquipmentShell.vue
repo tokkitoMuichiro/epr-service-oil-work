@@ -171,7 +171,7 @@ watch(
 
 @media (max-width: 860px) {
   .shell {
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
   .notice {

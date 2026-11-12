@@ -595,7 +595,33 @@ function changeObject() {
 
 @media (max-width: 860px) {
   .page {
-    gap: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .page :deep(.page-header) {
+    flex-wrap: nowrap;
+    align-items: stretch;
+  }
+
+  .page :deep(.page-header__tabs),
+  .page :deep(.page-header__actions) {
+    display: flex;
+    align-items: stretch;
+    height: var(--control-height);
+  }
+
+  .page :deep(.ui-segmented) {
+    width: 100%;
+  }
+
+  .page :deep(.ui-segmented > button) {
+    flex: 1;
+  }
+
+  .page :deep(.page-header__actions .btn) {
+    height: var(--control-height);
+    min-height: var(--control-height);
+    padding: 0 var(--space-3);
   }
 
   .objects {
