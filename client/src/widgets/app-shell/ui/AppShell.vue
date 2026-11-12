@@ -272,6 +272,7 @@ onUnmounted(() => {
         </span>
       </button>
       <div class="topbar__title">{{ pageTitle }}</div>
+      <ThemeSwitch v-if="isMobile" class="topbar__theme" compact />
       <NotificationBell v-if="isMobile" class="topbar__bell" inverse />
       <button
         class="topbar__button topbar__avatar-button"
@@ -424,7 +425,7 @@ onUnmounted(() => {
         <RoleSwitcher v-else>
           <template #actions>
             <NotificationBell v-if="!isMobile" inverse />
-            <ThemeSwitch compact />
+            <ThemeSwitch v-if="!isMobile" compact />
           </template>
         </RoleSwitcher>
       </div>
@@ -837,6 +838,7 @@ onUnmounted(() => {
   background: transparent;
 }
 
+.topbar__theme,
 .topbar__bell {
   flex: 0 0 auto;
 }
