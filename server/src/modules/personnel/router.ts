@@ -66,6 +66,11 @@ export function personnelRouter(repo: PersonnelRepository) {
     res.json({ item: repo.updateDocument(requestRole(req), param(req, 'id'), param(req, 'docId'), req.body ?? {}) })
   })
 
+  router.get('/:id/documents/archive', async (req, res) => {
+    const { fileName, file } = await repo.documentsArchive(param(req, 'id'))
+    sendFile(res, file, fileName)
+  })
+
   router.get('/:id/documents/:docId/file', async (req, res) => {
     const { doc, file } = await repo.documentFile(param(req, 'id'), param(req, 'docId'))
     sendFile(res, file, doc.fileName, { disposition: requestDisposition(req) })

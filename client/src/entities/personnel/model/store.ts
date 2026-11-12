@@ -122,6 +122,11 @@ export const usePersonnelStore = defineStore('personnel', () => {
     if (!(await mutate(() => personnelApi.downloadDocument(id, docId, fileName)))) await refresh()
   }
 
+  /** Long-running Bitrix fetch; caller should show a busy chip while this resolves. */
+  async function downloadDocumentsArchive(id: string, fileName: string) {
+    if (!(await mutate(() => personnelApi.downloadDocumentsArchive(id, fileName)))) await refresh()
+  }
+
   function setPhoto(id: string, file: File) {
     return mutate(async () => replace(await personnelApi.setPhoto(id, file)))
   }
@@ -157,6 +162,7 @@ export const usePersonnelStore = defineStore('personnel', () => {
     updateDocument,
     removeDocument,
     downloadDocument,
+    downloadDocumentsArchive,
     setPhoto,
     removePhoto,
     workerName,

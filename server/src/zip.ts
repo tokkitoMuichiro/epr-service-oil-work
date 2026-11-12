@@ -1,4 +1,90 @@
-import { crc32, inflateRawSync } from 'node:zlib'
+import { crc32, deflateRawSync, inflateRawSync } from 'node:zlib'
+
+export interface ZipEntry {
+  name: string
+  data: Buffer
+}
+
+/** Builds a ZIP in memory (same style as xlsx export): deflate, UTF-8 names, CRC verified by {@link unzip}. */
+export function zip(files: readonly ZipEntry[]): Buffer {
+  const locals: Buffer[] = []
+  const central: Buffer[] = []
+  let offset = 0
+  for (const file of files) {
+    const name = Buffer.from(file.name, 'utf8')
+    const raw = file.data
+    const data = deflateRawSync(raw)
+    const crc = crc32(raw) >>> 0
+
+    const local = Buffer.alloc(30)
+    local.writeUInt32LE(0x04034b50, 0)
+    local.writeUInt16LE(20, 4)
+    local.writeUInt16LE(0x0800, 6)
+    local.writeUInt16LE(8, 8)
+    local.writeUInt32LE(0, 10)
+    local.writeUInt32LE(crc, 14)
+    local.writeUInt32LE(data.length, 18)
+    local.writeUInt32LE(raw.length, 22)
+    local.writeUInt16LE(name.length, 26)
+    locals.push(local, name, data)
+
+    const entry = Buffer.alloc(46)
+    entry.writeUInt32LE(0x02014b50, 0)
+    entry.writeUInt16LE(20, 4)
+    entry.writeUInt16LE(20, 6)
+    entry.writeUInt16LE(0x0800, 8)
+    entry.writeUInt16LE(8, 10)
+    entry.writeUInt32LE(0, 12)
+    entry.writeUInt32LE(crc, 16)
+    entry.writeUInt32LE(data.length, 20)
+    entry.writeUInt32LE(raw.length, 24)
+    entry.writeUInt16LE(name.length, 28)
+    entry.writeUInt32LE(offset, 42)
+    central.push(entry, name)
+
+    offset += local.length + name.length + data.length
+  }
+  const directory = Buffer.concat(central)
+  const end = Buffer.alloc(22)
+  end.writeUInt32LE(0x06054b50, 0)
+  end.writeUInt16LE(files.length, 8)
+  end.writeUInt16LE(files.length, 10)
+  end.writeUInt32LE(directory.length, 12)
+  end.writeUInt32LE(offset, 16)
+  return Buffer.concat([...locals, directory, end])
+}
+
+/** Strips path separators / nulls so a document title cannot escape the ZIP root. */
+export function sanitizeZipEntryName(name: string): string {
+  const cleaned = name
+    .replace(/[/\\]+/g, '_')
+    .replace(/\0/g, '')
+    .replace(/^\.+/, '')
+    .replace(/^_+/, '')
+    .trim()
+  return cleaned || 'document'
+}
+
+function withNumericSuffix(name: string, n: number): string {
+  const dot = name.lastIndexOf('.')
+  if (dot > 0) return `${name.slice(0, dot)} (${n})${name.slice(dot)}`
+  return `${name} (${n})`
+}
+
+/** Unique ZIP entry names: sanitize, then append ` (2)`, ` (3)`, … before the extension on collision. */
+export function uniqueZipNames(names: readonly string[]): string[] {
+  const used = new Set<string>()
+  return names.map((raw) => {
+    const base = sanitizeZipEntryName(raw)
+    let candidate = base
+    let n = 2
+    while (used.has(candidate.toLowerCase())) {
+      candidate = withNumericSuffix(base, n++)
+    }
+    used.add(candidate.toLowerCase())
+    return candidate
+  })
+}
 
 /** Reads a ZIP (e.g. .xlsx) through its central directory and verifies every entry's CRC. */
 export function unzip(data: Buffer): Map<string, string> {

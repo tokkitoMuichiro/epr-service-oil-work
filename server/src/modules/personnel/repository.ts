@@ -1,5 +1,8 @@
 import { persisted, type AuditLog, type Storage } from '../../db.js'
+import { PERSONNEL_FOLDER, ensurePath, isFileUnavailable, type Disk, type DiskFolder } from '../../disk/index.js'
 import { badRequest, conflict, forbidden, notFound, nowIso, trimmed, uid, type StoredFile } from '../../http.js'
+import { log } from '../../log.js'
+import { uniqueZipNames, zip } from '../../zip.js'
 import {
   assignmentCompliance,
   assignmentConflict,
@@ -43,7 +46,6 @@ import {
   type WorkerDraft,
   type WorkerPii,
 } from '../../shared.js'
-import { PERSONNEL_FOLDER, ensurePath, isFileUnavailable, type Disk, type DiskFolder } from '../../disk/index.js'
 import type { ContractsRepository } from '../contracts/repository.js'
 import {
   PERSONNEL_KEY,
@@ -64,6 +66,10 @@ const OVERRIDE_COMMENT_MIN = 10
 const PHOTO_EXTENSIONS: Record<string, string> = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif' }
 
 export const FILE_DELETED_ON_DISK = 'Файл удалён на Диске Битрикс'
+/** Empty `worker.documents` → 404 on archive download. */
+export const NO_DOCUMENTS_TO_DOWNLOAD = 'Нет документов для скачивания'
+/** Every Disk download failed → 404 (archive is not produced). */
+export const FAILED_TO_DOWNLOAD_DOCUMENTS = 'Не удалось скачать документы'
 
 export interface PersonnelDeps {
   disk: Disk
@@ -448,6 +454,46 @@ export function createPersonnelRepository(contracts: ContractsRepository, storag
         if (record) record.documents = record.documents.filter((d) => d.id !== docId)
         save()
         notFound(FILE_DELETED_ON_DISK)
+      }
+    },
+
+    /**
+     * ZIP of all worker documents. Unavailable Disk files are skipped (warn); the card is not mutated.
+     * Empty list → 404 {@link NO_DOCUMENTS_TO_DOWNLOAD}; zero successful downloads → 404 {@link FAILED_TO_DOWNLOAD_DOCUMENTS}.
+     */
+    async documentsArchive(workerId: string): Promise<{ fileName: string; file: StoredFile }> {
+      const record = findWorker(workerId)
+      if (!record.documents.length) notFound(NO_DOCUMENTS_TO_DOWNLOAD)
+
+      const downloaded: { preferredName: string; data: Buffer }[] = []
+      for (const doc of record.documents) {
+        try {
+          let file: StoredFile
+          if (!doc.diskFileId) {
+            const legacy = legacyFiles.get(doc.id)
+            if (!legacy) {
+              log.warn('Документ без файла пропущен при сборке архива', { workerId, docId: doc.id })
+              continue
+            }
+            file = legacy
+          } else {
+            file = await disk.download(doc.diskFileId)
+          }
+          downloaded.push({ preferredName: doc.fileName || doc.title, data: file.data })
+        } catch (error) {
+          if (!isFileUnavailable(error)) throw error
+          log.warn('Документ недоступен на Диске, пропущен при сборке архива', { workerId, docId: doc.id })
+        }
+      }
+      if (!downloaded.length) notFound(FAILED_TO_DOWNLOAD_DOCUMENTS)
+
+      const names = uniqueZipNames(downloaded.map((entry) => entry.preferredName))
+      return {
+        fileName: `${record.fullName} — документы.zip`,
+        file: {
+          data: zip(downloaded.map((entry, i) => ({ name: names[i]!, data: entry.data }))),
+          mimeType: 'application/zip',
+        },
       }
     },
 

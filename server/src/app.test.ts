@@ -261,6 +261,62 @@ describe('api', () => {
     assert.equal(image.headers.get('content-type'), 'image/png')
   })
 
+  it('downloads all worker documents as a ZIP archive', async () => {
+    const worker = ((await call('GET', '/api/personnel')).json.items as Worker[]).find((w) => w.id === 'p-4')
+    assert.ok(worker)
+    const query = new URLSearchParams({
+      title: 'Паспорт',
+      fileName: 'Паспорт.pdf',
+      mimeType: 'application/pdf',
+    })
+    const created = await upload(`/api/personnel/${worker.id}/documents?${query}`, 'POST', '%PDF-archive')
+    assert.equal(created.status, 201)
+    const updated = ((await created.json()) as { item: Worker }).item
+
+    const archive = await download(`/api/personnel/${worker.id}/documents/archive`)
+    assert.equal(archive.status, 200)
+    assert.match(archive.headers.get('content-type') ?? '', /application\/zip/)
+    assert.match(archive.headers.get('content-disposition') ?? '', /^attachment;/)
+    assert.match(
+      archive.headers.get('content-disposition') ?? '',
+      /filename\*=UTF-8''.*%20%E2%80%94%20%D0%B4%D0%BE%D0%BA%D1%83%D0%BC%D0%B5%D0%BD%D1%82%D1%8B\.zip/,
+    )
+    const files = unzip(archive.data)
+    assert.ok(files.size >= 1)
+    assert.equal(files.get('Паспорт.pdf'), '%PDF-archive')
+
+    const asMaster = await download(`/api/personnel/${worker.id}/documents/archive`, 'master')
+    assert.equal(asMaster.status, 200)
+
+    const original = ((await call('GET', '/api/access')).json.item.matrix as Record<string, string[]>).master
+    await call('PATCH', '/api/access/roles/master', 'admin', {
+      permissions: original.filter((p) => p !== 'personnel_view'),
+    })
+    assert.equal((await download(`/api/personnel/${worker.id}/documents/archive`, 'master')).status, 403)
+    await call('PATCH', '/api/access/roles/master', 'admin', { permissions: original })
+
+    assert.equal((await download('/api/personnel/missing/documents/archive')).status, 404)
+
+    const fresh = await call('POST', '/api/personnel', 'admin', {
+      fullName: 'Архивный Бездоков',
+      position: 'Рабочий',
+      phone: '',
+      hiredAt: '',
+      note: '',
+    })
+    assert.equal(fresh.status, 201)
+    const empty = await call('GET', `/api/personnel/${fresh.json.item.id}/documents/archive`)
+    assert.equal(empty.status, 404)
+    assert.equal(empty.json.error, 'Нет документов для скачивания')
+
+    const clash = new URLSearchParams({ title: 'Дубль', fileName: 'Паспорт.pdf', mimeType: 'application/pdf' })
+    assert.equal((await upload(`/api/personnel/${worker.id}/documents?${clash}`, 'POST', '%PDF-dup')).status, 201)
+    const withClash = unzip((await download(`/api/personnel/${worker.id}/documents/archive`)).data)
+    assert.equal(withClash.get('Паспорт.pdf'), '%PDF-dup')
+    assert.equal(withClash.get('Паспорт (2).pdf'), '%PDF-archive')
+    assert.ok(updated.documents.some((d) => d.fileName === 'Паспорт.pdf'))
+  })
+
   it('stores qualification documents without inventing an expiry', async () => {
     const worker = ((await call('GET', '/api/personnel')).json.items as Worker[]).find((w) => w.id === 'p-6')
     assert.ok(worker)
@@ -1495,6 +1551,41 @@ describe('bitrix disk', () => {
     assert.equal(response.json.error, 'Файл удалён на Диске Битрикс')
     const worker = (await app.call('GET', '/api/personnel/p-5')).json.item as Worker
     assert.ok(!worker.documents.some((d) => d.id === doc.id))
+  })
+
+  it('skips unavailable Disk files in the documents archive without clearing the card', async () => {
+    const created = await app.call('POST', '/api/personnel', 'admin', {
+      fullName: 'Архив Недоступных',
+      position: 'Рабочий',
+      phone: '',
+      hiredAt: '',
+      note: '',
+    })
+    assert.equal(created.status, 201)
+    const workerId = created.json.item.id as string
+    const worker = await workerDoc(workerId, 'Справка', '%PDF-gone')
+    const doc = worker.documents[0]
+    disk.deleteOnDisk(await diskIdOf(doc.storagePath ?? ''))
+
+    const failed = await app.call('GET', `/api/personnel/${workerId}/documents/archive`)
+    assert.equal(failed.status, 404)
+    assert.equal(failed.json.error, 'Не удалось скачать документы')
+    const stillThere = (await app.call('GET', `/api/personnel/${workerId}`)).json.item as Worker
+    assert.ok(stillThere.documents.some((d) => d.id === doc.id))
+
+    const kept = await workerDoc(workerId, 'Живой', '%PDF-alive')
+    const aliveDoc = kept.documents.find((d) => d.fileName === 'Живой.pdf')
+    assert.ok(aliveDoc)
+    const partial = await app.download(`/api/personnel/${workerId}/documents/archive`)
+    assert.equal(partial.status, 200)
+    const files = unzip(partial.data)
+    assert.equal(files.get('Живой.pdf'), '%PDF-alive')
+    assert.equal(files.has('Справка.pdf'), false)
+
+    // Drop the unavailable card entry without a suite-wide sync (that would skew the next test's removed count).
+    assert.equal((await app.call('DELETE', `/api/personnel/${workerId}/documents/${doc.id}`)).status, 200)
+    assert.equal((await app.call('DELETE', `/api/personnel/${workerId}/documents/${aliveDoc.id}`)).status, 200)
+    assert.equal((await app.call('DELETE', `/api/personnel/${workerId}`)).status, 204)
   })
 
   it('removes files deleted on Disk from every module on sync', async () => {
