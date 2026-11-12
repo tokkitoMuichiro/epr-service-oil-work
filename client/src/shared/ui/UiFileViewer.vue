@@ -14,6 +14,8 @@ const props = defineProps<{
   fileName: string
   mimeType: string
   objectUrl: string
+  /** Kept Blob for mobile PDF (Safari cannot fetch blob: URLs reliably). */
+  blob?: Blob | null
   loading?: boolean
   error?: string
 }>()
@@ -72,7 +74,11 @@ const errorDetail = computed(() => {
       </UiState>
 
       <template v-else-if="showMedia">
-        <PdfJsViewport v-if="kind === 'pdf' && useZoomViewer" :object-url="objectUrl" />
+        <PdfJsViewport
+          v-if="kind === 'pdf' && useZoomViewer"
+          :object-url="objectUrl"
+          :blob="blob"
+        />
         <iframe
           v-else-if="kind === 'pdf'"
           class="viewer__frame"

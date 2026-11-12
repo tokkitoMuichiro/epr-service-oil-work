@@ -61,6 +61,7 @@ const {
   fileName: viewerFileName,
   mimeType: viewerMimeType,
   objectUrl: viewerObjectUrl,
+  previewBlob: viewerBlob,
   openPath: openViewerPath,
   close: closeViewer,
   download: downloadViewer,
@@ -343,6 +344,7 @@ async function openMaterial(material: TrainingMaterial) {
       :file-name="viewerFileName"
       :mime-type="viewerMimeType"
       :object-url="viewerObjectUrl"
+      :blob="viewerBlob"
       :loading="viewerLoading"
       :error="viewerError"
       @close="closeViewer"

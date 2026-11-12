@@ -116,6 +116,7 @@ const {
   fileName: viewerFileName,
   mimeType: viewerMimeType,
   objectUrl: viewerObjectUrl,
+  previewBlob: viewerBlob,
   openPath: openViewerPath,
   close: closeViewer,
   download: downloadViewer,
@@ -511,6 +512,7 @@ onBeforeUnmount(() => {
     :file-name="viewerFileName"
     :mime-type="viewerMimeType"
     :object-url="viewerObjectUrl"
+    :blob="viewerBlob"
     :loading="viewerLoading"
     :error="viewerError"
     @close="closeViewer"
