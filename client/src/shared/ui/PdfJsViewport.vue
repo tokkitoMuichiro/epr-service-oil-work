@@ -29,6 +29,7 @@ const canZoomOut = computed(() => factor.value > MIN_FACTOR + FIT_EPS)
 const canZoomIn = computed(() => factor.value < MAX_FACTOR - FIT_EPS)
 
 let pdfDoc: PDFDocumentProxy | null = null
+let loadingTask: { destroy(): Promise<void> } | null = null
 let renderToken = 0
 let loadToken = 0
 const activeTasks = new Set<RenderTask>()
@@ -37,6 +38,15 @@ let pinchStartDistance = 0
 let pinchStartFactor = 1
 let lastTapAt = 0
 let renderTimer: ReturnType<typeof setTimeout> | null = null
+
+/** Worker can't XHR blob: URLs in Safari/PWA — load bytes on the main thread. */
+async function readPdfBytes(url: string): Promise<Uint8Array> {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Не удалось прочитать файл (${response.status})`)
+  }
+  return new Uint8Array(await response.arrayBuffer())
+}
 
 function clampFactor(value: number) {
   return Math.min(MAX_FACTOR, Math.max(MIN_FACTOR, value))
@@ -77,12 +87,20 @@ async function destroyDocument() {
   }
   activeTasks.clear()
   if (pagesHost.value) pagesHost.value.replaceChildren()
-  if (pdfDoc) {
-    const doc = pdfDoc
-    pdfDoc = null
+  const doc = pdfDoc
+  const task = loadingTask
+  pdfDoc = null
+  loadingTask = null
+  if (doc) {
     try {
       await doc.cleanup()
-      await doc.loadingTask.destroy()
+    } catch {
+      /* ignore */
+    }
+  }
+  if (task) {
+    try {
+      await task.destroy()
     } catch {
       /* ignore */
     }
@@ -150,14 +168,18 @@ async function loadPdf(url: string) {
   await destroyDocument()
   if (token !== loadToken) return
   try {
+    const data = await readPdfBytes(url)
+    if (token !== loadToken) return
     const pdfjs = await import('pdfjs-dist')
     const workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
     pdfjs.GlobalWorkerOptions.workerSrc = workerSrc
-    const loadingTask = pdfjs.getDocument({ url })
-    const doc = await loadingTask.promise
+    const task = pdfjs.getDocument({ data })
+    loadingTask = task
+    const doc = await task.promise
     if (token !== loadToken) {
       await doc.cleanup()
-      await loadingTask.destroy()
+      await task.destroy()
+      if (loadingTask === task) loadingTask = null
       return
     }
     pdfDoc = doc
@@ -167,7 +189,11 @@ async function loadPdf(url: string) {
     isReady.value = true
   } catch (error) {
     if (token !== loadToken) return
-    const message = error instanceof Error ? error.message : 'Не удалось открыть PDF'
+    const raw = error instanceof Error ? error.message : ''
+    const message =
+      /unexpected server response|retrieving PDF|Failed to fetch|NetworkError/i.test(raw)
+        ? 'Не удалось открыть PDF. Попробуйте скачать файл.'
+        : raw || 'Не удалось открыть PDF'
     loadError.value = message
     emit('error', message)
   }
