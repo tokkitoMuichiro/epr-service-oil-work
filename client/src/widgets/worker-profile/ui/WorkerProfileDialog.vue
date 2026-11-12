@@ -13,6 +13,7 @@ import {
   VOLTAGE_LABEL,
   WorkerStatusBadge,
   admissionGroupValue,
+  formatRuPhone,
   personnelApi,
   qualificationLabel,
   qualificationType,
@@ -90,7 +91,7 @@ const {
   retry: retryViewer,
 } = useFileViewer()
 
-const form = reactive({ fullName: '', position: '', phone: '', snils: '' })
+const form = reactive({ fullName: '', position: '', phone: '', snils: '', note: '' })
 const editingDocId = ref<string | null>(null)
 const docForm = reactive<DocumentEditForm>({
   title: '',
@@ -213,7 +214,7 @@ const draft = computed<WorkerDraft | null>(() => {
     position: form.position,
     phone: form.phone,
     hiredAt: w.hiredAt,
-    note: w.note,
+    note: form.note,
     pii: piiVisible.value && w.pii ? { ...w.pii, snils: form.snils.trim() } : undefined,
   }
 })
@@ -236,10 +237,15 @@ function startEdit() {
   if (!w) return
   form.fullName = w.fullName
   form.position = w.position
-  form.phone = w.phone
+  form.phone = formatRuPhone(w.phone)
   form.snils = w.pii?.snils ?? ''
+  form.note = w.note
   personnel.actionError = ''
   isEditing.value = true
+}
+
+function onPhoneInput(event: Event) {
+  form.phone = formatRuPhone((event.target as HTMLInputElement).value)
 }
 
 function close() {
@@ -442,13 +448,24 @@ useEscape(
               </label>
               <label>
                 <span>Телефон</span>
-                <input v-model="form.phone" type="tel" placeholder="+7 900 000-00-00" />
+                <input
+                  :value="form.phone"
+                  type="tel"
+                  inputmode="tel"
+                  autocomplete="tel"
+                  placeholder="+7 (999) 999-99-99"
+                  @input="onPhoneInput"
+                />
               </label>
               <label v-if="piiVisible">
                 <span>СНИЛС</span>
                 <input v-model="form.snils" placeholder="123-456-789 00" />
               </label>
               <p v-else class="ui-form__note">СНИЛС изменяет только роль «Администратор».</p>
+              <label>
+                <span>Примечание</span>
+                <textarea v-model="form.note" rows="2" />
+              </label>
 
               <p v-if="validation || actionError" class="ui-form__hint">{{ validation || actionError }}</p>
 
@@ -470,7 +487,9 @@ useEscape(
                 <div>
                   <dt>Телефон</dt>
                   <dd>
-                    <a v-if="worker.phone" :href="`tel:${worker.phone.replace(/[^\d+]/g, '')}`">{{ worker.phone }}</a>
+                    <a v-if="worker.phone" :href="`tel:${formatRuPhone(worker.phone).replace(/[^\d+]/g, '') || worker.phone}`">
+                      {{ formatRuPhone(worker.phone) || worker.phone }}
+                    </a>
                     <template v-else>—</template>
                   </dd>
                 </div>
@@ -506,6 +525,10 @@ useEscape(
                       {{ brigade?.name ?? 'Не в бригаде' }}{{ brigadeRole }}
                     </span>
                   </dd>
+                </div>
+                <div class="facts__wide">
+                  <dt>Примечание</dt>
+                  <dd>{{ worker.note.trim() || '—' }}</dd>
                 </div>
               </dl>
 
@@ -869,6 +892,16 @@ useEscape(
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+}
+
+.facts__wide {
+  align-items: start;
+}
+
+.facts__wide dd {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-variant-numeric: normal;
 }
 
 .masked {

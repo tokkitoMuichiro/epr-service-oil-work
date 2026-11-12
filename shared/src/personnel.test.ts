@@ -3,11 +3,14 @@ import { describe, it } from 'node:test'
 import { rangesOverlap, daysBetweenIso, isIsoDate } from './dates.js'
 import {
   assignmentConflict,
+  formatRuPhone,
+  isCompleteRuPhone,
   isValidSnils,
   membershipConflicts,
   trainingDocState,
   validateAssignmentDraft,
   validateBrigadeDraft,
+  validateWorkerDraft,
   worstTrainingState,
   workerStatus,
   type Brigade,
@@ -71,6 +74,20 @@ describe('personnel', () => {
   it('checks SNILS format', () => {
     assert.equal(isValidSnils('112-233-445 95'), true)
     assert.equal(isValidSnils('11223344595'), false)
+  })
+
+  it('formats RU phone and normalizes leading 8 to +7', () => {
+    assert.equal(formatRuPhone(''), '')
+    assert.equal(formatRuPhone('8'), '+7')
+    assert.equal(formatRuPhone('89991234567'), '+7 (999) 123-45-67')
+    assert.equal(formatRuPhone('+7 999 123-45-67'), '+7 (999) 123-45-67')
+    assert.equal(formatRuPhone('9991234567'), '+7 (999) 123-45-67')
+    assert.equal(formatRuPhone('8999'), '+7 (999')
+    assert.equal(isCompleteRuPhone('+7 (999) 123-45-67'), true)
+    assert.equal(isCompleteRuPhone('+7 (999) 123'), false)
+    assert.equal(validateWorkerDraft({ fullName: 'Иванов', position: 'Мастер', phone: '8999' }), 'Телефон в формате +7 (999) 999-99-99')
+    assert.equal(validateWorkerDraft({ fullName: 'Иванов', position: 'Мастер', phone: '+7 (999) 123-45-67' }), null)
+    assert.equal(validateWorkerDraft({ fullName: 'Иванов', position: 'Мастер', phone: '' }), null)
   })
 
   it('classifies training documents by expiry', () => {

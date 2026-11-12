@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
-import { validateWorkerDraft, type Worker, type WorkerDraft } from '@/entities/personnel'
+import { formatRuPhone, validateWorkerDraft, type Worker, type WorkerDraft } from '@/entities/personnel'
 import { useDialogDirty } from '@/shared/lib/dialog-dirty'
 import { UiButton, UiDialog } from '@/shared/ui'
 
@@ -34,7 +34,7 @@ watch(
     const w = props.worker
     form.fullName = w?.fullName ?? ''
     form.position = w?.position ?? ''
-    form.phone = w?.phone ?? ''
+    form.phone = formatRuPhone(w?.phone ?? '')
     form.hiredAt = w?.hiredAt ?? ''
     form.note = w?.note ?? ''
     form.snils = w?.pii?.snils ?? ''
@@ -60,6 +60,10 @@ function save() {
   if (validation.value) return
   emit('save', draft.value)
 }
+
+function onPhoneInput(event: Event) {
+  form.phone = formatRuPhone((event.target as HTMLInputElement).value)
+}
 </script>
 
 <template>
@@ -76,7 +80,14 @@ function save() {
         </label>
         <label>
           <span>Телефон</span>
-          <input v-model="form.phone" type="tel" placeholder="+7 900 000-00-00" />
+          <input
+            :value="form.phone"
+            type="tel"
+            inputmode="tel"
+            autocomplete="tel"
+            placeholder="+7 (999) 999-99-99"
+            @input="onPhoneInput"
+          />
         </label>
       </div>
       <label>
