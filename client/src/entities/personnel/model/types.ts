@@ -4,6 +4,8 @@ export {
   TRAINING_DOC_STATE_LABEL,
   TRAINING_EXPIRING_DAYS,
   WORKER_STATUS_LABEL,
+  formatRuPhone,
+  isCompleteRuPhone,
   isValidSnils,
   trainingDocState,
   validateDocumentMeta,

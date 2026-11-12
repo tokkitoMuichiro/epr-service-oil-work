@@ -22,6 +22,7 @@ import {
   todayIso,
   DOCUMENT_UPLOAD_ERROR,
   documentUploadMimeType,
+  formatRuPhone,
   validateAssignmentDraft,
   validateBrigadeDraft,
   validateDocumentMeta,
@@ -103,7 +104,7 @@ function parseWorkerDraft(body: Partial<WorkerDraft>): WorkerDraft {
   const draft: WorkerDraft = {
     fullName: trimmed(body.fullName).replace(/\s+/g, ' '),
     position: trimmed(body.position),
-    phone: trimmed(body.phone),
+    phone: formatRuPhone(trimmed(body.phone)),
     hiredAt: trimmed(body.hiredAt),
     note: trimmed(body.note),
     pii: parsePii(body.pii),

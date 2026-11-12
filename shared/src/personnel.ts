@@ -160,9 +160,39 @@ export interface ObjectCrew {
 }
 
 const SNILS_FORMAT = /^\d{3}-\d{3}-\d{3} \d{2}$/
+const RU_PHONE_FORMAT = /^\+7 \(\d{3}\) \d{3}-\d{2}-\d{2}$/
 
 export function isValidSnils(value: string): boolean {
   return SNILS_FORMAT.test(value)
+}
+
+/** Digits for RU mobile/landline with country code 7 (max 11). Leading 8 → 7. */
+export function ruPhoneDigits(raw: string): string {
+  let digits = raw.replace(/\D/g, '')
+  if (!digits) return ''
+  if (digits.startsWith('8')) digits = `7${digits.slice(1)}`
+  if (!digits.startsWith('7')) digits = `7${digits}`
+  return digits.slice(0, 11)
+}
+
+/** Progressive mask: +7 (999) 999-99-99. Empty input stays empty. */
+export function formatRuPhone(raw: string): string {
+  const digits = ruPhoneDigits(raw)
+  if (!digits) return ''
+  const local = digits.slice(1)
+  let out = '+7'
+  if (!local.length) return out
+  out += ` (${local.slice(0, 3)}`
+  if (local.length <= 3) return out
+  out += `) ${local.slice(3, 6)}`
+  if (local.length <= 6) return out
+  out += `-${local.slice(6, 8)}`
+  if (local.length <= 8) return out
+  return `${out}-${local.slice(8, 10)}`
+}
+
+export function isCompleteRuPhone(value: string): boolean {
+  return RU_PHONE_FORMAT.test(value.trim())
 }
 
 export function trainingDocState(expiresAt: string | undefined, today: string): TrainingDocState {
@@ -253,6 +283,8 @@ export function validateWorkerDraft(draft: Partial<WorkerDraft>): string | null 
   if (!draft.fullName?.trim()) return 'Укажите ФИО'
   if (!draft.position?.trim()) return 'Укажите должность'
   if (draft.hiredAt && !isIsoDate(draft.hiredAt)) return 'Некорректная дата приёма'
+  const phone = draft.phone?.trim() ?? ''
+  if (phone && !isCompleteRuPhone(phone)) return 'Телефон в формате +7 (999) 999-99-99'
   if (draft.pii) {
     if (draft.pii.snils && !isValidSnils(draft.pii.snils)) return 'СНИЛС в формате 123-456-789 00'
     if (draft.pii.birthDate && !isIsoDate(draft.pii.birthDate)) return 'Некорректная дата рождения'

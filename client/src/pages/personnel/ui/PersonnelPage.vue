@@ -7,6 +7,7 @@ import {
   EMPLOYMENT_STATUS_LABEL,
   TRAINING_EXPIRING_DAYS,
   WorkerStatusBadge,
+  formatRuPhone,
   personnelApi,
   usePersonnelStore,
   workerAttention,
@@ -293,7 +294,7 @@ function openCreateBrigade() {
                   <UiClipText :text="brigadeName(w.brigadeId)" />
                 </span>
                 <span class="ui-rows__cell cell--phone">
-                  <UiClipText :text="w.phone || '—'" />
+                  <UiClipText :text="formatRuPhone(w.phone) || w.phone || '—'" />
                 </span>
                 <span class="ui-rows__cell cell--status">
                   <WorkerStatusBadge :status="w.status" />
