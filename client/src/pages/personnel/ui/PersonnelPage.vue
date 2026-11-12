@@ -719,7 +719,7 @@ function openCreateBrigade() {
 
 @media (max-width: 860px) {
   .page {
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
   .page :deep(.page-header) {
@@ -736,15 +736,10 @@ function openCreateBrigade() {
 
   .page :deep(.ui-segmented) {
     width: 100%;
-    height: var(--control-height);
-    padding: 0;
-    gap: 0;
   }
 
   .page :deep(.ui-segmented > button) {
     flex: 1;
-    min-height: 0;
-    height: 100%;
     padding: 0 var(--space-2);
   }
 
@@ -752,6 +747,10 @@ function openCreateBrigade() {
     height: var(--control-height);
     min-height: var(--control-height);
     padding: 0 var(--space-3);
+  }
+
+  .toolbar {
+    gap: var(--space-1);
   }
 
   .header-add__full {
@@ -771,8 +770,8 @@ function openCreateBrigade() {
 
   .legend {
     align-items: center;
-    gap: var(--space-1) var(--space-3);
-    margin: var(--space-2) 0 var(--space-1);
+    gap: var(--space-1) var(--space-2);
+    margin: 0;
   }
 
   .legend--brigades {

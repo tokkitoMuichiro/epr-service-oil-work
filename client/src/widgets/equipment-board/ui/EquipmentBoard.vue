@@ -781,8 +781,13 @@ function onTransferred() {
 }
 
 @media (max-width: 860px) {
+  .board__chrome {
+    gap: var(--space-1);
+  }
+
   .toolbar {
     grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
   }
 
   .toolbar__select {

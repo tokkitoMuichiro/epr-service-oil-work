@@ -391,7 +391,7 @@ function onAssigned() {
 
 @media (max-width: 860px) {
   .summary {
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
   .summary__counters {

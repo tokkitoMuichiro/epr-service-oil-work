@@ -112,7 +112,7 @@ const currentRoleHint = computed(() => {
 
 @media (max-width: 860px) {
   .page {
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
   .panel {

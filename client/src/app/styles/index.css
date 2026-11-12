@@ -208,7 +208,7 @@
   --select-chevron-inverse: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='m5 7.5 5 5 5-5' fill='none' stroke='%23ced9eb' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
-/* Плотность: с мышью контролы компактнее, на сенсорных экранах остаются 44 px. */
+/* Плотность: мышь и мобильный chrome (≤860) — 36 px; широкий touch >860 — 44 px. */
 @media (pointer: fine) {
   :root,
   :root[data-theme] {
@@ -1299,6 +1299,15 @@ textarea::placeholder {
     --font-size-2xl: 24px;
     --font-size-display: 26px;
     --page-title-size: var(--font-size-xl);
+    /* Мобильный chrome: компактнее touch-дефолт 44px (как pointer:fine). */
+    --control-height: 36px;
+    --control-height-sm: 32px;
+    --tap-size: 36px;
+    --timeline-row: 40px;
+  }
+
+  .ui-fill-page {
+    gap: var(--space-2);
   }
 
   .ui-form {
@@ -1315,8 +1324,18 @@ textarea::placeholder {
     gap: 5px;
   }
 
+  /* Chrome density: segmented fills --control-height without outer pad. */
+  .ui-segmented {
+    height: var(--control-height);
+    max-height: var(--control-height);
+    padding: 0;
+    gap: 0;
+  }
+
   .ui-segmented > button,
   .ui-segmented > a {
+    min-height: 0;
+    height: 100%;
     padding: 0 var(--space-3);
   }
 

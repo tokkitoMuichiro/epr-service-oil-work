@@ -487,7 +487,7 @@ async function openMaterial(material: TrainingMaterial) {
 
 @media (max-width: 860px) {
   .materials {
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
   .materials__toolbar {

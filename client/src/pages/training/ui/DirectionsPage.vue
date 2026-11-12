@@ -463,7 +463,7 @@ function archiveProgram(program: TrainingProgram) {
 
 @media (max-width: 860px) {
   .directions {
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
   .direction {

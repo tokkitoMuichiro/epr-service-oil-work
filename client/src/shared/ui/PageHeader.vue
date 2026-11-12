@@ -51,7 +51,7 @@ defineSlots<{ actions?(): unknown; tabs?(): unknown }>()
 @media (max-width: 860px) {
   .page-header {
     align-items: center;
-    gap: var(--space-2);
+    gap: var(--space-1) var(--space-2);
   }
 
   /* Название страницы на телефоне уже в верхней панели — оставляем его только для экранных читалок. */

@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { isPreviewableMime } from '@shared/files'
+import { useIsMobileViewer } from '@/shared/lib/media'
 import UiButton from './UiButton.vue'
 import UiDialog from './UiDialog.vue'
 import UiState from './UiState.vue'
+import ImageZoomViewport from './ImageZoomViewport.vue'
+
+const PdfJsViewport = defineAsyncComponent(() => import('./PdfJsViewport.vue'))
 
 const props = defineProps<{
   open: boolean
@@ -20,6 +24,8 @@ const emit = defineEmits<{
   retry: []
 }>()
 
+const isMobileViewer = useIsMobileViewer()
+
 const kind = computed(() => {
   const mime = props.mimeType.split(';')[0]?.trim().toLowerCase() ?? ''
   if (mime === 'application/pdf') return 'pdf'
@@ -31,6 +37,7 @@ const kind = computed(() => {
 
 const showMedia = computed(() => Boolean(props.objectUrl) && !props.loading && !props.error)
 const canDownload = computed(() => !props.loading)
+const useZoomViewer = computed(() => isMobileViewer.value && showMedia.value && (kind.value === 'pdf' || kind.value === 'image'))
 const errorDetail = computed(() => {
   if (!props.error) return ''
   if (props.error === 'Не удалось открыть файл') {
@@ -42,7 +49,7 @@ const errorDetail = computed(() => {
 
 <template>
   <UiDialog :open="open" :title="fileName || 'Файл'" wide @close="emit('close')">
-    <div class="viewer" :data-kind="kind">
+    <div class="viewer" :data-kind="kind" :data-mobile="isMobileViewer || undefined">
       <div v-if="loading" class="viewer__loading" role="status" aria-live="polite">
         <div class="viewer__sketch" aria-hidden="true">
           <span class="viewer__bar viewer__bar--lg" />
@@ -65,7 +72,18 @@ const errorDetail = computed(() => {
       </UiState>
 
       <template v-else-if="showMedia">
-        <iframe v-if="kind === 'pdf'" class="viewer__frame" :src="objectUrl" title="Просмотр PDF" />
+        <PdfJsViewport v-if="kind === 'pdf' && useZoomViewer" :object-url="objectUrl" />
+        <iframe
+          v-else-if="kind === 'pdf'"
+          class="viewer__frame"
+          :src="objectUrl"
+          title="Просмотр PDF"
+        />
+        <ImageZoomViewport
+          v-else-if="kind === 'image' && useZoomViewer"
+          :object-url="objectUrl"
+          :file-name="fileName"
+        />
         <img v-else-if="kind === 'image'" class="viewer__image" :src="objectUrl" :alt="fileName" />
         <video v-else-if="kind === 'video'" class="viewer__video" :src="objectUrl" controls playsinline />
         <UiState v-else kind="error" compact title="Не удалось показать файл">
@@ -95,6 +113,10 @@ const errorDetail = computed(() => {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
   overflow: hidden;
+}
+
+.viewer[data-mobile] {
+  min-height: min(70vh, 640px);
 }
 
 .viewer__loading {
