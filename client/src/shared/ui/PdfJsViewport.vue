@@ -177,8 +177,9 @@ async function loadPdf(url: string, blob: Blob | null | undefined) {
   try {
     const data = await readPdfBytes(blob, url)
     if (token !== loadToken) return
-    const pdfjs = await import('pdfjs-dist')
-    const workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
+    // legacy: полифилл Map.getOrInsertComputed — без него render падает на Safari/старых Chromium.
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+    const workerSrc = (await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')).default
     pdfjs.GlobalWorkerOptions.workerSrc = workerSrc
     const task = pdfjs.getDocument({ data, disableStream: true, disableAutoFetch: true })
     loadingTask = task
@@ -198,7 +199,9 @@ async function loadPdf(url: string, blob: Blob | null | undefined) {
     if (token !== loadToken) return
     const raw = error instanceof Error ? error.message : ''
     const message =
-      /unexpected server response|retrieving PDF|Failed to fetch|NetworkError|^Load failed$/i.test(raw)
+      /unexpected server response|retrieving PDF|Failed to fetch|NetworkError|^Load failed$|getOrInsertComputed/i.test(
+        raw,
+      )
         ? 'Не удалось открыть PDF. Попробуйте скачать файл.'
         : raw || 'Не удалось открыть PDF'
     loadError.value = message
