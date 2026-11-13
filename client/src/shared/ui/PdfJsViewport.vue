@@ -38,8 +38,12 @@ const activeTasks = new Set<RenderTask>()
 let resizeObserver: ResizeObserver | null = null
 let pinchStartDistance = 0
 let pinchStartFactor = 1
+let isPinching = false
 let lastTapAt = 0
 let renderTimer: ReturnType<typeof setTimeout> | null = null
+/** Width used for the last paint — ignore ResizeObserver noise (scrollbar gutter). */
+let lastRenderWidth = 0
+const WIDTH_EPS = 2
 
 /** Bytes for pdf.js without worker fetching blob: URLs (broken in Safari/PWA). */
 async function readPdfBytes(blob: Blob | null | undefined, url: string): Promise<Uint8Array> {
@@ -75,12 +79,12 @@ function fitWidth() {
   factor.value = 1
 }
 
-function scheduleRender() {
+function scheduleRender(delayMs = 80) {
   if (renderTimer) clearTimeout(renderTimer)
   renderTimer = setTimeout(() => {
     renderTimer = null
     void renderPages()
-  }, 40)
+  }, delayMs)
 }
 
 async function destroyDocument() {
@@ -112,6 +116,7 @@ async function destroyDocument() {
       /* ignore */
     }
   }
+  lastRenderWidth = 0
   isReady.value = false
 }
 
@@ -124,16 +129,20 @@ async function measureFitScale(page: PDFPageProxy, width: number) {
 async function renderPages() {
   const host = pagesHost.value
   const doc = pdfDoc
+  const sc = scroller.value
   if (!host || !doc) return
   const token = ++renderToken
-  const width = scroller.value?.clientWidth ?? host.clientWidth
+  const width = sc?.clientWidth ?? host.clientWidth
   if (width < 8) return
+
+  const scrollRatio = sc && sc.scrollHeight > 0 ? sc.scrollTop / sc.scrollHeight : 0
 
   const first = await doc.getPage(1)
   if (token !== renderToken) return
   fitScale.value = await measureFitScale(first, width)
   const scale = fitScale.value * factor.value
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  lastRenderWidth = width
 
   host.replaceChildren()
 
@@ -166,6 +175,9 @@ async function renderPages() {
       activeTasks.delete(task)
     }
   }
+
+  if (token !== renderToken || !sc) return
+  sc.scrollTop = scrollRatio * sc.scrollHeight
 }
 
 async function loadPdf(url: string, blob: Blob | null | undefined) {
@@ -226,6 +238,7 @@ function touchDistance(touches: TouchList) {
 
 function onTouchStart(event: TouchEvent) {
   if (event.touches.length === 2) {
+    isPinching = true
     pinchStartDistance = touchDistance(event.touches)
     pinchStartFactor = factor.value
   }
@@ -236,11 +249,19 @@ function onTouchMove(event: TouchEvent) {
   event.preventDefault()
   const distance = touchDistance(event.touches)
   if (!distance) return
-  setFactor(pinchStartFactor * (distance / pinchStartDistance))
+  // Update factor only — paint once on pinch end (continuous render kills scroll).
+  factor.value = clampFactor(pinchStartFactor * (distance / pinchStartDistance))
 }
 
 function onTouchEnd(event: TouchEvent) {
-  if (event.touches.length < 2) pinchStartDistance = 0
+  if (event.touches.length >= 2) return
+  const wasPinching = isPinching
+  isPinching = false
+  pinchStartDistance = 0
+  if (wasPinching) {
+    setFactor(factor.value)
+    scheduleRender(0)
+  }
 }
 
 function onPointerUp(event: PointerEvent) {
@@ -271,7 +292,7 @@ watch(
 )
 
 watch(factor, () => {
-  if (!pdfDoc || !isReady.value) return
+  if (!pdfDoc || !isReady.value || isPinching) return
   scheduleRender()
 })
 
@@ -284,8 +305,11 @@ onMounted(() => {
   el.addEventListener('touchend', onTouchEnd, { passive: true })
   el.addEventListener('touchcancel', onTouchEnd, { passive: true })
   el.addEventListener('pointerup', onPointerUp)
-  resizeObserver = new ResizeObserver(() => {
-    if (pdfDoc && isReady.value) scheduleRender()
+  resizeObserver = new ResizeObserver((entries) => {
+    if (!pdfDoc || !isReady.value || isPinching) return
+    const nextWidth = entries[0]?.contentRect.width ?? el.clientWidth
+    if (Math.abs(nextWidth - lastRenderWidth) < WIDTH_EPS) return
+    scheduleRender(120)
   })
   resizeObserver.observe(el)
 })
@@ -348,6 +372,8 @@ onBeforeUnmount(() => {
 .pdf-viewport__scroller {
   min-height: 0;
   overflow: auto;
+  /* Keep width stable when scrollbar appears — avoids ResizeObserver re-render loop. */
+  scrollbar-gutter: stable;
   overscroll-behavior: contain;
   touch-action: pan-x pan-y;
   -webkit-overflow-scrolling: touch;
