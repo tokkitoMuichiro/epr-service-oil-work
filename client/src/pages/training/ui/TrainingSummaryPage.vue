@@ -268,17 +268,16 @@ function onAssigned() {
 }
 
 .summary-rows {
-  --ui-rows-columns: minmax(6rem, 1.4fr) minmax(5rem, 1.1fr) minmax(5rem, 8rem) minmax(6rem, 10rem);
+  --ui-rows-columns: minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(0, 8rem) minmax(0, 10rem);
 }
 
 .summary-rows--assign {
-  --ui-rows-columns: var(--tap-size) minmax(6rem, 1.4fr) minmax(5rem, 1.1fr) minmax(5rem, 8rem) minmax(6rem, 10rem)
-    minmax(5.5rem, 7rem);
+  --ui-rows-columns: var(--tap-size) minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(0, 8rem) minmax(0, 10rem)
+    var(--ui-rows-actions);
 }
 
 .cell--due {
-  min-width: 6rem;
-  max-width: 11rem;
+  min-width: 0;
 }
 
 .due__short {

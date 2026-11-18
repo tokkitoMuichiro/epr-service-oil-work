@@ -293,11 +293,11 @@ async function remove(w: Warehouse) {
 }
 
 .rows {
-  --name-col: minmax(5rem, 1.5fr);
-  --address-col: minmax(4rem, 1.2fr);
-  --keepers-col: minmax(4rem, 1fr);
-  --total-col: minmax(3.5rem, 5.5rem);
-  --actions-col: calc(var(--control-height-sm) * 2 + 4px);
+  --name-col: minmax(0, 1.5fr);
+  --address-col: minmax(0, 1.2fr);
+  --keepers-col: minmax(0, 1fr);
+  --total-col: minmax(0, 5.5rem);
+  --actions-col: var(--ui-rows-actions);
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
@@ -335,6 +335,8 @@ async function remove(w: Warehouse) {
 
 .rows__head {
   flex: 0 0 auto;
+  overflow: auto;
+  scrollbar-gutter: stable;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--table-head-bg);
   color: var(--text-secondary);
@@ -346,6 +348,7 @@ async function remove(w: Warehouse) {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+  scrollbar-gutter: stable;
 }
 
 .rows__list {
@@ -405,8 +408,10 @@ async function remove(w: Warehouse) {
 
 .cell--actions {
   justify-content: flex-end;
+  box-sizing: border-box;
   gap: 2px;
-  min-width: 0;
+  min-width: var(--actions-col);
+  width: var(--actions-col);
   max-width: var(--actions-col);
 }
 
