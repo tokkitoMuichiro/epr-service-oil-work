@@ -69,7 +69,7 @@ onMounted(load)
     <template v-else>
       <div
         class="ui-rows users__rows"
-        style="--ui-rows-columns: minmax(6rem, 1.4fr) minmax(4.5rem, 1fr) minmax(4.5rem, 0.8fr) minmax(5rem, 7rem) minmax(5rem, 6.5rem) minmax(5.5rem, 7rem)"
+        style="--ui-rows-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 7rem) minmax(0, 6.5rem) var(--ui-rows-actions)"
       >
         <div class="ui-rows__head">
           <span class="ui-rows__cell ui-rows__cell--name">Пользователь</span>
@@ -177,13 +177,11 @@ onMounted(load)
 }
 
 .cell--created {
-  min-width: 5rem;
-  max-width: 7rem;
+  min-width: 0;
 }
 
 .cell--role {
-  min-width: 4.5rem;
-  max-width: 8rem;
+  min-width: 0;
 }
 
 .is-inactive {
@@ -205,7 +203,7 @@ onMounted(load)
   }
 
   .users .ui-rows {
-    --ui-rows-columns: minmax(4.5rem, 1.3fr) minmax(3.25rem, 1fr) minmax(3.25rem, 0.8fr) minmax(4.5rem, 6.5rem) minmax(5.5rem, 7rem);
+    --ui-rows-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 6.5rem) var(--ui-rows-actions);
   }
 
   .cell--created {

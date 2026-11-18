@@ -505,12 +505,12 @@ function onTransferred() {
 
 .rows {
   --check-col: var(--tap-size);
-  --name-col: minmax(6rem, 2.2fr);
-  --id-col: minmax(3.5rem, 0.9fr);
+  --name-col: minmax(0, 2.2fr);
+  --id-col: minmax(0, 0.9fr);
   --condition-col: 3.25rem;
   --docs-col: 3.25rem;
-  --owner-col: minmax(4rem, 1.05fr);
-  --actions-col: 6.25rem;
+  --owner-col: minmax(0, 1.05fr);
+  --actions-col: var(--ui-rows-actions);
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
@@ -562,6 +562,8 @@ function onTransferred() {
   flex: 0 0 auto;
   min-height: var(--control-height-sm);
   max-height: var(--control-height-sm);
+  overflow: auto;
+  scrollbar-gutter: stable;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--table-head-bg);
   color: var(--text-secondary);
@@ -573,6 +575,7 @@ function onTransferred() {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+  scrollbar-gutter: stable;
 }
 
 .rows__list {
@@ -617,14 +620,14 @@ function onTransferred() {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  min-width: 3.5rem;
+  min-width: 0;
   max-width: 100%;
   max-height: 100%;
   overflow: hidden;
 }
 
 .cell--name {
-  min-width: 6rem;
+  min-width: 0;
   max-width: 100%;
 }
 
@@ -633,20 +636,17 @@ function onTransferred() {
 }
 
 .cell--id {
-  min-width: 3.5rem;
-  max-width: 8rem;
+  min-width: 0;
 }
 
 .cell--condition,
 .cell--docs {
   justify-content: center;
-  min-width: 2.75rem;
-  max-width: 3.25rem;
+  min-width: 0;
 }
 
 .cell--owner {
-  min-width: 4rem;
-  max-width: 10rem;
+  min-width: 0;
 }
 
 .cell--check {
@@ -657,7 +657,9 @@ function onTransferred() {
 
 .cell--actions {
   justify-content: flex-end;
-  min-width: 5.5rem;
+  box-sizing: border-box;
+  min-width: var(--actions-col);
+  width: var(--actions-col);
   max-width: var(--actions-col);
 }
 
@@ -801,7 +803,7 @@ function onTransferred() {
   .rows {
     --condition-col: 1.5rem;
     --docs-col: 1.5rem;
-    --owner-col: minmax(3rem, 1.05fr);
+    --owner-col: minmax(0, 1.05fr);
     --actions-col: 5.75rem;
     border: 0;
     background: none;
@@ -909,6 +911,7 @@ function onTransferred() {
     grid-area: action;
     align-self: stretch;
     align-items: center;
+    width: auto;
     min-width: 0;
     max-width: none;
   }

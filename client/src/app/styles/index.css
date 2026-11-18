@@ -183,6 +183,7 @@
   --control-height: 44px;
   --control-height-sm: 40px;
   --tap-size: 44px;
+  --ui-rows-actions: 5.5rem;
   --header-height: 56px;
   --shell-sidebar: 264px;
   --shell-rail: 72px;
@@ -733,10 +734,13 @@ textarea::placeholder {
 /*
  * Единый списочный формат (оборудование, персонал, обучение…):
  * одна строка `--control-height`, ячейки с min/max шириной, без таблицы.
- * Колонки задаются `--ui-rows-columns`.
+ * Колонки задаются `--ui-rows-columns` (один трек у head и item на desktop).
+ * fr-треки — только `minmax(0, Nfr)`: иначе intrinsic min контента
+ * (аватар+ФИО vs короткий заголовок) разъезжает колонки между отдельными grid head/item.
+ * Колонка действий — `--ui-rows-actions` (не auto/max-content на desktop).
  */
 .ui-rows {
-  --ui-rows-columns: minmax(6rem, 1fr);
+  --ui-rows-columns: minmax(0, 1fr);
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
@@ -766,11 +770,14 @@ textarea::placeholder {
   overflow: hidden;
 }
 
-/* Header lives outside the scrollport — not sticky. */
+/* Header lives outside the scrollport — not sticky.
+ * overflow + scrollbar-gutter mirror .ui-rows__body so fr-tracks share width. */
 .ui-rows__head {
   flex: 0 0 auto;
   min-height: var(--control-height-sm);
   max-height: var(--control-height);
+  overflow: auto;
+  scrollbar-gutter: stable;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--table-head-bg);
   color: var(--text-secondary);
@@ -784,6 +791,7 @@ textarea::placeholder {
   min-height: 0;
   overflow: auto;
   overflow-x: clip;
+  scrollbar-gutter: stable;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: none;
 }
@@ -815,14 +823,14 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  min-width: 3.5rem;
+  min-width: 0;
   max-width: 100%;
   max-height: 100%;
   overflow: hidden;
 }
 
 .ui-rows__cell--name {
-  min-width: 6rem;
+  min-width: 0;
 }
 
 .ui-rows__cell--check {
@@ -833,7 +841,10 @@ textarea::placeholder {
 
 .ui-rows__cell--actions {
   justify-content: flex-end;
-  min-width: 5.5rem;
+  box-sizing: border-box;
+  min-width: var(--ui-rows-actions);
+  width: var(--ui-rows-actions);
+  max-width: var(--ui-rows-actions);
 }
 
 .ui-rows__head .ui-rows__cell {
@@ -944,11 +955,11 @@ textarea::placeholder {
   }
 
   .ui-rows__cell {
-    min-width: 3rem;
+    min-width: 0;
   }
 
   .ui-rows__cell--name {
-    min-width: 4.5rem;
+    min-width: 0;
   }
 }
 

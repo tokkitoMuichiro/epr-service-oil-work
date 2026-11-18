@@ -356,7 +356,7 @@ function archiveProgram(program: TrainingProgram) {
 }
 
 .direction-rows {
-  --ui-rows-columns: minmax(6rem, 1.6fr) minmax(4.5rem, 8rem) 6.5rem;
+  --ui-rows-columns: minmax(0, 1.6fr) minmax(0, 8rem) var(--ui-rows-actions);
   flex: 0 0 auto;
   border: 1px solid var(--border-subtle);
 }
@@ -369,8 +369,7 @@ function archiveProgram(program: TrainingProgram) {
 }
 
 .cell--period {
-  min-width: 4.5rem;
-  max-width: 8rem;
+  min-width: 0;
 }
 
 .cell--sub {

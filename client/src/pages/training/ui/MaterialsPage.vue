@@ -365,7 +365,7 @@ async function openMaterial(material: TrainingMaterial) {
 }
 
 .materials-rows {
-  --ui-rows-columns: minmax(8rem, 1.6fr) minmax(6rem, 1.1fr) auto;
+  --ui-rows-columns: minmax(0, 1.6fr) minmax(0, 1.1fr) var(--ui-rows-actions);
 }
 
 .materials-rows .ui-rows__head {

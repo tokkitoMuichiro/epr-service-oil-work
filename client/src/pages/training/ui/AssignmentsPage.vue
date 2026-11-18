@@ -324,7 +324,7 @@ function onAssigned() {
 
 .assignments-rows,
 .assignments-rows--manage {
-  --ui-rows-columns: minmax(6rem, 1.1fr) minmax(8rem, 1.8fr) minmax(5.5rem, 9rem);
+  --ui-rows-columns: minmax(0, 1.1fr) minmax(0, 1.8fr) minmax(0, 9rem);
 }
 
 .assignments-rows .ui-rows__head,
@@ -420,6 +420,8 @@ function onAssigned() {
 .assignments__actions {
   flex-wrap: nowrap;
   justify-content: flex-end;
+  box-sizing: border-box;
+  width: auto;
   min-width: 0;
   max-width: none;
   gap: var(--space-1);

@@ -192,12 +192,12 @@ function nameTip(t: { equipmentName: string; factoryNumber?: string | null }) {
 
 .history-rows {
   --ui-rows-columns:
-    minmax(6.25rem, 8rem)
-    minmax(5rem, 1.5fr)
-    minmax(4rem, 1fr)
-    minmax(4rem, 1fr)
-    minmax(3rem, 3.5rem)
-    minmax(4rem, 0.9fr)
+    minmax(0, 8rem)
+    minmax(0, 1.5fr)
+    minmax(0, 1fr)
+    minmax(0, 1fr)
+    minmax(0, 3.5rem)
+    minmax(0, 0.9fr)
     8rem;
   font-size: var(--font-size-xs);
 }

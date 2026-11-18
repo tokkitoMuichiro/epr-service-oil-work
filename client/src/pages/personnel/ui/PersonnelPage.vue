@@ -449,34 +449,30 @@ function openCreateBrigade() {
 }
 
 .workers-rows {
-  --ui-rows-columns: minmax(6rem, 1.4fr) minmax(4.5rem, 1fr) minmax(4.5rem, 1fr) minmax(5.5rem, 8rem) minmax(5rem, 8rem)
-    minmax(5rem, 7rem);
+  --ui-rows-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 8rem) minmax(0, 8rem) minmax(0, 7rem);
 }
 
 .workers-rows--testing {
-  --ui-rows-columns: minmax(6rem, 1.4fr) minmax(4.5rem, 1fr) minmax(4.5rem, 1fr) minmax(5.5rem, 8rem) minmax(5rem, 8rem)
-    minmax(5rem, 7rem) minmax(3.5rem, 5rem);
+  --ui-rows-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 8rem) minmax(0, 8rem) minmax(0, 7rem)
+    minmax(0, 5rem);
 }
 
 .brigades-rows {
-  --ui-rows-columns: minmax(6rem, 1.6fr) minmax(5rem, 8rem) minmax(4rem, 6rem) minmax(5rem, 1.1fr);
+  --ui-rows-columns: minmax(0, 1.6fr) minmax(0, 8rem) minmax(0, 6rem) minmax(0, 1.1fr);
 }
 
 .cell--phone,
 .cell--employment {
-  min-width: 5rem;
-  max-width: 8rem;
+  min-width: 0;
 }
 
 .cell--testing {
   justify-content: center;
-  min-width: 3.5rem;
-  max-width: 5rem;
+  min-width: 0;
 }
 
 .cell--size {
-  min-width: 4rem;
-  max-width: 6rem;
+  min-width: 0;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }

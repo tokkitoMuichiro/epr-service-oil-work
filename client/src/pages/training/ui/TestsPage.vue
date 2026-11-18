@@ -239,7 +239,7 @@ function openTest(id: string) {
 }
 
 .tests-rows {
-  --ui-rows-columns: minmax(6rem, 1.6fr) minmax(5rem, 1fr) minmax(5rem, 8rem) minmax(4rem, 6rem);
+  --ui-rows-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 8rem) minmax(0, 6rem);
 }
 
 .tests-rows .ui-rows__item {
@@ -261,8 +261,7 @@ function openTest(id: string) {
 }
 
 .cell--questions {
-  min-width: 4rem;
-  max-width: 6rem;
+  min-width: 0;
   font-variant-numeric: tabular-nums;
 }
 
