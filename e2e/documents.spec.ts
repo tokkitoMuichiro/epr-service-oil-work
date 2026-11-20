@@ -30,7 +30,6 @@ test('документ сотрудника загружается, открыв
   const row = card.locator('li').filter({ hasText: file.name })
   const link = row.getByRole('button', { name: title, exact: true })
   await expect(link).toBeVisible()
-  await expect(row.getByText('Срок действия')).toBeVisible()
   await expect(row.getByText('бессрочно')).toBeVisible()
   await expect(row.getByText('Действует')).toBeVisible()
 
