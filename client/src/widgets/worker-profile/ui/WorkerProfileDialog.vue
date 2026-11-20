@@ -15,7 +15,6 @@ import {
   admissionGroupValue,
   formatRuPhone,
   personnelApi,
-  qualificationLabel,
   qualificationType,
   trainingDocState,
   usePersonnelStore,
@@ -48,6 +47,12 @@ interface DocumentEditForm {
   group: string
   voltage: string
   expiresAt: string
+}
+
+interface DocumentSection {
+  id: QualificationTypeId | 'other'
+  title: string
+  docs: WorkerDocument[]
 }
 
 interface ProfileTab {
@@ -129,7 +134,6 @@ const brigadeRole = computed(() => {
 const photoUrl = computed(() => (worker.value ? personnelApi.photoUrl(worker.value) : null))
 
 function documentMeta(doc: {
-  qualificationTypeId?: string
   number?: string
   group?: string
   voltage?: string
@@ -137,7 +141,6 @@ function documentMeta(doc: {
   issuer?: string
 }) {
   return [
-    qualificationLabel(doc.qualificationTypeId),
     doc.number ? `№ ${doc.number}` : '',
     doc.group ? `группа ${doc.group}` : '',
     doc.voltage && doc.voltage in VOLTAGE_LABEL ? VOLTAGE_LABEL[doc.voltage as keyof typeof VOLTAGE_LABEL] : '',
@@ -147,6 +150,35 @@ function documentMeta(doc: {
     .filter(Boolean)
     .join(' · ')
 }
+
+function documentFileMeta(doc: WorkerDocument) {
+  return [
+    doc.fileName,
+    doc.size ? formatFileSize(doc.size) : '',
+    `загружен ${formatDateRu(doc.uploadedAt.slice(0, 10))}`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+const knownQualificationIds = new Set(QUALIFICATION_TYPES.map((t) => t.id))
+
+const documentSections = computed<DocumentSection[]>(() => {
+  const docs = worker.value?.documents ?? []
+  const sections: DocumentSection[] = QUALIFICATION_TYPES.map((t) => ({
+    id: t.id,
+    title: t.name,
+    docs: docs.filter((d) => d.qualificationTypeId === t.id),
+  })).filter((s) => s.docs.length > 0)
+
+  const other = docs.filter(
+    (d) => !d.qualificationTypeId || !knownQualificationIds.has(d.qualificationTypeId as QualificationTypeId),
+  )
+  if (other.length) {
+    sections.push({ id: 'other', title: OTHER_QUALIFICATION_LABEL, docs: other })
+  }
+  return sections
+})
 
 function docHasGroup() {
   return Boolean(qualificationType(docForm.typeId || undefined)?.hasGroup)
@@ -544,123 +576,133 @@ useEscape(
             <h3>Документы <span class="muted">· {{ worker.documents.length }}</span></h3>
             <p v-if="actionError" class="error" role="alert">{{ actionError }}</p>
             <p v-if="!worker.documents.length" class="muted">Документы ещё не загружены.</p>
-            <ul v-else class="docs__list">
-              <li v-for="doc in worker.documents" :key="doc.id" class="doc" :class="{ 'doc--editing': editingDocId === doc.id }">
-                <svg class="doc__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                  <path
-                    d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5zm0 0v5h5"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.6"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-                <div v-if="editingDocId === doc.id" class="doc__main">
-                  <div class="doc__fields">
-                    <label class="doc__wide">
-                      <span>Вид документа</span>
-                      <select v-model="docForm.typeId" class="ui-control" @change="onDocTypeChange">
-                        <option value="">{{ OTHER_QUALIFICATION_LABEL }}</option>
-                        <option v-for="t in QUALIFICATION_TYPES" :key="t.id" :value="t.id">{{ t.name }}</option>
-                      </select>
-                    </label>
-                    <label class="doc__wide">
-                      <span>Название</span>
-                      <textarea v-model="docForm.title" class="ui-control doc__title" rows="2" />
-                    </label>
-                    <template v-if="docForm.typeId">
-                      <label>
-                        <span>Номер</span>
-                        <input v-model="docForm.number" class="ui-control" size="1" />
-                      </label>
-                      <label v-if="docHasGroup()">
-                        <span>Группа</span>
-                        <select v-model="docForm.group" class="ui-control">
-                          <option value="">Не указана</option>
-                          <option v-for="g in docGroupOptions()" :key="g" :value="g">{{ g }}</option>
-                        </select>
-                      </label>
-                      <label v-if="docIsElectrical()">
-                        <span>Напряжение</span>
-                        <select v-model="docForm.voltage" class="ui-control">
-                          <option value="">Не указано</option>
-                          <option v-for="(label, key) in VOLTAGE_LABEL" :key="key" :value="key">{{ label }}</option>
-                        </select>
-                      </label>
-                      <label>
-                        <span>Дата выдачи</span>
-                        <input v-model="docForm.issuedAt" class="ui-control" type="date" />
-                      </label>
-                      <label>
-                        <span>Действует до</span>
-                        <input v-model="docForm.expiresAt" class="ui-control" type="date" />
-                      </label>
-                      <label class="doc__wide">
-                        <span>Кем выдан</span>
-                        <input v-model="docForm.issuer" class="ui-control" size="1" />
-                      </label>
-                    </template>
-                    <label v-else>
-                      <span>Действует до</span>
-                      <input v-model="docForm.expiresAt" class="ui-control" type="date" />
-                    </label>
-                  </div>
-                  <small class="doc__note">Если дата окончания не указана — документ действует бессрочно.</small>
-                  <p v-if="docEditError" class="error" role="alert">{{ docEditError }}</p>
-                  <div class="doc__edit-actions">
-                    <UiButton type="button" variant="ghost" :disabled="busy" @click="cancelDocEdit">Отмена</UiButton>
-                    <UiButton type="button" variant="primary" :disabled="busy" @click="saveDocument">
-                      {{ busy ? 'Сохранение…' : 'Сохранить' }}
-                    </UiButton>
-                  </div>
-                </div>
-                <div v-else class="doc__main">
-                  <button
-                    type="button"
-                    class="doc__link"
-                    :title="`Открыть ${doc.fileName}`"
-                    :disabled="busy"
-                    @click="openDocument(doc)"
+            <div v-else class="docs__groups">
+              <section v-for="group in documentSections" :key="group.id" class="docs-group">
+                <h4 class="docs-group__head">
+                  {{ group.title }} <span class="muted">· {{ group.docs.length }}</span>
+                </h4>
+                <ul class="docs-group__list">
+                  <li
+                    v-for="doc in group.docs"
+                    :key="doc.id"
+                    class="doc"
+                    :class="{ 'doc--editing': editingDocId === doc.id }"
                   >
-                    {{ doc.title }}
-                  </button>
-                  <span class="doc__meta">{{ documentMeta(doc) }}</span>
-                  <span class="doc__meta">
-                    {{ doc.fileName }}<template v-if="doc.size"> · {{ formatFileSize(doc.size) }}</template>
-                    · загружен {{ formatDateRu(doc.uploadedAt.slice(0, 10)) }}
-                  </span>
-                  <div class="doc__validity" :data-state="documentState(doc.expiresAt)">
-                    <p class="doc__until">
-                      <span class="doc__until-label">Срок действия</span>
-                      <span class="doc__until-value">{{ documentExpiryText(doc.expiresAt) }}</span>
-                    </p>
-                    <TrainingStateBadge :state="documentState(doc.expiresAt)" />
-                  </div>
-                </div>
-                <div v-if="canEdit && editingDocId !== doc.id" class="doc__actions">
-                  <button
-                    type="button"
-                    class="doc__action"
-                    :aria-label="`Редактировать ${doc.title}`"
-                    title="Редактировать"
-                    :disabled="busy"
-                    @click="startDocEdit(doc)"
-                  >
-                    <IconPencil :size="18" />
-                  </button>
-                  <button
-                    type="button"
-                    class="doc__action"
-                    :aria-label="`Удалить ${doc.title}`"
-                    title="Удалить документ"
-                    :disabled="busy"
-                    @click="removeDocument(doc.id, doc.title)"
-                  >
-                    <IconClose :size="18" />
-                  </button>
-                </div>
-              </li>
-            </ul>
+                    <svg class="doc__icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                      <path
+                        d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5zm0 0v5h5"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.6"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                    <div v-if="editingDocId === doc.id" class="doc__main">
+                      <div class="doc__fields">
+                        <label class="doc__wide">
+                          <span>Вид документа</span>
+                          <select v-model="docForm.typeId" class="ui-control" @change="onDocTypeChange">
+                            <option value="">{{ OTHER_QUALIFICATION_LABEL }}</option>
+                            <option v-for="t in QUALIFICATION_TYPES" :key="t.id" :value="t.id">{{ t.name }}</option>
+                          </select>
+                        </label>
+                        <label class="doc__wide">
+                          <span>Название</span>
+                          <textarea v-model="docForm.title" class="ui-control doc__title" rows="2" />
+                        </label>
+                        <template v-if="docForm.typeId">
+                          <label>
+                            <span>Номер</span>
+                            <input v-model="docForm.number" class="ui-control" size="1" />
+                          </label>
+                          <label v-if="docHasGroup()">
+                            <span>Группа</span>
+                            <select v-model="docForm.group" class="ui-control">
+                              <option value="">Не указана</option>
+                              <option v-for="g in docGroupOptions()" :key="g" :value="g">{{ g }}</option>
+                            </select>
+                          </label>
+                          <label v-if="docIsElectrical()">
+                            <span>Напряжение</span>
+                            <select v-model="docForm.voltage" class="ui-control">
+                              <option value="">Не указано</option>
+                              <option v-for="(label, key) in VOLTAGE_LABEL" :key="key" :value="key">{{ label }}</option>
+                            </select>
+                          </label>
+                          <label>
+                            <span>Дата выдачи</span>
+                            <input v-model="docForm.issuedAt" class="ui-control" type="date" />
+                          </label>
+                          <label>
+                            <span>Действует до</span>
+                            <input v-model="docForm.expiresAt" class="ui-control" type="date" />
+                          </label>
+                          <label class="doc__wide">
+                            <span>Кем выдан</span>
+                            <input v-model="docForm.issuer" class="ui-control" size="1" />
+                          </label>
+                        </template>
+                        <label v-else>
+                          <span>Действует до</span>
+                          <input v-model="docForm.expiresAt" class="ui-control" type="date" />
+                        </label>
+                      </div>
+                      <small class="doc__note">Если дата окончания не указана — документ действует бессрочно.</small>
+                      <p v-if="docEditError" class="error" role="alert">{{ docEditError }}</p>
+                      <div class="doc__edit-actions">
+                        <UiButton type="button" variant="ghost" :disabled="busy" @click="cancelDocEdit">Отмена</UiButton>
+                        <UiButton type="button" variant="primary" :disabled="busy" @click="saveDocument">
+                          {{ busy ? 'Сохранение…' : 'Сохранить' }}
+                        </UiButton>
+                      </div>
+                    </div>
+                    <div v-else class="doc__main">
+                      <div class="doc__primary">
+                        <button
+                          type="button"
+                          class="doc__link"
+                          :title="doc.title"
+                          :disabled="busy"
+                          @click="openDocument(doc)"
+                        >
+                          {{ doc.title }}
+                        </button>
+                        <div class="doc__status">
+                          <span class="doc__expiry" :data-state="documentState(doc.expiresAt)">
+                            {{ documentExpiryText(doc.expiresAt) }}
+                          </span>
+                          <TrainingStateBadge :state="documentState(doc.expiresAt)" />
+                        </div>
+                      </div>
+                      <span v-if="documentMeta(doc)" class="doc__meta">{{ documentMeta(doc) }}</span>
+                      <span class="doc__meta doc__meta--file">{{ documentFileMeta(doc) }}</span>
+                    </div>
+                    <div v-if="canEdit && editingDocId !== doc.id" class="doc__actions">
+                      <button
+                        type="button"
+                        class="doc__action"
+                        :aria-label="`Редактировать ${doc.title}`"
+                        title="Редактировать"
+                        :disabled="busy"
+                        @click="startDocEdit(doc)"
+                      >
+                        <IconPencil :size="18" />
+                      </button>
+                      <button
+                        type="button"
+                        class="doc__action"
+                        :aria-label="`Удалить ${doc.title}`"
+                        title="Удалить документ"
+                        :disabled="busy"
+                        @click="removeDocument(doc.id, doc.title)"
+                      >
+                        <IconClose :size="18" />
+                      </button>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+            </div>
 
             <DocumentDropzone v-if="canEdit" ref="dropzone" :busy="busy" @upload="upload" />
           </section>
@@ -989,7 +1031,28 @@ useEscape(
   color: var(--text-secondary);
 }
 
-.docs__list {
+.docs__groups {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.docs-group {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.docs-group__head {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.docs-group__list {
   display: grid;
   gap: var(--space-2);
   margin: 0;
@@ -1001,10 +1064,14 @@ useEscape(
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  min-height: 56px;
-  padding: var(--space-3) var(--space-1) var(--space-3) var(--space-3);
+  min-height: var(--control-height);
+  padding: var(--space-2) var(--space-1) var(--space-2) var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
+}
+
+.doc--editing {
+  align-items: stretch;
 }
 
 .doc__icon {
@@ -1020,7 +1087,16 @@ useEscape(
   gap: var(--space-1);
 }
 
+.doc__primary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+}
+
 .doc__link {
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 0;
   border: 0;
   background: none;
@@ -1031,8 +1107,34 @@ useEscape(
   line-height: var(--line-height-tight);
   text-align: left;
   text-decoration: none;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+.doc__status {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.doc__expiry {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.doc__expiry[data-state='expiring'] {
+  color: var(--status-warn-fg);
+}
+
+.doc__expiry[data-state='expired'] {
+  color: var(--status-bad-fg);
 }
 
 .doc__meta {
@@ -1041,59 +1143,6 @@ useEscape(
   line-height: var(--line-height-tight);
   overflow-wrap: anywhere;
   font-variant-numeric: tabular-nums;
-}
-
-.doc__validity {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-  margin-top: var(--space-1);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius);
-  background: var(--surface-sunken);
-  box-shadow: inset 3px 0 0 var(--status-ok-solid);
-}
-
-.doc__validity[data-state='expiring'] {
-  box-shadow: inset 3px 0 0 var(--status-warn-solid);
-}
-
-.doc__validity[data-state='expired'] {
-  box-shadow: inset 3px 0 0 var(--status-bad-solid);
-}
-
-.doc__until {
-  display: grid;
-  gap: var(--space-1);
-  margin: 0;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.doc__until-label {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.doc__until-value {
-  color: var(--status-ok-fg);
-  font-size: var(--font-size-sm);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.doc__validity[data-state='expiring'] .doc__until-value {
-  color: var(--status-warn-fg);
-}
-
-.doc__validity[data-state='expired'] .doc__until-value {
-  color: var(--status-bad-fg);
-}
-
-.doc__validity :deep(.ui-badge) {
-  flex: none;
 }
 
 .doc__actions {
@@ -1195,6 +1244,10 @@ useEscape(
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .doc__meta--file {
+    display: none;
+  }
+
   .overlay {
     overflow: hidden;
   }
@@ -1269,6 +1322,27 @@ useEscape(
 @media (max-width: 860px) {
   .profile__tabs > button {
     min-height: var(--tap-size);
+  }
+
+  .doc__primary {
+    flex-wrap: wrap;
+  }
+
+  .doc__link {
+    flex: 1 1 calc(100% - var(--space-3));
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-overflow: unset;
+  }
+
+  .doc__status {
+    flex: 1 1 100%;
+  }
+
+  .doc__meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 </style>
